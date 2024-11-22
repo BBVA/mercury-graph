@@ -1,6 +1,6 @@
 # mercury-graph
 
-**`mercury-graph`** is a Python library that offers **graph analytics capabilities with a technology-agnostic API**, allowing users to use a curated range of performant and scalable algorithms and utilities regardless of the technologies employed (pure Python, [Numba](https://numba.pydata.org/)-compiled, [**networkx**](https://networkx.org/), distributed Spark [**graphframes**](https://graphframes.github.io/graphframes/docs/_site/index.html), etc.).
+**`mercury-graph`** is a Python library that offers **graph analytics capabilities with a technology-agnostic API**, enabling users to apply a curated range of performant and scalable algorithms and utilities regardless of the underlying data framework. The consistent, scikit-like interface abstracts away the complexities of internal transformations, allowing users to effortlessly switch between different graph representations to leverage optimized algorithms implemented using pure Python, [**numba**](https://numba.pydata.org/), [**networkx**](https://networkx.org/) and PySpark [**GraphFrames**](https://graphframes.github.io/graphframes/docs/_site/index.html).
 
 Currently implemented **submodules** in `mercury.graph` include:
 
@@ -12,22 +12,6 @@ Currently implemented **submodules** in `mercury.graph` include:
 
 - [**`mercury.graph.viz`**](reference/viz.md), with capabilities for graph visualization.
 
-
-## Python installation
-
-The easiest way to install `mercury-graph` is using `pip`:
-
-```bash
-    pip install mercury-graph
-```
-
 ### Repository
 
 The website for the GitHub repository can be found [here](https://github.com/BBVA/mercury-graph).
-
-## Help and support
-
-It is a part of [**`mercury`**](https://www.bbvaaifactory.com/mercury/), a collaborative library developed by the **Advanced Analytics community at BBVA** that offers a broad range of tools to simplify and accelerate data science workflows. This library was originally an Inner Source project, but some components, like `mercury.graph`, have been released as Open Source.
-
-  * [Mercury team](mailto:mercury.group@bbva.com?subject=[mercury-graph])
-  * [Issues](https://github.com/BBVA/mercury-graph/issues)
