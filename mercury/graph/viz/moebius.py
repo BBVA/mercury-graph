@@ -14,6 +14,9 @@ class Moebius:
     """
     Moebius class for visualizing graphs using JavaScript and HTML.
 
+    Note:
+        Moebius is currently only compatible with Google Colab and Jupyter Notebooks Classic (prior to v7).
+
     Usage:
         ```python
         from mercury.graph.viz import Moebius
@@ -41,6 +44,17 @@ class Moebius:
         self.front_pat = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/frontend'
         self._int_id_map = {node['id'] : i for i, node in enumerate(self.G.nodes)}
 
+        # Define callback for JS interactions within Google Colab
+        if importlib.util.find_spec('google') is not None and importlib.util.find_spec('google.colab') is not None:
+            from google.colab import output
+            from IPython import get_ipython
+
+            def colab_execute_python(code):
+                # Use get_ipython() to access the Moebius object defined by the user in a Colab cell
+                get_ipython().run_cell(f"_temp_colab_execute_python_result = {code}")
+                return get_ipython().user_ns["_temp_colab_execute_python_result"]
+
+            output.register_callback("notebook.colab_execute_python", colab_execute_python)
 
     def __str__(self):
         """
@@ -203,6 +217,7 @@ class Moebius:
         Load the Moebius javascript library and call the function to draw the graph
         """
 
+        display(HTML('<script src="https://requirejs.org/docs/release/2.3.7/minified/require.js"></script>'))
         self.JS('require.config({paths: {d3: \'https://d3js.org/d3.v4.min\'}});')
         self.FJS(self.front_pat + '/moebius.js')
         self.FHT(self.front_pat + '/moebius.svg.html')

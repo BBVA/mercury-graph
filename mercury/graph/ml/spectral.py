@@ -13,6 +13,8 @@ class SpectralClustering(BaseClass):
     """
     Implementation of the spectral clustering algorithm which detect communities inside a graph.
 
+    Contributed by Gibran Gabriel Otazo Sanchez.
+
     Args:
         n_clusters (int): The number of clusters that you want to detect.
         random_state (int): Seed for reproducibility
