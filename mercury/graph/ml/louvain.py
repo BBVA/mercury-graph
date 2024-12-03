@@ -25,7 +25,10 @@ class LouvainCommunities(BaseClass):
     all nodes are reassigned at the same time and conflicts (i.e., 1 -> C2 and
     2 -> C1) are resolved with a simple tie-breaking rule. This version also
     introduces the resolution parameter _gamma_, as in [^2].
-    
+
+    Contributed by Arturo Soberon Cedillo, Jose Antonio Guzman Vazquez and 
+    Isaac Dodanim Hernandez Garcia.
+
     [^1]: 
         Blondel V D, Guillaume J-L, Lambiotte R and Lefebvre E (2008). Fast
         unfolding of communities in large networks. Journal of Statistical

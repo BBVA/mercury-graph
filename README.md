@@ -13,11 +13,18 @@
 
 **`mercury-graph`** is a Python library that offers **graph analytics capabilities with a technology-agnostic API**, enabling users to apply a curated range of performant and scalable algorithms and utilities regardless of the underlying data framework. The consistent, scikit-like interface abstracts away the complexities of internal transformations, allowing users to effortlessly switch between different graph representations to leverage optimized algorithms implemented using pure Python, [**numba**](https://numba.pydata.org/), [**networkx**](https://networkx.org/) and PySpark [**GraphFrames**](https://graphframes.github.io/graphframes/docs/_site/index.html).
 
+![mercury-graph cheatsheet](docs/images/mercury_graph.png)
+
 
 ## Try it without installation in Google Colab
 
-<!-- * mercury.graph methods using the [FIFA dataset](https://www.kaggle.com/datasets/artimous/complete-fifa-2017-player-dataset-global) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://www.google.com) -->
-<!-- * mercury.graph methods using the [BankSim dataset](https://www.researchgate.net/publication/265736405_BankSim_A_Bank_Payment_Simulation_for_Fraud_Detection_Research) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://www.google.com) -->
+* mercury.graph methods using the [FIFA dataset](https://www.kaggle.com/datasets/artimous/complete-fifa-2017-player-dataset-global) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/BBVA/mercury-graph/blob/master/tutorials/mercury-graph-tutorial-fifa.ipynb)
+
+  * Version without Spark [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/BBVA/mercury-graph/blob/master/tutorials/mercury-graph-tutorial-fifa-nospark.ipynb)
+
+* mercury.graph methods using the [BankSim dataset](https://www.researchgate.net/publication/265736405_BankSim_A_Bank_Payment_Simulation_for_Fraud_Detection_Research) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/BBVA/mercury-graph/blob/master/tutorials/mercury-graph-tutorial-banksim.ipynb)
+
+  * Version without Spark [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/BBVA/mercury-graph/blob/master/tutorials/mercury-graph-tutorial-banksim-nospark.ipynb)
 
 
 ## Install
@@ -25,16 +32,6 @@
 ```bash
 pip install mercury-graph
 ```
-
-
-## Usage
-
-<!-- TODO: Write this! -->
-
-
-### Usage with Docker
-
-<!-- TODO: Write this! -->
 
 
 ## Documentation
@@ -70,7 +67,9 @@ After installation, the test suite can be launched with coverage statistics from
 
 ## Contributing
 
-<!-- TODO: Write this! -->
+If you can complete a new feature on your own (new feature, doc, tests, version bump, changelog), you can directly create a Pull request to the master branch. Of course, you will get help via the PR.
+
+An easier way to contribute is to create a new issue. If the idea is accepted, we will create a branch for you and start working on how to implement it.
 
 
 ## Help and support
