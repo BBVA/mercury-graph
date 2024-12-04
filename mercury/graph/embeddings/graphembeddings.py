@@ -69,6 +69,8 @@ class GraphEmbedding(BaseClass):
     """
     Create an embedding mapping the nodes of a graph.
 
+    Includes contributions by David Muelas Recuenco.
+
     Args:
         dimension (int): The number of columns in the embedding. See note the notes in `Embeddings` for details. (This parameter will be
             ignored when `load_file` is used.)
