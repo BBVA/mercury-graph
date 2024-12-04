@@ -1451,6 +1451,7 @@ much an embedding can learn can be estimated by measuring how row correlations a
 
 
         <p>Create an embedding mapping the nodes of a graph.</p>
+<p>Includes contributions by David Muelas Recuenco.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1576,9 +1577,7 @@ using GraphEmbedding.save().</p>
 
                   <details class="quote">
                     <summary>Source code in <code>mercury/graph/embeddings/graphembeddings.py</code></summary>
-                    <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
+                    <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 90</span>
 <span class="normal"> 91</span>
 <span class="normal"> 92</span>
 <span class="normal"> 93</span>
@@ -1600,7 +1599,9 @@ using GraphEmbedding.save().</p>
 <span class="normal">109</span>
 <span class="normal">110</span>
 <span class="normal">111</span>
-<span class="normal">112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">dimension</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">n_jumps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -1709,9 +1710,7 @@ using GraphEmbedding.save().</p>
 
             <details class="quote">
               <summary>Source code in <code>mercury/graph/embeddings/graphembeddings.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">116</span>
 <span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
@@ -1720,7 +1719,9 @@ using GraphEmbedding.save().</p>
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span>
-<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Method to access rows in the embedding by ID.</span>
 
@@ -1776,9 +1777,7 @@ using GraphEmbedding.save().</p>
 
             <details class="quote">
               <summary>Source code in <code>mercury/graph/embeddings/graphembeddings.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">205</span>
 <span class="normal">206</span>
 <span class="normal">207</span>
 <span class="normal">208</span>
@@ -1786,7 +1785,9 @@ using GraphEmbedding.save().</p>
 <span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
-<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">embedding</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">embedding</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the internal Embeddings object.</span>
 
@@ -1879,9 +1880,7 @@ Of course, it can be called many times on the same GraphEmbedding.</p>
 
             <details class="quote">
               <summary>Source code in <code>mercury/graph/embeddings/graphembeddings.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
@@ -1953,7 +1952,9 @@ Of course, it can be called many times on the same GraphEmbedding.</p>
 <span class="normal">198</span>
 <span class="normal">199</span>
 <span class="normal">200</span>
-<span class="normal">201</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">g</span><span class="p">:</span> <span class="n">Graph</span><span class="p">):</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">g</span><span class="p">:</span> <span class="n">Graph</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Train the embedding by doing random walks.</span>
 
@@ -2161,9 +2162,7 @@ Of course, it can be called many times on the same GraphEmbedding.</p>
 
             <details class="quote">
               <summary>Source code in <code>mercury/graph/embeddings/graphembeddings.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">217</span>
 <span class="normal">218</span>
 <span class="normal">219</span>
 <span class="normal">220</span>
@@ -2188,7 +2187,9 @@ Of course, it can be called many times on the same GraphEmbedding.</p>
 <span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
-<span class="normal">242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">get_most_similar_nodes</span><span class="p">(</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">get_most_similar_nodes</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">node_id</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s2">&quot;cosine&quot;</span><span class="p">,</span> <span class="n">return_as_indices</span><span class="o">=</span><span class="kc">False</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -2287,9 +2288,7 @@ controls if the embedding is saved or not (the default value).</p>
 
             <details class="quote">
               <summary>Source code in <code>mercury/graph/embeddings/graphembeddings.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">246</span>
 <span class="normal">247</span>
 <span class="normal">248</span>
 <span class="normal">249</span>
@@ -2316,7 +2315,9 @@ controls if the embedding is saved or not (the default value).</p>
 <span class="normal">270</span>
 <span class="normal">271</span>
 <span class="normal">272</span>
-<span class="normal">273</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file_name</span><span class="p">,</span> <span class="n">save_embedding</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file_name</span><span class="p">,</span> <span class="n">save_embedding</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Saves a GraphEmbedding to a compressed binary file with or without the embedding itself. It saves the graph&#39;s node names</span>
 <span class="sd">    and the adjacency matrix as a sparse matrix.</span>

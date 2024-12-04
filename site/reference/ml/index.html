@@ -774,6 +774,8 @@ nodes to new communities is calculated in parallel, not sequentially. That is,
 all nodes are reassigned at the same time and conflicts (i.e., 1 -&gt; C2 and
 2 -&gt; C1) are resolved with a simple tie-breaking rule. This version also
 introduces the resolution parameter <em>gamma</em>, as in <sup id="mercury.graph.ml.LouvainCommunities--fnref:2"><a class="footnote-ref" href="#mercury.graph.ml.LouvainCommunities--fn:2">2</a></sup>.</p>
+<p>Contributed by Arturo Soberon Cedillo, Jose Antonio Guzman Vazquez and 
+Isaac Dodanim Hernandez Garcia.</p>
 <div class="footnote">
 <hr />
 <ol>
@@ -916,10 +918,7 @@ execution. Defaults to True.</p>
 
                   <details class="quote">
                     <summary>Source code in <code>mercury/graph/ml/louvain.py</code></summary>
-                    <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
+                    <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">70</span>
 <span class="normal">71</span>
 <span class="normal">72</span>
 <span class="normal">73</span>
@@ -935,7 +934,10 @@ execution. Defaults to True.</p>
 <span class="normal">83</span>
 <span class="normal">84</span>
 <span class="normal">85</span>
-<span class="normal">86</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">min_modularity_gain</span><span class="o">=</span><span class="mf">1e-03</span><span class="p">,</span>
     <span class="n">max_pass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
@@ -1038,10 +1040,7 @@ execution. Defaults to True.</p>
 
             <details class="quote">
               <summary>Source code in <code>mercury/graph/ml/louvain.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
 <span class="normal">108</span>
@@ -1157,7 +1156,10 @@ execution. Defaults to True.</p>
 <span class="normal">218</span>
 <span class="normal">219</span>
 <span class="normal">220</span>
-<span class="normal">221</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">g</span><span class="p">:</span> <span class="n">Graph</span><span class="p">):</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">g</span><span class="p">:</span> <span class="n">Graph</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Args:</span>
 <span class="sd">        g (Graph): A mercury graph structure.</span>
@@ -1940,6 +1942,7 @@ the influence. It must be pyspark dataframe with column 'id' or python list</p>
 
 
         <p>Implementation of the spectral clustering algorithm which detect communities inside a graph.</p>
+<p>Contributed by Gibran Gabriel Otazo Sanchez.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2028,16 +2031,16 @@ the influence. It must be pyspark dataframe with column 'id' or python list</p>
 
                   <details class="quote">
                     <summary>Source code in <code>mercury/graph/ml/spectral.py</code></summary>
-                    <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
+                    <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
-<span class="normal">33</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">n_clusters</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;networkx&quot;</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span>
 <span class="p">):</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">n_clusters</span> <span class="o">=</span> <span class="n">n_clusters</span>
@@ -2132,9 +2135,7 @@ the modularity in the object self.</p>
 
             <details class="quote">
               <summary>Source code in <code>mercury/graph/ml/spectral.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
 <span class="normal">54</span>
@@ -2149,7 +2150,9 @@ the modularity in the object self.</p>
 <span class="normal">63</span>
 <span class="normal">64</span>
 <span class="normal">65</span>
-<span class="normal">66</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="n">Graph</span><span class="p">):</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="n">Graph</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Find the optimal clusters of a given graph. The function returns nothing, but saves the clusters and</span>
 <span class="sd">    the modularity in the object self.</span>
