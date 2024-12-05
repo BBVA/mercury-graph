@@ -26,6 +26,8 @@
 
   * Version without Spark [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/BBVA/mercury-graph/blob/master/tutorials/mercury-graph-tutorial-banksim-nospark.ipynb)
 
+* Interactive graph visualization: The Moebius class [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/BBVA/mercury-graph/blob/master/tutorials/moebius_demo.ipynb)
+
 
 ## Install
 

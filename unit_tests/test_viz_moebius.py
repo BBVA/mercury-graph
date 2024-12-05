@@ -6,15 +6,6 @@ from mercury.graph.core.graph import Graph
 import mercury.graph.viz as viz
 
 
-"""
-ISSUES:
-    - Test (fix) with jupyterlab.
-    - Fix spark viz issue despite the callback returning as expected.
-    - Understand why the JS paints some nodes in splitted.
-	- Understand the JS setting that makes nodes move/fixed.
-"""
-
-
 def toy_datasets():
     data = {
         'src':    ['Alice', 'Bob', 'Alice', 'Eve', 'Diana', 'Charlie', 'Frank', 'Bob', 'Grace', 'Alice'],
