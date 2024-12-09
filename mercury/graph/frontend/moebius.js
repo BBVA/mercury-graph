@@ -1444,7 +1444,12 @@ define('moebius', ['d3'], function(d3) {
     function updateSimulation(graph) {
       simulation.nodes(graph.nodes);
       simulation.force('link').links(graph.links);
-      simulation.alpha(1).restart();
+      if (d3.select('#double-click-restart-sim').property('checked')) {
+          simulation.alpha(1).restart();
+      } else {
+          // Keep simulation with very small force to allow the nodes to blend in the graph
+          simulation.alpha(0.02).restart();
+      }
     }
 
     /**
@@ -1964,6 +1969,22 @@ define('moebius', ['d3'], function(d3) {
 
       hideClassWithCheckboxFactory(generalTabContent, 'info-container', 'Hide attribute menu');
 
+      // PHYSICS SETTINGS
+      generalTabContent.append('p')
+          .attr('class', 'menu-subtitle')
+          .text('Simulation physics');
+
+      const doubleClickRestartSimDiv = generalTabContent.append('div')
+          .attr('class', 'menu-checkbox')
+          .attr('style', 'display: flex;')  // Wrap text
+
+      doubleClickRestartSimDiv.append('input')
+          .attr('type', 'checkbox')
+          .attr('id', 'double-click-restart-sim')
+
+      doubleClickRestartSimDiv.append('label')
+          .attr('class', 'label-radio')
+          .text('Restart simulation on node expansion');
 
       // NODES CONTENT
       const nodesTabContent = confMenu.append('div')
