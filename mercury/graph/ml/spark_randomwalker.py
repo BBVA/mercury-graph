@@ -8,10 +8,9 @@ if pyspark_installed:
     import pyspark.sql.functions as f
     from pyspark.sql import Window
 
-if graphframes_installed:
-    from graphframes import GraphFrame
-
-    from graphframes.lib import AggregateMessages
+    if graphframes_installed:
+        from graphframes import GraphFrame
+        from graphframes.lib import AggregateMessages
 
 
 class SparkRandomWalker(BaseClass):

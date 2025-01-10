@@ -28,10 +28,9 @@ if pyspark_installed:
 
     udf_select_element_2 = f.udf(_add_new_element_2, ArrayType(StringType()))
 
-if graphframes_installed:
-    from graphframes import GraphFrame
-
-    from graphframes.lib import AggregateMessages
+    if graphframes_installed:
+        from graphframes import GraphFrame
+        from graphframes.lib import AggregateMessages
 
 
 class SparkNode2Vec(BaseClass):

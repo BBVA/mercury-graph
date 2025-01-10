@@ -1,13 +1,19 @@
 from mercury.graph.core import Graph
 from mercury.graph.core.base import BaseClass
+from mercury.graph.core.spark_interface import pyspark_installed
+
 from pandas import DataFrame
 from networkx import normalized_laplacian_matrix
 from networkx.algorithms.community import modularity as nx_modularity
+
 from sklearn.cluster import KMeans
 from numpy.linalg import eigh
 from numpy import asarray
 import numpy as np
 
+if pyspark_installed:
+    from pyspark.sql import functions as F
+    from pyspark.ml.clustering import PowerIterationClustering
 
 class SpectralClustering(BaseClass):
     """
@@ -109,9 +115,6 @@ class SpectralClustering(BaseClass):
             (self): Fitted self (or raises an error)
         """
 
-        from pyspark.sql import functions as F
-        from pyspark.ml.clustering import PowerIterationClustering
-
         graph_frames_graph = graph.graphframe
 
         pic = PowerIterationClustering(k=self.n_clusters, weightCol="weight")
@@ -156,7 +159,6 @@ class SpectralClustering(BaseClass):
         """Computes modularity using the same approximation as networkx:
         https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.quality.modularity.html
         """
-        from pyspark.sql import functions as F
 
         edge_nb = edges.count()
         q = []

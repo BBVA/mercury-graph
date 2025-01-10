@@ -26,9 +26,9 @@ if pyspark_installed:
 
     udf_add_new_nodes = f.udf(_add_new_nodes, ArrayType(StringType()))
 
-if graphframes_installed:
-    from graphframes import GraphFrame
-    from graphframes.lib import AggregateMessages as AM
+    if graphframes_installed:
+        from graphframes import GraphFrame
+        from graphframes.lib import AggregateMessages as AM
 
 
 class SparkSpreadingActivation(BaseClass):

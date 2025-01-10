@@ -1,4 +1,4 @@
-import copy, json, os, pytest
+import json, os, pytest
 
 import pandas as pd
 
@@ -28,12 +28,6 @@ def test_moebius():
     G = Graph(edges, nodes = nodes)
     M = viz.Moebius(G)
 
-    M.JS(';')
-    with pytest.raises(FileNotFoundError):
-        M.FJS('_not_here.js')
-    with pytest.raises(FileNotFoundError):
-        M.FHT('_not_here.html')
-
     bak_HTML = viz.moebius.HTML
     viz.moebius.HTML = None
     with pytest.raises(ImportError):
@@ -41,23 +35,7 @@ def test_moebius():
 
     viz.moebius.HTML = bak_HTML
 
-    _ = viz.Moebius(G)
-    with pytest.raises(NotImplementedError):
-        _._get_instance_name()
-
     assert M.G is G
-    assert M.use_spark is False
-    assert os.path.exists('%s/moebius.js' % M.front_pat)
-    assert os.path.exists('%s/moebius.svg.html' % M.front_pat)
-    assert os.path.exists('%s/moebius.css.html' % M.front_pat)
-    assert type(M._int_id_map) == dict
-    assert 'Charlie' in M._int_id_map
-
-    assert M.name == 'M'
-
-    N = copy.copy(M)
-
-    assert N.name == 'N'
 
     assert str(M).startswith('Moebius')
 
@@ -91,10 +69,7 @@ def test_moebius():
 
     assert type(jj) == list and len(jj) == 10
 
-    with pytest.raises(NotImplementedError):
-        M.show()
-
-    M._load_moebius_js('', 'M', '', '')
+    M.show()
 
 
 def check_key(jj, ky, neighbors, n_nodes, n_edges, degree, dim_n, dim_e):
@@ -139,7 +114,14 @@ def check_key(jj, ky, neighbors, n_nodes, n_edges, degree, dim_n, dim_e):
 def test_moebius_callbacks():
     edges, nodes = toy_datasets()
     G = Graph(edges, nodes = nodes)
-    M = viz.Moebius(G)
+    M = viz.moebius.MoebiusAnywidget(G)
+
+    assert M.use_spark is False
+    assert os.path.exists('%s/moebius.js' % M.front_pat)
+    assert os.path.exists('%s/moebius.svg.html' % M.front_pat)
+    assert os.path.exists('%s/moebius.css' % M.front_pat)
+    assert type(M._int_id_map) == dict
+    assert 'Charlie' in M._int_id_map
 
     # 'src':    ['Alice', 'Bob',     'Alice', 'Eve',   'Diana', 'Charlie', 'Frank', 'Bob', 'Grace', 'Alice']
     # 'dst':    ['Bob',   'Charlie', 'Diana', 'Frank', 'Eve',   'Grace',   'Grace', 'Eve', 'Diana', 'Frank']
@@ -176,7 +158,7 @@ def test_moebius_callbacks():
     spark_nodes = G.nodes_as_dataframe()
 
     H = Graph(spark_edges, nodes = spark_nodes)
-    N = viz.Moebius(H)
+    N = viz.moebius.MoebiusAnywidget(H)
 
     check_key(N['Alice'],   'Alice',   ['Bob', 'Diana', 'Frank'],     4, 3, 3, 5, 5)
 

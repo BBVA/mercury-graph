@@ -3,3 +3,4 @@ pandas
 scipy
 networkx
 scikit-learn
+anywidget

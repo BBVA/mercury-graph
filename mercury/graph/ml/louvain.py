@@ -7,9 +7,11 @@ yields the maximum modularity.
 """
 
 from mercury.graph.core.base import BaseClass
-from mercury.graph.core import Graph, SparkInterface
+from mercury.graph.core import Graph
+from mercury.graph.core.spark_interface import pyspark_installed
 
-from pyspark.sql import DataFrame, Window, functions as F
+if pyspark_installed:
+    from pyspark.sql import DataFrame, Window, functions as F
 
 from typing import Union
 
