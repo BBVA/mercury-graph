@@ -1,5 +1,1 @@
 .vscode
-.coverage
-**/__pycache__/
-**/checkpoint/
-**/tmp_checkpoint/

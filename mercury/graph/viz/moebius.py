@@ -18,6 +18,10 @@ class MoebiusAnywidget(anywidget.AnyWidget):
     MoebiusAnywidget class for visualizing graphs creating an anywidget that uses JavaScript and HTML.
     Note: It is recommended to use wrapper class Moebius.
 
+    **Important**: This class requires: anywidget, traitlets and IPython.display!! These packages are not mandatory
+    for the rest of the library, since you may not be intereseted in visualizing graphs. If you want to use this
+    class, you need to install these packages.
+
     Args:
         G (Graph):          The graph to be visualized.
         initial_id (str): The id of the node to start the visualization.
@@ -75,7 +79,7 @@ class MoebiusAnywidget(anywidget.AnyWidget):
                     // Set up shared state or event handlers.
                     return () => {{
                     // Optional: Called when the widget is destroyed.
-                    }} 
+                    }}
                 }},
                 render({{ model, el }}) {{
                     // Render the widget's view into the el HTMLElement.
@@ -128,6 +132,37 @@ class MoebiusAnywidget(anywidget.AnyWidget):
         """
 
         return self._get_adjacent_nodes_moebius(item)
+
+
+    def generate_color_palette(self, cats, hue = 0, sat = 0.7, light = 0.5):
+        """
+        Generates a color palette for the given categories. This can be used in combination with `node_or_edge_config` to generate
+        the dictionary expected by the `colors` argument with colors that cover the whole 0..1 hue range.
+
+        Args:
+            cats (iterable): An iterable of categories for which the color palette is to be generated.
+            hue (float, optional): The base hue that is added to all the colors in the color palette. It must be in range, 0..1, all the
+            resulting hue values will be kept modulo 1.0. Default is 0 (no shift).
+            sat (float, optional): The saturation level for the colors. Default is 0.7. Range is 0..1.
+            light (float, optional): The lightness level for the colors. Default is 0.5. Range is 0..1.
+
+        Returns:
+            dict: A dictionary where keys are categories and values are hex color codes.
+        """
+        cats = set(cats)
+        cols = {}
+        N = len(cats)
+        for i, cat in enumerate(cats):
+            h = (i/N + hue) % 1.0
+            s = sat
+            l = light
+
+            r, g, b = self._hsl_to_rgb(h, s, l)
+
+            hex_color = '#%02x%02X%02x' % (r, g, b)
+            cols[cat] = hex_color
+
+        return cols
 
 
     def node_or_edge_config(self, text_is = None, color_is = None, colors = None, size_is = None, size_range = None, size_scale = 'linear'):
@@ -260,17 +295,17 @@ class MoebiusAnywidget(anywidget.AnyWidget):
 
         if self.use_spark:
             json_final = {
-                'nodes': json.loads(nodes_df.toPandas().to_json(orient = 'records')),
-                'links': json.loads(edges_df.toPandas().to_json(orient = 'records'))
+                'nodes': json.loads(nodes_df.toPandas().to_json(orient = 'records', force_ascii = False)),
+                'links': json.loads(edges_df.toPandas().to_json(orient = 'records', force_ascii = False))
             }
 
         else:
             json_final = {
-                'nodes': json.loads(nodes_df.to_json(orient = 'records')),
-                'links': json.loads(edges_df.to_json(orient = 'records'))
+                'nodes': json.loads(nodes_df.to_json(orient = 'records', force_ascii = False)),
+                'links': json.loads(edges_df.to_json(orient = 'records', force_ascii = False))
             }
 
-        return json.dumps(json_final)
+        return json.dumps(json_final, ensure_ascii = False)
 
 
     def _get_one_level_subgraph_graphframes(self, node_id, _testing=False):
@@ -420,7 +455,7 @@ class MoebiusAnywidget(anywidget.AnyWidget):
 
             json_final = {'nodes' : nodes, 'links' : edges}
 
-            return json.dumps(json_final, ensure_ascii=False)
+            return json.dumps(json_final, ensure_ascii = False)
             ```
 
         Args:
@@ -433,9 +468,43 @@ class MoebiusAnywidget(anywidget.AnyWidget):
 
         return json.loads(df_json)
 
+
+    def _hsl_to_rgb(self, h, s, l):
+        """
+        Convert HSL (Hue, Saturation, Lightness) color space to RGB (Red, Green, Blue) color space.
+
+        Parameters:
+        h (float): Hue value, should be between 0 and 1.
+        s (float): Saturation value, should be between 0 and 1.
+        l (float): Lightness value, should be between 0 and 1.
+
+        Returns:
+        tuple: A tuple containing the RGB values (r, g, b), each ranging from 0 to 255.
+        """
+        def hue_to_rgb(p, q, t):
+            if t < 0: t += 1
+            if t > 1: t -= 1
+            if t < 1/6: return p + (q - p)*6*t
+            if t < 1/2: return q
+            if t < 2/3: return p + (q - p)*(2/3 - t)*6
+            return p
+
+        q = l + s - l*s if l < 0.5 else l + s - l*s
+        p = 2*l - q
+        r = hue_to_rgb(p, q, h + 1/3)
+        g = hue_to_rgb(p, q, h)
+        b = hue_to_rgb(p, q, h - 1/3)
+
+        return int(255*r), int(255*g), int(255*b)
+
+
 class Moebius(MoebiusAnywidget):
     """
     Moebius class for visualizing graphs using an anywidget.
+
+    **Important**: This class requires: anywidget, traitlets and IPython.display!! These packages are not mandatory
+    for the rest of the library, since you may not be intereseted in visualizing graphs. If you want to use this
+    class, you need to install these packages.
 
     Usage:
         ```python

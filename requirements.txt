@@ -4,3 +4,4 @@ scipy
 networkx
 scikit-learn
 anywidget
+traitlets

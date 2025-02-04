@@ -1,3 +1,5 @@
 include mercury/graph/
 
 graft mercury/graph/
+
+recursive-include tutorials *

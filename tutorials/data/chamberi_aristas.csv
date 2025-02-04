@@ -1,0 +1,61 @@
+src	dst	weight
+La Boutique de Luz	Pepe, Dalila & Co	115
+Artesanía y Alma	EcoVida	87
+Juegos y Aventuras	Café Serenidad	142
+Juegos y Aventuras	Yoga y Equilibrio	12
+Greenland	Madridities	98
+Pan y Tradición	Greenland	173
+Diversión sin Límites	Tierra Pura	38
+Flores de Chamberí	Artesanía y Alma	170
+Flores y Colores	Galería Inspiración	15
+Flores y Colores	Artesanía y Alma	151
+EcoVida	Flores de Chamberí	33
+Arte en Vivo	Pepe, Dalila & Co	23
+Madridities	Pan y Tradición	135
+Arte en Vivo	Moda Urbana	147
+Juegos y Aventuras	Pepe, Dalila & Co	109
+Flores de Chamberí	Equilibrio Natural	58
+Gambón Hub	Madridities	152
+Pan y Tradición	Moda Urbana	133
+Flores y Colores	Tierra Pura	186
+Rincón del Sabor	Equilibrio Natural	64
+Rincón del Sabor	Creaciones Únicas	81
+Horno del Barrio	Greenland	162
+Moda Urbana	Pan y Tradición	182
+Edges	Café Serenidad	85
+Helados del Sol	Diversión sin Límites	109
+Madridities	Gambón Hub	164
+Helados del Sol	Equilibrio Natural	64
+Flores y Colores	Artesanía y Alma	150
+Gambón Hub	Pan y Tradición	74
+EcoVida	Greenland	200
+Horno del Barrio	Pan y Tradición	109
+Gambón Hub	Juegos y Aventuras	80
+Dulces Recuerdos	Greenland	142
+Pan y Tradición	Greenland	122
+Tierra Pura	Equilibrio Natural	152
+Equilibrio Natural	Rincón del Sabor	33
+Madridities	Diversión sin Límites	80
+Pepe, Dalila & Co	Café Serenidad	143
+Juegos y Aventuras	Diversión sin Límites	163
+Rincón del Sabor	Dulces Recuerdos	63
+EcoVida	Café Serenidad	175
+Flores de Chamberí	La Boutique de Luz	47
+Diversión sin Límites	EcoVida	143
+Juegos y Aventuras	Artesanía y Alma	52
+Diversión sin Límites	Moda Urbana	160
+Arte en Vivo	Café Serenidad	17
+La Boutique de Luz	Greenland	179
+Helados del Sol	Equilibrio Natural	66
+Edges	Arte en Vivo	194
+Creaciones Únicas	Yoga y Equilibrio	33
+Rincón del Sabor	La Boutique de Luz	104
+Pepe, Dalila & Co	Creaciones Únicas	152
+Artesanía y Alma	Diversión sin Límites	145
+Café Serenidad	Artesanía y Alma	98
+La Boutique de Luz	Artesanía y Alma	193
+Yoga y Equilibrio	Pan y Tradición	101
+Gambón Hub	Galería Inspiración	186
+Rincón del Sabor	Madridities	69
+Horno del Barrio	Gambón Hub	96
+Horno del Barrio	Helados del Sol	37
