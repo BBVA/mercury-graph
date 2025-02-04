@@ -18,8 +18,8 @@ from typing import Union
 
 class LouvainCommunities(BaseClass):
     """
-    Class that defines the functions that run a PySpark implementation of the 
-    Louvain algorithm to find the partition that maximizes the modularity of an 
+    Class that defines the functions that run a PySpark implementation of the
+    Louvain algorithm to find the partition that maximizes the modularity of an
     undirected graph (as in [^1]).
 
     This version of the algorithm differs from [^1] in that the reassignment of
@@ -28,22 +28,22 @@ class LouvainCommunities(BaseClass):
     2 -> C1) are resolved with a simple tie-breaking rule. This version also
     introduces the resolution parameter _gamma_, as in [^2].
 
-    Contributed by Arturo Soberon Cedillo, Jose Antonio Guzman Vazquez and 
+    Contributed by Arturo Soberon Cedillo, Jose Antonio Guzman Vazquez and
     Isaac Dodanim Hernandez Garcia.
 
-    [^1]: 
+    [^1]:
         Blondel V D, Guillaume J-L, Lambiotte R and Lefebvre E (2008). Fast
         unfolding of communities in large networks. Journal of Statistical
         Mechanics: Theory and Experiment, 2008.
         <https://doi.org/10.1088/1742-5468/2008/10/p10008>
 
-    [^2]: 
+    [^2]:
         Aynaud T, Blondel V D, Guillaume J-L and Lambiotte R (2013). Multilevel
         local optimization of modularity. Graph Partitioning (315--345), 2013.
 
     Args:
         min_modularity_gain (float):
-            Modularity gain threshold between each pass. The algorithm 
+            Modularity gain threshold between each pass. The algorithm
             stops if the gain in modularity between the current pass
             and the previous one is less than the given threshold.
 
@@ -229,8 +229,19 @@ class LouvainCommunities(BaseClass):
         """Checks if `edges` meets the format expected by `LouvainCommunities`.
 
         Args:
-            edges (pyspark.sql.dataframe.DataFrame):
-                A pyspark dataframe on which to perform basic data availability tests
+            df (pyspark.sql.dataframe.DataFrame):
+                A pyspark dataframe representing the edges of an undirected graph.
+                It must have `src` and `dst` as its columns. The user may also
+                specify the weight of each edge via the additional `weight` column
+                (optional).
+
+            expected_cols_grouping (list):
+                A list of strings representing the columns that must be present in
+                `df` to group the data.
+
+            expected_cols_others (list):
+                A list of strings representing the columns that must be present in
+                `df` but are not used for grouping.
         """
 
         cols = df.columns
@@ -400,13 +411,7 @@ class LouvainCommunities(BaseClass):
                 belongs to). The dataframe must have columns `id` (indicating each
                 node's ID) and `c` (indicating each node's assigned community).
 
-            resolution (float):
-                The resolution parameter _gamma_. Its value
-                must be greater or equal to zero. If resolution is less than 1,
-                modularity favors larger communities, while values greater than 1
-                favor smaller communities.
-
-            (int):
+            m (int):
                 The weighted size of the graph (the output of `_get_m()`).
 
         Returns:

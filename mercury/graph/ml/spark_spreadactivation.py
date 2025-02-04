@@ -41,7 +41,7 @@ class SparkSpreadingActivation(BaseClass):
     based on the influence that has been accumulated.
 
     The diffusion model is based on Spreading Activation (SPA) techniques proposed in cognitive psychology
-    and later used for trust metric computations. For more details, please see paper entitled 
+    and later used for trust metric computations. For more details, please see paper entitled
     ["Social Ties and their Relevance to Churn in Mobile Telecom Networks"](https://pdfs.semanticscholar.org/3275/3d80adb5ec2d4a974b5d1a872e2c957b263b.pdf)
 
     Args:
@@ -121,7 +121,7 @@ class SparkSpreadingActivation(BaseClass):
         Set seed nodes which are the source of influence using pyspark dataframe.
 
         Args:
-            G (mercury.graph.core.Graph): A `mercury.graph` Graph object.
+            g (mercury.graph.core.Graph): A `mercury.graph` Graph object.
             seed_nodes (Union[List, pyspark.sql.DataFrame]): Collection of nodes that are the source to spread
                 the influence. It must be pyspark dataframe with column 'id' or python list.
         """
@@ -170,7 +170,7 @@ class SparkSpreadingActivation(BaseClass):
         attributes: inDegree, outDegree, w_inDegree, w_outDegree.
 
         Args:
-            - graph: graphframe object, network
+            g: graphframe object, network
         """
         g_vertices = g.graphframe.vertices
         g_edges = g.graphframe.edges
@@ -202,10 +202,7 @@ class SparkSpreadingActivation(BaseClass):
         One step in the spread activation model.
 
         Args:
-            graph: graphframe object, network
-            attribute: str, name of column for attribute/influence
-            spreading_factor: 0 - 1, amount of influence to spread
-            transfer_function: weighted or unweighted, how to transfer influence along edges
+            g: graphframe object, network
 
         Returns:
             (Graphframe): new network with updated new calculation of attribute in vertices

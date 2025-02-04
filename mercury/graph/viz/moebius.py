@@ -142,12 +142,12 @@ class MoebiusAnywidget(anywidget.AnyWidget):
         Args:
             cats (iterable): An iterable of categories for which the color palette is to be generated.
             hue (float, optional): The base hue that is added to all the colors in the color palette. It must be in range, 0..1, all the
-            resulting hue values will be kept modulo 1.0. Default is 0 (no shift).
+                resulting hue values will be kept modulo 1.0. Default is 0 (no shift).
             sat (float, optional): The saturation level for the colors. Default is 0.7. Range is 0..1.
             light (float, optional): The lightness level for the colors. Default is 0.5. Range is 0..1.
 
         Returns:
-            dict: A dictionary where keys are categories and values are hex color codes.
+            (dict): A dictionary where keys are categories and values are hex color codes.
         """
         cats = set(cats)
         cols = {}
@@ -249,7 +249,7 @@ class MoebiusAnywidget(anywidget.AnyWidget):
             depth (int): The depth of the graph to be returned.
 
         Returns:
-            A JSON string with the adjacent nodes and edges.
+            (str): A JSON string with the adjacent nodes and edges.
         """
 
         if self.use_spark:
@@ -316,7 +316,7 @@ class MoebiusAnywidget(anywidget.AnyWidget):
             node_id (str): The ID of the node for which to get the one-level subgraph.
 
         Returns:
-            tuple: A tuple containing two Spark DataFrames:
+            (tuple): A tuple containing two Spark DataFrames:
                 - nodes_df: DataFrame with columns 'id', 'count', '_int_id', and any other node attributes.
                 - edges_df: DataFrame with columns 'source', 'target', '_int_id' the edges connecting the nodes in the subgraph.
         """
@@ -387,7 +387,7 @@ class MoebiusAnywidget(anywidget.AnyWidget):
             node_id (str): The ID of the node for which to get the one-level subgraph.
 
         Returns:
-            tuple: A tuple containing two Pandas DataFrames:
+            (tuple): A tuple containing two Pandas DataFrames:
                 - nodes_df: DataFrame with columns 'id', 'count', '_int_id', and any other node attributes.
                 - edges_df: DataFrame with columns 'source', 'target', '_int_id' the edges connecting the nodes in the subgraph.
         """
