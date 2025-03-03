@@ -17,7 +17,7 @@ readme			= 'README.md'
 dependencies 	= ['numpy', 'pandas', 'scipy', 'networkx', 'scikit-learn', 'anywidget', 'traitlets']
 
 [project.optional-dependencies]
-dev = ['pytest', 'coverage', 'flake8', 'graphframes-latest', 'pyspark', 'matplotlib', 'seaborn', 'pyyaml', 'setuptools==69.2', 'ipywidgets', 'pyvis']
+dev = ['pytest', 'coverage', 'flake8', 'graphframes-latest', 'pyspark', 'matplotlib', 'seaborn', 'pyyaml', 'setuptools>=61.0', 'ipywidgets', 'pyvis']
 doc = ['mkdocs', 'mkdocstrings[python]', 'mkdocs-material', 'mkdocs-minify-plugin==0.5.0', 'mkdocs-exclude', 'nbconvert', 'pyyaml']
 
 [tool.setuptools]
