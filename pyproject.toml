@@ -4,7 +4,7 @@ build-backend	= 'setuptools.build_meta'
 
 [project]
 name			= 'mercury-graph'
-version			= '3.2.5'
+version			= '3.2.6'
 description		= 'mercury-graph offers graph analytics capabilities with a technology-agnostic API'
 license			= {file = "LICENSE"}
 requires-python = '>=3.8'

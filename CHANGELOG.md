@@ -1,7 +1,8 @@
-## Latest version 3.2.5
+## Latest version 3.2.6
 
 | Release  | Feature link to discussion | State |
 | -------- | -------------------------- | ----- |
+| 3.2.6 | Adds dependencies and description to pyproject.toml | READY |
 | 3.2.5 | Fixes Moebius utf-8 issue, adds create_tutorials(), <br>adds generate_color_palette(), improves Moebius example, <br>adds python 3.13 support. | READY |
 | 3.2.4 | Implements Moebius as anywidget for modern Jupyterlab | READY |
 | 3.2.3 | Fixes Moebius in Google Colab and update docs | READY |
