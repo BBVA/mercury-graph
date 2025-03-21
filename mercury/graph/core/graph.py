@@ -192,7 +192,7 @@ class Graph:
         spark_int = SparkInterface()
 
         if pyspark_installed and graphframes_installed:
-            if type(data) == spark_int.type_spark_dataframe:
+            if type(data) in spark_int.type_spark_dataframe:
                 self._from_dataframe(data, nodes, keys)
                 return
 

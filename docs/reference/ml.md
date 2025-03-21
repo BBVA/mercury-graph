@@ -7,3 +7,5 @@
 ::: mercury.graph.ml.SpectralClustering
 
 ::: mercury.graph.ml.Transition
+
+::: mercury.graph.ml.GraphFeatures
