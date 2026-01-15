@@ -12,6 +12,12 @@ We want to extend mercury-graph with tools to make it more enterprise-friendly. 
 
 ### Why?
 
+- it is a natural evolution of mercury-graph towards enterprise use cases
+- we avoid guesswork on adding cool-features and focus instead on production readiness
+- it is consistent with the OSS philosophy of a financial institution
+- it provides opportunities for incremental delivery and feedback
+- we do not break existing APIs or paradigms
+
 Conceptually, this is a class `ObservedGraph` that:
 
 - focuses on translating business insights and applying governance to graphs
