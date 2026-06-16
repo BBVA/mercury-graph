@@ -1,4 +1,4 @@
-# Proposal: Graph Observers & ObservedGraph
+# Proposal -- Graph Observers & ObservedGraph
 
 ## Core Idea
 
