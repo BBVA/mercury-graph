@@ -6,9 +6,11 @@ Currently implemented **submodules** in `mercury.graph` include:
 
 - [**`mercury.graph.core`**](reference/core.md), with the main classes of the library that create and store the graphs' data and properties.
 
-- [**`mercury.graph.ml`**](reference/ml.md), with graph theory and machine learning algorithms such as Louvain community detection, spectral clustering, Markov chains, spreading activation-based diffusion models and graph random walkers.
-
 - [**`mercury.graph.embeddings`**](reference/embeddings.md), with classes that calculate graph embeddings in different ways, such as following the Node2Vec algorithm.
+
+- [**`mercury.graph.evidence`**](reference/evidence.md), anything related with evidence graphs using agents.
+
+- [**`mercury.graph.ml`**](reference/ml.md), with graph theory and machine learning algorithms such as Louvain community detection, spectral clustering, Markov chains, spreading activation-based diffusion models and graph random walkers.
 
 - [**`mercury.graph.viz`**](reference/viz.md), with capabilities for graph visualization.
 

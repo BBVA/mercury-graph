@@ -16,13 +16,13 @@ theme:
   icon:
     logo: material/book-open-page-variant
     repo: fontawesome/brands/github
-  palette: 
+  palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: custom
       accent: custom
       toggle:
-        icon: material/brightness-7 
+        icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
@@ -36,8 +36,9 @@ nav:
 - Home: index.md
 - API:
   - mercury.graph.core: reference/core.md
-  - mercury.graph.ml: reference/ml.md
   - mercury.graph.embeddings: reference/embeddings.md
+  - mercury.graph.evidence: reference/evidence.md
+  - mercury.graph.ml: reference/ml.md
   - mercury.graph.viz: reference/viz.md
 
 docs_dir: docs
@@ -45,9 +46,9 @@ site_dir: site
 
 extra:
   social:
-    - icon: fontawesome/brands/linkedin 
+    - icon: fontawesome/brands/linkedin
       link: https://es.linkedin.com/showcase/bbva-ai-factory/
-    - icon: fontawesome/brands/x-twitter 
+    - icon: fontawesome/brands/x-twitter
       link: https://x.com/bbva_aifactory
 
 extra_css:
