@@ -239,9 +239,6 @@ class GraphFeatures(BaseClass):
         Args:
             vertices : DataFrame
                 A PySpark DataFrame representing vertices in a graph.
-
-        Returns:
-            None
         """
 
         # Check type
@@ -319,9 +316,6 @@ class GraphFeatures(BaseClass):
         Args:
             edges : DataFrame
                 A PySpark DataFrame representing edges in a graph.
-
-        Returns:
-            None
         """
 
         # Check type
@@ -404,8 +398,8 @@ class GraphFeatures(BaseClass):
                 The active Spark session. Required if `checkpoint=True`.
                 Default is None.
 
-        Returns:
-            DataFrame
+        Returns (DataFrame):
+
                 A Spark DataFrame with the columns:
                 - 'id': The node ID.
                 - 'neigh': The ID of a neighboring node.
