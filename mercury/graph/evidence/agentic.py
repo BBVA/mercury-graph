@@ -46,7 +46,7 @@ class Agentic(ABC):
 	Attributes:
 
 	* `id` (str): the ID of the Agentic, composed of the IDs of its parents and its own name.
-	* `logger`: the logger to use for logging events. It must provide an `append()` method to add new events. It is optional and can be None.
+	* `logger`: the logger to use for logging events. It must provide an `append()` method to add new events. It is optional.
 	* `root` (Agentic): the root of the tree. It is used to find other Agentics in the tree.
 	* `children` (dict): a dictionary of child Agentics, keyed by their IDs.
 
