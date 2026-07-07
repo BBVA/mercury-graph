@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
+import datetime, re
 
-import datetime
+from abc import ABC, abstractmethod
 
 
 class Agentic(ABC):
@@ -157,3 +157,17 @@ class Agentic(ABC):
 		* `request` (dict): the request to simulate.
 		"""
 		return self._dry_run(request)
+
+
+	def _normalize_name(self, name):
+		""" Normalizes a name to be used as an ID.
+
+		That replaces spaces with underscores and removes any character that is not a letter, number, or underscore.
+
+		Arguments:
+		* `name` (str): the name to normalize.
+		"""
+		name = name.replace(' ', '_')
+		name = re.sub(r'[^a-zA-Z0-9_]', '', name)
+
+		return name
