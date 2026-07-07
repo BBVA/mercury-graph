@@ -159,7 +159,8 @@ class Agentic(ABC):
 		return self._dry_run(request)
 
 
-	def _normalize_name(self, name):
+	@staticmethod
+	def _normalize_name(name):
 		""" Normalizes a name to be used as an ID.
 
 		That replaces spaces with underscores and removes any character that is not a letter, number, or underscore.
