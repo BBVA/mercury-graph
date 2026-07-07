@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import argparse, sys, subprocess
+import argparse, os, pathlib, sys, subprocess
 
 import mercury.graph as mg
 
@@ -59,10 +59,33 @@ class MgeCli:
 
 
     def new(self):
+        if mg.evidence.Agentic._normalize_name(self.name) != self.name:
+            print('Error: The name "%s" is not valid. It must be a string of letters, numbers, and underscores.' % self.name)
+            sys.exit(1)
+
+        ifn = str(pathlib.Path(__file__).resolve().parent / 'new_endpoint_template')
+        if not os.path.exists(ifn):
+            print('Error: The source template directory "%s" does not exist. Try re-installing the package.' % ifn)
+            sys.exit(1)
+
         print ('Creating a new Endpoint object with the name %s...' % self.name)
+
+        ofn = os.path.abspath(self.name)
+        if os.path.exists(ofn):
+            print('Error: The target directory "%s" already exists. Please choose a different name or remove the existing directory.' % ofn)
+            sys.exit(1)
+
+        self.__exec('cp -r %s %s' % (ifn, ofn))
 
 
     def summary(self):
+        try:
+            ep = mg.evidence.Endpoint(self.name)
+
+        except Exception:
+            print('Error: Could not load the Endpoint object from %s. Please check the path and try again.' % self.name)
+            sys.exit(1)
+
         print ('Displaying a summary of the Endpoint in %s...' % self.name)
 
 
@@ -76,6 +99,10 @@ class MgeCli:
 
     def unlock(self):
         print ('Unlocking the Endpoint in %s...' % self.name)
+
+
+    def complete(self):
+        print('complete -W "new summary pilot serve unlock complete --just_once --help --version" mge ')
 
 
 # An argparse.ArgumentParser to manage the command line interface.
@@ -93,10 +120,12 @@ help = '\n'.join([
     '                               queries to reach that state.',
     '🌎 serve [path, intent, port]: Loads the Endpoint, verifies the intent and serves it via http on the given',
     '                               port. It exposes its Agentic \033[1m.meta\033[0m property and the \033[1m.run\033[0m method.',
-    '🔑 unlock [path]:              Forces removing the lock of the current Endpoint. \033[1mUse with caution!\033[0m',])
+    '🔑 unlock [path]:              Forces removing the lock of the current Endpoint. \033[1mUse with caution!\033[0m',
+    '✨ complete bash:              Prints the Bash tab-completion command.',
+    '                               Use: \033[1msource <(mge complete bash)\033[0m'])
 
 # Add each argument to the parser.
-parser.add_argument('command', choices = ['new', 'summary', 'pilot', 'serve', 'unlock'], help = help)
+parser.add_argument('command', choices = ['new', 'summary', 'pilot', 'serve', 'unlock', 'complete'], help = help)
 parser.add_argument('name', help = 'name of new Endpoint \033[3m(for new)\033[0m or path to an existing Endpoint \033[3m(all other commands)\033[0m.')
 parser.add_argument('intent', help = 'desired final state \033[3m(for pilot)\033[0m or required state \033[3m(for serve)\033[0m', nargs = '?')
 parser.add_argument('port', help = 'port to serve the Endpoint \033[3m(only for serve)\033[0m', nargs = '?')
@@ -119,3 +148,5 @@ if __name__ == '__main__':
         cli.serve()
     elif args.command == 'unlock':
         cli.unlock()
+    elif args.command == 'complete':
+        cli.complete()
