@@ -26,6 +26,3 @@ include-package-data = true
 [tool.setuptools.packages.find]
 include 		= ['mercury*', 'tutorials*']
 exclude 		= ['docker', 'unit_tests']
-
-[tool.pytest.ini_options]
-testpaths 		= ["unit_tests"]
