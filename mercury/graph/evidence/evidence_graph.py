@@ -1,4 +1,4 @@
-from mercury.graph.evidence import Agentic
+from .agentic import Agentic
 
 
 class EvidenceGraph(Agentic):
@@ -43,3 +43,15 @@ class EvidenceGraph(Agentic):
 
 	def __init__(self, schema = None, parent = None, logger = None):
 		super().__init__(my_class = 'evidence_graph', schema = schema, parent = parent, logger = logger)
+
+
+	def _run(self, request):
+		return {'status': 'ok'}
+
+
+	def _meta(self):
+		return {'status': 'ok'}
+
+
+	def _dry_run(self, request):
+		return {'status': 'ok'}
