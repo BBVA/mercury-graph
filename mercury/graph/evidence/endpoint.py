@@ -115,7 +115,7 @@ class Endpoint(Agentic):
 
 
 	def _meta(self):
-		return {'status': 'ok', 'message': 'Endpoint is running.'}
+		return {'status': 'ok', 'state' : 'ready', 'message': 'Endpoint is running.'}
 
 
 	def _dry_run(self, request):
