@@ -2,7 +2,104 @@
 
 import argparse, os, pathlib, sys, subprocess
 
+import uvicorn
+
+from fastapi import Body, FastAPI, HTTPException
+
 import mercury.graph as mg
+
+
+class MgeHttpServe:
+    """ The MgeHttpServe class exposes an Endpoint Agentic API over HTTP.
+    """
+
+    def __init__(self, ep):
+        """ Initializes the HTTP server object.
+
+        Arguments:
+            ep (Endpoint): The Endpoint to expose.
+        """
+
+        self.ep = ep
+        self.app = FastAPI(title = 'Mercury-graph Evidence Endpoint', version = mg.__version__)
+
+        self.app.get('/meta')(self.meta)
+        self.app.post('/run')(self.run)
+        self.app.post('/dry_run')(self.dry_run)
+
+
+    def meta(self):
+        """ Returns the Endpoint metadata. """
+
+        try:
+            return self.ep.meta
+
+        except HTTPException:
+            raise
+
+        except Exception as e:
+            raise HTTPException(status_code = 500, detail = str(e))
+
+
+    def run(self, request = Body(...)):
+        """ Runs a request against the Endpoint.
+
+        Arguments:
+            request (dict): The JSON request body.
+        """
+
+        request = self.__validated_request(request)
+
+        try:
+            return self.ep.run(request)
+
+        except HTTPException:
+            raise
+
+        except Exception as e:
+            raise HTTPException(status_code = 500, detail = str(e))
+
+
+    def dry_run(self, request = Body(...)):
+        """ Simulates running a request against the Endpoint.
+
+        Arguments:
+            request (dict): The JSON request body.
+        """
+
+        request = self.__validated_request(request)
+
+        try:
+            return self.ep.dry_run(request)
+
+        except HTTPException:
+            raise
+
+        except Exception as e:
+            raise HTTPException(status_code = 500, detail = str(e))
+
+
+    def serve(self, port):
+        """ Starts the HTTP server.
+
+        Arguments:
+            port (int): The TCP port to listen on.
+        """
+
+        uvicorn.run(self.app, host = '0.0.0.0', port = port)
+
+
+    def __validated_request(self, request):
+        """ Checks that a request body is a JSON object.
+
+        Arguments:
+            request (dict): The JSON request body.
+        """
+
+        if type(request) != dict:
+            raise HTTPException(status_code = 400, detail = 'Request body must be a JSON object.')
+
+        return request
 
 
 class MgeCli:
@@ -133,9 +230,19 @@ class MgeCli:
             print('Error: Could not lock the Endpoint "%s". It is locked by another process.' % ep.id)
             sys.exit(1)
 
-        print ('Serving the Endpoint "%s" only if state is actually "%s" on port "%s" ...' % (ep.id, self.intent, self.port))
+        state = ep.meta.get('state')
+        if state is not None and state != self.intent:
+            ep.lock(mg.evidence.endpoint.LockState.FREE)
+            print('Error: The Endpoint "%s" is in state "%s" but the intent is "%s".' % (ep.id, state, self.intent))
+            sys.exit(1)
 
-        raise NotImplementedError('The serve command is not yet implemented!')
+        print ('Serving the Endpoint "%s" see "http://127.0.0.1:%s/meta" ...' % (ep.id, self.port))
+
+        try:
+            MgeHttpServe(ep).serve(self.port)
+
+        finally:
+            ep.lock(mg.evidence.endpoint.LockState.FREE)
 
 
     def unlock(self):
