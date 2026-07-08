@@ -20,7 +20,6 @@ class MgeCli:
             print('Error: The intent argument is required.')
             sys.exit(1)
 
-
         self.intent = args['intent']
         self.just_once = args['just_once']
 
@@ -59,6 +58,8 @@ class MgeCli:
 
 
     def new(self):
+        """ Executes the "new" command after the arguments have been checked to exist. """
+
         if mg.evidence.Agentic._normalize_name(self.name) != self.name:
             print('Error: The name "%s" is not valid. It must be a string of letters, numbers, and underscores.' % self.name)
             sys.exit(1)
@@ -68,41 +69,94 @@ class MgeCli:
             print('Error: The source template directory "%s" does not exist. Try re-installing the package.' % ifn)
             sys.exit(1)
 
-        print ('Creating a new Endpoint object with the name %s...' % self.name)
-
         ofn = os.path.abspath(self.name)
         if os.path.exists(ofn):
-            print('Error: The target directory "%s" already exists. Please choose a different name or remove the existing directory.' % ofn)
+            print('Error: The target directory "%s" already exists. Please choose a different name or edit the existing Endpoint.' % ofn)
             sys.exit(1)
 
         self.__exec('cp -r %s %s' % (ifn, ofn))
 
-
-    def summary(self):
         try:
             ep = mg.evidence.Endpoint(self.name)
 
         except Exception:
-            print('Error: Could not load the Endpoint object from %s. Please check the path and try again.' % self.name)
+            print('Error: The newly created Endpoint "%s" failed to load.' % self.name)
             sys.exit(1)
 
-        print ('Displaying a summary of the Endpoint in %s...' % self.name)
+        print ('Created a new Endpoint object "%s" in folder "%s".' % (ep.id, ep.home))
+
+
+    def summary(self):
+        """ Executes the "summary" command after the arguments have been checked to exist. """
+
+        try:
+            ep = mg.evidence.Endpoint(self.name)
+
+        except Exception:
+            print('Error: Could not load the Endpoint object from "%s". Please check the path and try again.' % self.name)
+            sys.exit(1)
+
+        print ('Displaying a summary of the Endpoint "%s" ...' % ep.id)
+
+        raise NotImplementedError('The summary command is not yet implemented!')
 
 
     def pilot(self):
-        print ('Piloting the Endpoint in %s to the state %s with just_once=%s...' % (self.name, self.intent, self.just_once))
+        """ Executes the "pilot" command after the arguments have been checked to exist. """
+        try:
+            ep = mg.evidence.Endpoint(self.name)
+
+        except Exception:
+            print('Error: Could not load the Endpoint object from "%s". Please check the path and try again.' % self.name)
+            sys.exit(1)
+
+        if ep.lock(mg.evidence.endpoint.LockState.LOCK) != mg.evidence.endpoint.LockState.LOCK:
+            print('Error: Could not lock the Endpoint "%s". It is locked by another process.' % ep.id)
+            sys.exit(1)
+
+        print ('Piloting the Endpoint "%s" to the state "%s" with just_once=%s ...' % (ep.id, self.intent, self.just_once))
+
+        raise NotImplementedError('The pilot command is not yet implemented!')
 
 
     def serve(self):
-        print ('Serving the Endpoint in %s only if state is actually %s on port %s...' % (self.name, self.intent, self.port))
+        """ Executes the "serve" command after the arguments have been checked to exist. """
+
+        try:
+            ep = mg.evidence.Endpoint(self.name)
+
+        except Exception:
+            print('Error: Could not load the Endpoint object from "%s". Please check the path and try again.' % self.name)
+            sys.exit(1)
+
+        if ep.lock(mg.evidence.endpoint.LockState.LOCK) != mg.evidence.endpoint.LockState.LOCK:
+            print('Error: Could not lock the Endpoint "%s". It is locked by another process.' % ep.id)
+            sys.exit(1)
+
+        print ('Serving the Endpoint "%s" only if state is actually "%s" on port "%s" ...' % (ep.id, self.intent, self.port))
+
+        raise NotImplementedError('The serve command is not yet implemented!')
 
 
     def unlock(self):
-        print ('Unlocking the Endpoint in %s...' % self.name)
+        """ Executes the "unlock" command after the arguments have been checked to exist. """
+
+        try:
+            ep = mg.evidence.Endpoint(self.name)
+
+        except Exception:
+            print('Error: Could not load the Endpoint object from "%s". Please check the path and try again.' % self.name)
+            sys.exit(1)
+
+        ep.lock(mg.evidence.endpoint.LockState.FORCE_FREE)
+
+        print ('Endpoint "%s" forcefully unlocked.' % ep.id)
 
 
     def complete(self):
-        print('complete -W "new summary pilot serve unlock complete --just_once --help --version" mge ')
+        """ Executes the "complete". The argument self.name is ignored. Should be "bash" because it is a mandatory argument. """
+
+        print('complete -W "new summary pilot serve unlock complete --just_once --help --version" -A directory mge')
 
 
 # An argparse.ArgumentParser to manage the command line interface.
@@ -120,7 +174,7 @@ help = '\n'.join([
     '                               queries to reach that state.',
     '🌎 serve [path, intent, port]: Loads the Endpoint, verifies the intent and serves it via http on the given',
     '                               port. It exposes its Agentic \033[1m.meta\033[0m property and the \033[1m.run\033[0m method.',
-    '🔑 unlock [path]:              Forces removing the lock of the current Endpoint. \033[1mUse with caution!\033[0m',
+    '🔑 unlock [path]:              Forces removing the lock of the Endpoint. \033[1mUse with caution!\033[0m',
     '✨ complete bash:              Prints the Bash tab-completion command.',
     '                               Use: \033[1msource <(mge complete bash)\033[0m'])
 
