@@ -14,8 +14,9 @@ class Agentic(ABC):
 
 	It provides a simple interface with three main methods:
 
-	* `meta` for anything that is constant and can be cached: what the class can an cannot do, what input it expects and what
-		output it produces.
+	* `meta` for the object's metadata: What the class can and cannot do, what input it expects and what output it produces, what state
+		the object is in, ... That may be constant and can be cached, typically it is a dictionary and the object can provide some mix
+		of constant and variable metadata.
 	* `run` for the actual execution of a "query", i.e., the request is a valid dictionary created according to the meta.
 	* `dry_run` for simulating the execution of a query, without actually running it. This validates the input and returns fast and
 		descriptive feedback on errors.

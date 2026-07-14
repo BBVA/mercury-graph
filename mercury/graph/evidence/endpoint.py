@@ -30,15 +30,32 @@ class Endpoint(Agentic):
 
 	### What the Endpoint manages
 
-	* The mutex providing exclusive write access to the tree. The Endpoint is locked when the cli either serves or pilots the Endpoint
-		or it can also be programmatically by calling the `lock()` method. This is mandatory when the metadata is modified.
-	* The definition of the architecture. The Agentics are defined here but may be located anywhere.
+	* The definition of the architecture. The Agentic objects are defined here but may be located anywhere.
+		The architecture can have a life cycle defined by `intent` values. An intent is a desired state for the architecture. These
+		intents can apply to each Agentic in the architecture. They will typically be ordered integer numbers with names such as "initial",
+		"ready", "busy", etc. defined as a dictionary to support human-friendly interfaces (E.g., `mge serve main_doc ready 8888').
+		Negative values represent non recoverable errors, zero is the initial state, and positive values are sorted in such a way
+		that the smallest value represents the state of the entire Endpoint. Say "ready" is 100, and the numbers 1..99 represent intents
+		that require: building indices, chunking documents, setting up vector databases, formalizing chunks of text, merging into
+		evidence graphs, etc. across multiple Agentic objects. Also, the arrival/update of new documents may require updating the Evidence
+		Graph setting back the state of some of them. So the Endpoint is not ready until all of them are.
+	* Saving, loading and parsing (manually edited) its own definition stored in a folder with its name and a `mge_endpoint.json` file.
+		That file also contains configuration of Agentics stored as separate files in the same folder.
+	* A mechanism to `pilot` the Endpoint's state up to a desired state. This is different from the `run()` method which runs queries
+		using the Endpoint's Agentic interface. Piloting is a process typically done using the `mge` cli.
+	* The mutex providing exclusive write access to the tree. The Endpoint is locked when the cli either serves or pilots the Endpoint.
+		It can also be done programmatically by calling the `lock()` method. This is mandatory when the metadata is modified.
 	* It's own Agentic API.
-	* Internals like map of the names of its Agentics to provide valid id.
+	* A map of the names of its Agentics to provide valid ids so that each Agent can see whatever Agentic it has access to as downstream
+		its own branch in the Agentic tree.
 
-	### http interface
+	### Http interface
 
 	The cli provides a simple http interface to the Endpoint. The Endpoint exposes its Agentic API like any other Agentic object.
+
+	### Self configuration
+
+	Endpoint can use Agents to complete and verify their configuration with or without human intervention.
 
 	"""
 

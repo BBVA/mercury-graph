@@ -41,8 +41,13 @@ class EvidenceGraph(Agentic):
 
 	"""
 
-	def __init__(self, schema = None, parent = None, logger = None):
+	def __init__(self, schema = None, parent = None, logger = None, extra_args = None):
 		super().__init__(my_class = 'evidence_graph', schema = schema, parent = parent, logger = logger)
+
+		if extra_args is not None:
+			self.conf = extra_args
+		else:
+			self.conf = {}
 
 
 	def _run(self, request):
