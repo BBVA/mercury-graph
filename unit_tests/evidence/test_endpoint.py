@@ -14,12 +14,12 @@ def test_endpoint_lock(tmp_path):
 
 	os.makedirs(path)
 
-	with pytest.raises(ValueError):	# The file "mge_endpoint.json" is missing.
+	with pytest.raises(ValueError):	# The file "mge_endpoint.jsonc" is missing.
 		Endpoint(str(path))
 
 	conf = {'key': 'value'}
 
-	with open(path / 'mge_endpoint.json', 'w') as f:
+	with open(path / 'mge_endpoint.jsonc', 'w') as f:
 		json.dump(conf, f)
 
 	endpoint = Endpoint(str(path))
@@ -57,7 +57,7 @@ def test_dummy_runs(tmp_path):
 
 	conf = {'key': 'value'}
 
-	with open(path / 'mge_endpoint.json', 'w') as f:
+	with open(path / 'mge_endpoint.jsonc', 'w') as f:
 		json.dump(conf, f)
 
 	endpoint = Endpoint(str(path))

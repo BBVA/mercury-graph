@@ -22,7 +22,7 @@ class Endpoint(Agentic):
 	## Overview
 
 	An `Endpoint` is a full project that contains any number of Agentic objects. It's metadata lives in a folder that contains a
-	`mge_endpoint.json` file and a file named either `mge_endpoint.free` or `mge_endpoint.locked` that acts as a write mutex.
+	`mge_endpoint.jsonc` file and a file named either `mge_endpoint.free` or `mge_endpoint.locked` that acts as a write mutex.
 	`Endpoint` is the only object that owns the architecture of the tree.
 
 	For any "outside" Agentic user, an `Endpoint` is just another Agentic service. It is a tree of Agentic objects.
@@ -39,7 +39,7 @@ class Endpoint(Agentic):
 		that require: building indices, chunking documents, setting up vector databases, formalizing chunks of text, merging into
 		evidence graphs, etc. across multiple Agentic objects. Also, the arrival/update of new documents may require updating the Evidence
 		Graph setting back the state of some of them. So the Endpoint is not ready until all of them are.
-	* Saving, loading and parsing (manually edited) its own definition stored in a folder with its name and a `mge_endpoint.json` file.
+	* Saving, loading and parsing (manually edited) its own definition stored in a folder with its name and a `mge_endpoint.jsonc` file.
 		That file also contains configuration of Agentics stored as separate files in the same folder.
 	* A mechanism to `pilot` the Endpoint's state up to a desired state. This is different from the `run()` method which runs queries
 		using the Endpoint's Agentic interface. Piloting is a process typically done using the `mge` cli.
@@ -66,12 +66,12 @@ class Endpoint(Agentic):
 
 		self.home	 = os.path.abspath(path)
 		schema		 = self._normalize_name(os.path.basename(self.home))
-		self.conf_fn = os.path.join(self.home, 'mge_endpoint.json')
+		self.conf_fn = os.path.join(self.home, 'mge_endpoint.jsonc')
 		self.lock_fn = os.path.join(self.home, 'mge_endpoint.locked')
 		self.free_fn = os.path.join(self.home, 'mge_endpoint.free')
 
 		if not os.path.isfile(self.conf_fn):
-			raise ValueError('The path "%s" is not a valid Endpoint. The file "mge_endpoint.json" is missing.' % self.conf_fn)
+			raise ValueError('The path "%s" is not a valid Endpoint. The file "mge_endpoint.jsonc" is missing.' % self.conf_fn)
 
 		self.conf = json.load(open(self.conf_fn, 'r'))
 
