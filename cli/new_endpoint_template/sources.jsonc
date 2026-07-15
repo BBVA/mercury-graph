@@ -1,0 +1,40 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+	"demo": {
+		"name": "demo",
+		// Possible types are: fs_markdown, fs_text, fs_convert_to_markdown, fs_codebase, fs_dataframe
+		// fs_ stands for filesystem, all types are filesystem based. fs_convert_to_markdown requires a conversion tool,
+		// fs_dataframe requires pandas_read_args, fs_codebase requires file_extensions.
+		"type": "fs_markdown",
+		"conversion_tool": {},
+		"pandas_read_args": {},
+		"file_extensions": [],
+
+		// This applies to fs_markdown, fs_text, fs_convert_to_markdown
+		"chunk_on": ["sections", "paragraphs"],
+
+		// In characters
+		"max_chunk_size": 1000,
+		"source": "./sandbox/mge/demo",
+
+		"persistence": {
+			"indices": {},
+			"text_chunks": {},
+			"embedding_model": {},
+			"vector_storage": {},
+			"vector_query": {}
+		}
+
+		// About intents and capabilities: They are created by the Source object depending on state and type. This config file is just
+		// what a user needs to provide to create a Source object.
+	}
+}

@@ -1,0 +1,12 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+}

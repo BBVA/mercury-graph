@@ -1,0 +1,51 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+	// name, creation_date, mge_version are overridden by the mge new command.
+	"name": "",
+	"creation_date": "",
+	"mge_version": "",
+
+	"description": "-- Add a description of your endpoint here --",
+
+	"state_names": {
+		"error_paths": -9,
+		"error_persistence": -8,
+		"error_indices": -7,
+		"error_running": -1,
+		"initial": 0,
+		"paths_verified": 1,
+		"persistence_ready": 2,
+		"indices_ready": 3,
+		"ready": 100,
+		"ready_fully_parsed": 200
+	},
+
+	"sources": {
+		"$ref": "./sources.jsonc"
+	},
+	"ontologies": {
+		"$ref": "./ontologies.jsonc"
+	},
+	"formalizers": {
+		"$ref": "./formalizers.jsonc"
+	},
+	"evidence_graphs": {
+		"$ref": "./evidence_graphs.jsonc"
+	},
+	"agents": {
+		"$ref": "./agents.jsonc"
+	},
+
+	"metadata": {
+		"expose" : "./gru"
+	}
+}
