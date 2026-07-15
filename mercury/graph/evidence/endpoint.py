@@ -73,6 +73,7 @@ class Endpoint(Agentic):
 		if not os.path.isfile(self.conf_fn):
 			raise ValueError('The path "%s" is not a valid Endpoint. The file "mge_endpoint.jsonc" is missing.' % self.conf_fn)
 
+#TODO: Replace json.load with a custom method.
 		self.conf = json.load(open(self.conf_fn, 'r'))
 
 		self.lock(LockState.INIT_IF_NONE)

@@ -27,6 +27,18 @@ class Agent(Agentic):
 	These agents do not, in general, communicate through natural language. They use instructions and metadata in natural language but
 	produce structured output that may also include natural language.
 
+	## Interfacing with Agents
+
+#TODO: Update as in the notebook that uses tools!
+
+	Agents have a fixed list of capabilities, a fixed number of steps they can use and a list of Agentic services they can call. The first
+	thing and Agent must do is match which of its capabilities is required to answer the query. There is always a NOT_FOR_ME placeholder
+	that ends a query just as not for the Agent. A supervising Agent can check in an Agent's `meta` if the Agent should be suited to answer
+	a query.
+
+	The Agent object exposes the history of the steps in the Agent's prompt. The Agent can either answer the query or ask do a query. In
+	case it does a query, the answer will be added to the history.
+
 	"""
 
 	def __init__(self, schema = None, parent = None, logger = None, extra_args = None):
