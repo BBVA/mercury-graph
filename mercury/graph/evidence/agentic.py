@@ -12,37 +12,60 @@ class Agentic(ABC):
 	itself implements and validates. It takes inspiration from the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/docs)
 	while being lighter, oriented towards classes that coexist within the same process although they can also represent remote services.
 
-	It provides a simple interface with three main methods:
+	It provides a simple interface with four main methods:
 
-	* `meta` for the object's metadata: What the class can and cannot do, what input it expects and what output it produces, what state
+	* `meta` for the object's metadata: What the class can do, what input it expects and what output it produces, what state
 		the object is in, ... That may be constant and can be cached, typically it is a dictionary and the object can provide some mix
 		of constant and variable metadata.
 	* `run` for the actual execution of a "query", i.e., the request is a valid dictionary created according to the meta.
 	* `dry_run` for simulating the execution of a query, without actually running it. This validates the input and returns fast and
 		descriptive feedback on errors.
+	* `pilot` for piloting the object to a desired state. This is different from `run` which runs queries. Piloting is typically class
+	specific and involves things like setting up services, loading data, etc.
 
-	## Architecture
+	## Parts of a Agentic object
+
+	### ID
 
 	Architecturally, all Agentic descendants form a tree. Each Agentic has an ID that is composed of the IDs of its parents, and of its
 	own name joined by a /. Its name has the format: class_schema (schema is optional if there is only one instance
 	of the class). Each of them can find each other, but can only run its descendants. Agents are Agentics too and provide the same
 	interface. The root of the tree is an Endpoint. Endpoints are Agentic too, simplifying composing trees with other trees.
 
-	## Validation
+	### Capabilities
+
+	Think of capabilities as calling tools. Each tool has a unique function name, it expects input and returns output. That is specified
+	in the object's `.meta`. There is a key called "capabilities" which is a list of dictionaries in the format:
+	"name": {"description": ..., "parameters": ..., "returns": ...}. The "parameters" is a dictionary with the format: {"type": "object",
+	"properties": ..., "required": [-- the names of the required properties --]}. Each property is a dictionary with the format:
+	{"name": {"type": "...", "description": "..."}}. "returns" is a dictionary with the same format as "parameters" except it does not
+	have a "required" key.
+
+	### State
+
+	State is managed internally and exposed in the `.meta` attribute as the key "state" containing an integer number. Additionally,
+	meta can also contain a "state_names" dictionary like: `{"error_xxx": -9, "initial": 0, "loaded": 1, "ready": 100}` to improve
+	readability and cli argument parsing. Additionally, state that reports errors specific to a query will be returned by the `run` method.
+
+	### Intent and piloting
+
+	Intent is a desired state for the object. Piloting is the process of taking the object to a desired state. This is done typically
+	using the `mge` cli. An Agentic that is "always ready" does not need to define its own pilot() method. The `mge` will pilot a complete
+	Endpoint and the Endpoint will pilot its Agentics. A class that overrides the `pilot()` method must set the state according to the
+	success or failure of the piloting process.
+
+	## Validation and Debugging
 
 	The descendants are responsible for validating the input and returning/logging errors. Additionally, they can use the method
 	`log_error()` to provide further details via the logger.
 
-	## State
-
-	State is managed internally and returned as part of the output. There are no separate methods for state checking but descendants can
-	provide this information via `run`.
-
-	## Logger
+	### Logger
 
 	The class can log events, errors, and other function calls and responses. The logger is optional can be used for debugging and
 	can be as simple as a python list. I must provide an `append()` method to add new events. A custom method can filter events or add
 	extra fields to the event.
+
+	## API:
 
 	Attributes:
 
@@ -160,6 +183,20 @@ class Agentic(ABC):
 		return self._dry_run(request)
 
 
+	def pilot(self, intent):
+		""" Pilots the object to a desired state.
+
+		In the parent class, this method returns the object as "always ready". The classes that need piloting must override it.
+
+		Arguments:
+		* `intent` (str): the desired state to pilot to. It must be a valid state name in the object's meta.
+		"""
+		if self._meta_ is None:
+			self._meta_ = self._meta()
+
+		self._meta_['state'] = 0x7fffFFFF	# This is higher than any state. That means the object is always "more than ready".
+
+
 	@staticmethod
 	def _normalize_name(name):
 		""" Normalizes a name to be used as an ID.
@@ -170,6 +207,6 @@ class Agentic(ABC):
 		* `name` (str): the name to normalize.
 		"""
 		name = name.replace(' ', '_')
-		name = re.sub(r'[^a-zA-Z0-9_]', '', name)
+		name = re.sub('[^a-zA-Z0-9_]', '', name)
 
 		return name
