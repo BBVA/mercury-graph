@@ -76,6 +76,14 @@ def test_meta_is_cached():
 	assert dummy.meta_count == 1
 
 
+def test_pilot():
+	""" Verifies the pilot method sets the state to "more than ready". """
+	dummy = DummyAgentic()
+
+	dummy.pilot(42)
+	assert dummy.meta['state'] == 0x7fffFFFF
+
+
 def test_run_and_log_error_write_events():
 	""" Verifies request, response, and error logging fields. """
 	logger = []
