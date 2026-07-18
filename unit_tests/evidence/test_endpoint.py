@@ -1,4 +1,5 @@
 import json, os
+import shutil
 
 import pytest
 
@@ -79,6 +80,12 @@ def test_json_load(tmp_path):
 	ep = Endpoint(path)
 
 	assert len(ep.conf['agents']) > 1
+
+	with open('%s/ontologies.jsonc' % path, 'w') as f:
+		json.dump({'loop': {'$ref': './ontologies.jsonc'}}, f)
+
+	with pytest.raises(ValueError):
+		ep = Endpoint(path)
 
 
 # if __name__ == "__main__":
