@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import argparse, os, pathlib, sys, subprocess
+import argparse, datetime, os, pathlib, sys, subprocess
 
 import uvicorn
 
@@ -172,6 +172,19 @@ class MgeCli:
             sys.exit(1)
 
         self.__exec('cp -r %s %s' % (ifn, ofn))
+
+        conf_fn = os.path.join(ofn, 'mge_endpoint.jsonc')
+        creation_date = datetime.date.today().isoformat()
+
+        with open(conf_fn, 'r') as f:
+            txt = f.read()
+
+        txt = txt.replace('"name": ""', '"name": "%s"' % self.name, 1)
+        txt = txt.replace('"creation_date": ""', '"creation_date": "%s"' % creation_date, 1)
+        txt = txt.replace('"mge_version": ""', '"mge_version": "%s"' % mg.__version__, 1)
+
+        with open(conf_fn, 'w') as f:
+            f.write(txt)
 
         try:
             ep = mg.evidence.Endpoint(self.name)
