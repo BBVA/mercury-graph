@@ -1,4 +1,5 @@
 import json, os
+import re
 import shutil
 
 import pytest
@@ -66,6 +67,58 @@ def test_dummy_runs(tmp_path):
 	endpoint.run({'query': 'dummy'})
 	endpoint.dry_run({'query': 'dummy'})
 	assert type(endpoint.meta) == dict
+
+
+def test_endpoint_str(tmp_path):
+	path = tmp_path / 'endpoint_str'
+
+	os.makedirs(path)
+
+	conf = {
+		'name': 'demo_endpoint',
+		'creation_date': '2026-07-18',
+		'mge_version': '1.2.3',
+		'description': 'A console friendly endpoint summary.',
+		'state_names': {
+			'initial': 0,
+			'ready': 100
+		},
+		'sources': {},
+		'ontologies': {},
+		'formalizers': {},
+		'evidence_graphs': {},
+		'agents': {
+			'reader': {
+				'name': 'reader',
+				'state': 100
+			},
+			'gru': {
+				'name': 'gru'
+			}
+		}
+	}
+
+	with open(path / 'mge_endpoint.jsonc', 'w') as f:
+		json.dump(conf, f)
+
+	endpoint = Endpoint(str(path))
+	txt = str(endpoint)
+	clean = re.sub(r'\033\[[0-9;]*m', '', txt)
+
+	assert 'Endpoint' in clean.splitlines()[0]
+	assert 'demo_endpoint' in txt
+	assert '2026-07-18' in txt
+	assert '1.2.3' in txt
+	assert 'A console friendly endpoint summary.' in txt
+	assert 'sources (0 total)' in clean
+	assert 'ontologies (0 total)' in clean
+	assert 'formalizers (0 total)' in clean
+	assert 'evidence_graphs (0 total)' in clean
+	assert 'agents (2 total)' in clean
+	assert 'state' in clean
+	assert 'ready' in clean
+	assert 'reader: unknown' in clean
+	assert 'gru: unknown' in clean
 
 
 def test_json_load(tmp_path):
