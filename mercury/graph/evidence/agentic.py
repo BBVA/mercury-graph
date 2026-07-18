@@ -183,13 +183,16 @@ class Agentic(ABC):
 		return self._dry_run(request)
 
 
-	def pilot(self, intent):
+	def pilot(self, intent, just_once = False):
 		""" Pilots the object to a desired state.
 
 		In the parent class, this method returns the object as "always ready". The classes that need piloting must override it.
 
 		Arguments:
 		* `intent` (str): the desired state to pilot to. It must be a valid state name in the object's meta.
+		* `just_once` (bool): An optional argument to break without necessarily reaching the desired state after completing one iteration.
+			The iteration is Agentic specific and can be anything, (E.g., a complete file chunked and processed, ...) That parameter is
+			intended for when piloting can take hours or days and the user wants a finer control of the process.
 		"""
 		if self._meta_ is None:
 			self._meta_ = self._meta()
