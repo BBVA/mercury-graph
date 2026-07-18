@@ -81,6 +81,49 @@ class Endpoint(Agentic):
 		super().__init__(my_class = 'endpoint', schema = schema, parent = None, logger = logger)
 
 
+	def __str__(self):
+		""" Returns a console friendly summary of the Endpoint state. """
+
+		bold	 = '\033[1m'
+		italic	 = '\033[3m'
+		reset	 = '\033[0m'
+		labels	 = ['name', 'creation_date', 'mge_version', 'description']
+		sections = ['sources', 'ontologies', 'formalizers', 'evidence_graphs', 'agents']
+		unknown	 = '%sunknown%s' % (italic, reset)
+		icons	 = {
+			'endpoint': '🌐',
+			'sources': '📚',
+			'ontologies': '🏛️',
+			'formalizers': '🧩',
+			'evidence_graphs': '🕸️',
+			'agents': '🤖'
+		}
+
+		txt = ['%s%s Endpoint%s' % (bold, icons['endpoint'], reset)]
+
+		for label in labels:
+			value = self.conf.get(label, '')
+
+			txt.append('   %-14s: %s' % (label, value))
+
+		txt.append('   %-14s: %s' % ('state', self._meta().get('state', unknown)))
+
+		for section_name in sections:
+			items = self.conf.get(section_name, {})
+			txt.append('')
+			txt.append('  %s%s %s%s (%d total)' % (bold, icons[section_name], section_name, reset, len(items)))
+
+			if len(items) == 0:
+				txt.append('     %sempty%s' % (italic, reset))
+				continue
+
+			for item_name in sorted(items.keys()):
+# TODO: Get the state of each item.
+				txt.append('     - %s: %s' % (item_name, unknown))
+
+		return '\n'.join(txt)
+
+
 	def lock(self, cmd):
 		if cmd == LockState.FREE:
 			try:
