@@ -193,9 +193,7 @@ class MgeCli:
             print('Error: Could not load the Endpoint object from "%s". Please check the path and try again.' % self.name)
             sys.exit(1)
 
-        print ('Displaying a summary of the Endpoint "%s" ...' % ep.id)
-
-        raise NotImplementedError('The summary command is not yet implemented!')
+        print (ep)
 
 
     def pilot(self):
