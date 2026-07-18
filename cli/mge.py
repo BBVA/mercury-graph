@@ -224,7 +224,13 @@ class MgeCli:
 
         print ('Piloting the Endpoint "%s" to the state "%s" with just_once=%s ...' % (ep.id, self.intent, self.just_once))
 
-        raise NotImplementedError('The pilot command is not yet implemented!')
+        try:
+            ep.pilot(self.intent, just_once = self.just_once)
+
+        finally:
+            ep.lock(mg.evidence.endpoint.LockState.FREE)
+
+        print ('\nDone.')
 
 
     def serve(self):
