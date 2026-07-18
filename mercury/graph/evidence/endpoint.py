@@ -1,4 +1,4 @@
-import json, os
+import json, os, re
 
 from enum import Enum
 
@@ -64,17 +64,17 @@ class Endpoint(Agentic):
 		if not os.path.isdir(path):
 			raise ValueError('The path "%s" is not a valid directory.' % path)
 
-		self.home	 = os.path.abspath(path)
-		schema		 = self._normalize_name(os.path.basename(self.home))
-		self.conf_fn = os.path.join(self.home, 'mge_endpoint.jsonc')
-		self.lock_fn = os.path.join(self.home, 'mge_endpoint.locked')
-		self.free_fn = os.path.join(self.home, 'mge_endpoint.free')
+		self.home		= os.path.abspath(path)
+		schema			= self._normalize_name(os.path.basename(self.home))
+		self.conf_fn	= os.path.join(self.home, 'mge_endpoint.jsonc')
+		self.lock_fn	= os.path.join(self.home, 'mge_endpoint.locked')
+		self.free_fn	= os.path.join(self.home, 'mge_endpoint.free')
+		self.rex_remark = re.compile('^[ \\t]*//.*$')	# Regular expression to remove comments from JSONC files.
 
 		if not os.path.isfile(self.conf_fn):
 			raise ValueError('The path "%s" is not a valid Endpoint. The file "mge_endpoint.jsonc" is missing.' % self.conf_fn)
 
-#TODO: Replace json.load with a custom method.
-		self.conf = json.load(open(self.conf_fn, 'r'))
+		self.conf = self._json_load(self.conf_fn)
 
 		self.lock(LockState.INIT_IF_NONE)
 
@@ -139,3 +139,32 @@ class Endpoint(Agentic):
 	def _dry_run(self, request):
 		return {'status': 'ok', 'message': 'Endpoint is running.'}
 
+
+	def _json_load(self, fn, recursion_depth = 0):
+
+		if recursion_depth > 8:
+			raise ValueError('Recursion depth exceeded while loading JSON file "%s".' % fn)
+
+		base_path = os.path.dirname(os.path.abspath(fn))
+
+		# Load it as a list of string to remove comments.
+		with open(fn, 'r') as f:
+			txt = f.readlines()
+
+		txt = [s for s in txt if not self.rex_remark.match(s)]
+
+		ret = json.loads(''.join(txt))
+
+		# Parse the object (top level only) to search for dictionaries that have "$ref" as their only key. When found, load the referenced
+		# file and replace the corresponding value with the object loaded recursively.
+
+		if type(ret) == dict:
+			for key in ret.keys():
+				o = ret[key]
+
+				if (type(o) == dict) and (len(o) == 1) and ('$ref' in o):
+					r_fn  = os.path.abspath(os.path.join(base_path, o['$ref']))
+					r_ret = self._json_load(r_fn, recursion_depth + 1)
+					ret[key] = r_ret
+
+		return ret

@@ -67,5 +67,19 @@ def test_dummy_runs(tmp_path):
 	assert type(endpoint.meta) == dict
 
 
+def test_json_load(tmp_path):
+	fn = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'cli', 'new_endpoint_template'))
+
+	path = str(tmp_path / 'endpoint_a')
+
+	os.makedirs(path)
+
+	os.system('cp %s/* %s/' % (fn, path))
+
+	ep = Endpoint(path)
+
+	assert len(ep.conf['agents']) > 1
+
+
 # if __name__ == "__main__":
 # 	pytest.main([__file__])
