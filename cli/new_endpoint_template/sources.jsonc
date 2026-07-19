@@ -15,23 +15,29 @@
 		// fs_ stands for filesystem, all types are filesystem based. fs_convert_to_markdown requires a conversion tool,
 		// fs_dataframe requires pandas_read_args, fs_codebase requires file_extensions.
 		"type": "fs_markdown",
+		// The conversion tool is used to convert files to markdown. It is only required for fs_convert_to_markdown.
 		"conversion_tool": {},
+		// The pandas_read_args are used to read dataframes from files. It is only required for fs_dataframe.
 		"pandas_read_args": {},
-		"file_extensions": [],
-
-		// This applies to fs_markdown, fs_text, fs_convert_to_markdown
+		// The file_extensions are used to filter files in the filesystem.
+		"file_extensions": ["md", "txt"],
+		// This applies to fs_markdown, fs_text, fs_convert_to_markdown.
 		"chunk_on": ["sections", "paragraphs"],
-
 		// In characters
 		"max_chunk_size": 1000,
-		"source": "./sandbox/mge/demo",
+		// The root path of the source.
+		"source_path": "./sandbox/mge/demo",
+		// A cache path where the source is allowed to write to store metadata.
+		"source_cache": "./sandbox/mge/demo/.mge_cache",
 
+		// As more technologies are added, replace each by a {"$ref": "./<technology>.jsonc"} to hold configuration for that technology.
+		// The value "python" means, as a PoC, we use Python lists and dicts, cached as a pickle file.
 		"persistence": {
-			"indices": {},
-			"text_chunks": {},
-			"embedding_model": {},
-			"vector_storage": {},
-			"vector_query": {}
+			"indices": "python",
+			"text_chunks": "python",
+			"embedding_model": null,
+			"vector_storage": null,
+			"vector_query": null
 		}
 
 		// About intents and capabilities: They are created by the Source object depending on state and type. This config file is just
