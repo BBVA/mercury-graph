@@ -116,7 +116,6 @@ def test_endpoint_str(tmp_path):
 	assert 'evidence_graphs (0 total)' in clean
 	assert 'agents (2 total)' in clean
 	assert 'state' in clean
-	assert 'ready' in clean
 	assert 'reader: unknown' in clean
 	assert 'gru: unknown' in clean
 
@@ -131,6 +130,20 @@ def test_json_load(tmp_path):
 	os.system('cp %s/* %s/' % (fn, path))
 
 	ep = Endpoint(path)
+
+	assert ep.state_name(100) == 'READY'
+
+	txt = str(ep)
+
+	assert 'READY' in txt
+
+	ep._meta_['state'] = 999
+
+	txt = str(ep)
+
+	assert 'no name' in txt
+
+	ep.pilot(0)
 
 	assert len(ep.conf['agents']) > 1
 
