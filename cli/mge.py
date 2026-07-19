@@ -230,7 +230,12 @@ class MgeCli:
         finally:
             ep.lock(mg.evidence.endpoint.LockState.FREE)
 
-        print ('\nDone.')
+        state = ep.meta['state']
+        name  = ep.state_name(state)
+        if name is None:
+            name = '\033[2m(no name)\033[0m'
+
+        print ('\nFinal state is %d "%s"\n\nDone.' % (state, name))
 
 
     def serve(self):
