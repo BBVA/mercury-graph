@@ -16,6 +16,15 @@ class LockState(Enum):
 	FREE_FAILED	 =  3	# The state when a FREE failed. Only if the mutex is not available.
 
 
+class EndPointState(Enum):
+	""" The `EndPointState` is an enumeration that defines the possible states of the Endpoint.
+	"""
+	INITIAL		=  0	# The initial state of the source.
+	READY		=  100	# The source is ready to be processed.
+
+
+
+
 class Endpoint(Agentic):
 	""" The `Endpoint` is the class that serves an entire Agentic tree to the outside world.
 
@@ -80,6 +89,8 @@ class Endpoint(Agentic):
 
 		super().__init__(my_class = 'endpoint', schema = schema, parent = None, logger = logger)
 
+		self.states = EndPointState
+
 
 	def __str__(self):
 		""" Returns a console friendly summary of the Endpoint state. """
@@ -106,7 +117,12 @@ class Endpoint(Agentic):
 
 			txt.append('   %-14s: %s' % (label, value))
 
-		txt.append('   %-14s: %s' % ('state', self._meta().get('state', unknown)))
+		state = self.meta['state']
+		name  = self.state_name(state)
+		if name is None:
+			name = 'no name'
+
+		txt.append('   %-14s: %s %s(%s)%s' % ('state', state, italic, name, reset))
 
 		for section_name in sections:
 			items = self.conf.get(section_name, {})
@@ -176,11 +192,15 @@ class Endpoint(Agentic):
 
 
 	def _meta(self):
-		return {'status': 'ok', 'state' : 'ready', 'message': 'Endpoint is running.'}
+		return {'state' : 100, 'message': 'Endpoint is running.'}
 
 
 	def _dry_run(self, request):
 		return {'status': 'ok', 'message': 'Endpoint is running.'}
+
+
+	def pilot(self, intent, just_once = False):
+		pass
 
 
 	def _json_load(self, fn, recursion_depth = 0):
