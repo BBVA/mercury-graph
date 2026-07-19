@@ -73,6 +73,8 @@ class Agentic(ABC):
 	* `logger`: the logger to use for logging events. It must provide an `append()` method to add new events. It is optional.
 	* `root` (Agentic): the root of the tree. It is used to find other Agentics in the tree.
 	* `children` (dict): a dictionary of child Agentics, keyed by their IDs.
+	* `states` (Enum): an optional Enum class that defines names for the states of an Agentic. It is used to improve readability and cli
+	argument parsing.
 
 	Arguments:
 
@@ -91,6 +93,7 @@ class Agentic(ABC):
 		self.seq_num  = 0
 		self.root	  = self
 		self.children = {}
+		self.states	  = None
 		self._meta_	  = None
 
 		if schema is not None:
@@ -198,6 +201,22 @@ class Agentic(ABC):
 			self._meta_ = self._meta()
 
 		self._meta_['state'] = 0x7fffFFFF	# This is higher than any state. That means the object is always "more than ready".
+
+
+	def state_name(self, state):
+		""" Returns the name of a state given its integer value.
+
+		Arguments:
+		* `state` (int): the integer value of the state.
+		"""
+		if self.states is not None:
+			try:
+				ret = self.states(int(state)).name
+
+			except ValueError:
+				ret = None
+
+			return ret
 
 
 	@staticmethod
