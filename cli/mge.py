@@ -252,10 +252,14 @@ class MgeCli:
             print('Error: Could not lock the Endpoint "%s". It is locked by another process.' % ep.id)
             sys.exit(1)
 
-        state = ep.meta.get('state')
-        if state is not None and state != self.intent:
+        state = ep.meta['state']
+        name  = ep.state_name(state)
+        if name is None:
+            name = '\033[2m(no name)\033[0m'
+
+        if str(state) != str(self.intent) and str(name).lower() != str(self.intent).lower():
             ep.lock(mg.evidence.endpoint.LockState.FREE)
-            print('Error: The Endpoint "%s" is in state "%s" but the intent is "%s".' % (ep.id, state, self.intent))
+            print('Error: The Endpoint "%s" is in state %d "%s" but the intent is "%s".' % (ep.id, state, name, self.intent))
             sys.exit(1)
 
         print ('Serving the Endpoint "%s" see "http://127.0.0.1:%s/meta" ...' % (ep.id, self.port))
