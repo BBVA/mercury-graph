@@ -6,13 +6,13 @@ from mercury.graph.evidence import Agentic
 class DummyAgentic(Agentic):
 	""" Test implementation of the Agentic abstract interface. """
 
-	def __init__(self, my_class = 'dummy', schema = None, parent = None, logger = None):
+	def __init__(self, my_class = 'dummy', schema = None, endpoint = None, logger = None):
 		""" Initializes a test double with counters for delegated calls. """
 		self.run_count = 0
 		self.meta_count = 0
 		self.dry_run_count = 0
 
-		super().__init__(my_class = my_class, schema = schema, parent = parent, logger = logger)
+		super().__init__(my_class = my_class, schema = schema, endpoint = endpoint, logger = logger)
 
 
 	def _run(self, request):
@@ -51,20 +51,22 @@ def test_abstract_method_bodies_return_none():
 	assert Agentic._dry_run(dummy, {'query': 'dry_run'}) is None
 
 
-def test_child_is_registered_with_parent():
-	""" Verifies IDs, roots, and child registration across a small tree. """
-	parent = DummyAgentic(my_class = 'parent', schema = 'main')
-	child = DummyAgentic(my_class = 'child', schema = 'schema', parent = parent)
-	grandchild = DummyAgentic(my_class = 'leaf', parent = child)
+def test_child_is_registered_with_endpoint():
+	""" Verifies IDs, endpoints, and child registration across a small tree. """
+	endpoint = DummyAgentic(my_class = 'endpoint', schema = 'main')
+	child = DummyAgentic(my_class = 'child', schema = 'schema', endpoint = endpoint)
+	grandchild = DummyAgentic(my_class = 'leaf', endpoint = child)
 
-	assert parent.id == 'parent_main'
-	assert parent.root is parent
-	assert child.id == 'parent_main/child_schema'
-	assert child.root is parent
-	assert grandchild.id == 'parent_main/child_schema/leaf'
-	assert grandchild.root is parent
-	assert parent.children[child.id] is child
-	assert child.children[grandchild.id] is grandchild
+	assert endpoint.id == 'endpoint_main'
+	assert endpoint.endpoint is endpoint
+	assert child.id == 'endpoint_main/child_schema'
+	assert child.endpoint is endpoint
+	assert grandchild.id == 'endpoint_main/child_schema/leaf'
+	assert grandchild.endpoint is child
+
+	child.add_tool(grandchild)
+
+	assert grandchild.id in child.tools
 
 
 def test_meta_is_cached():

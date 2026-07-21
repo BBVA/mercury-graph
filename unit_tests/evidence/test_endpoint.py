@@ -131,11 +131,11 @@ def test_json_load(tmp_path):
 
 	ep = Endpoint(path)
 
-	assert ep.state_name(100) == 'READY'
+	assert ep.state_name(100) == 'ALL_READY'
 
 	txt = str(ep)
 
-	assert 'READY' in txt
+	assert 'Endpoint' in txt
 
 	ep._meta_['state'] = 999
 
