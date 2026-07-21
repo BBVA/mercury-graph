@@ -16,19 +16,6 @@
 
 	"description": "-- Add a description of your endpoint here --",
 
-	"state_names": {
-		"error_paths": -9,
-		"error_persistence": -8,
-		"error_indices": -7,
-		"error_running": -1,
-		"initial": 0,
-		"paths_verified": 1,
-		"persistence_ready": 2,
-		"indices_ready": 3,
-		"ready": 100,
-		"ready_fully_parsed": 200
-	},
-
 	"sources": {
 		"$ref": "./sources.jsonc"
 	},
@@ -44,8 +31,10 @@
 	"agents": {
 		"$ref": "./agents.jsonc"
 	},
+	"custom_agentics": {
+		"$ref": "./custom_agentics.jsonc"
+	},
 
-	"metadata": {
-		"expose" : "./gru"
-	}
+	// The Endpoint's Agentic API is merged from exposed Agentics (at least one is mandatory).
+	"expose" : ["gru"]
 }
