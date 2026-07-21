@@ -15,8 +15,8 @@ class Formalizer(Agentic):
 
 	"""
 
-	def __init__(self, schema = None, parent = None, logger = None, extra_args = None):
-		super().__init__(my_class = 'formalizer', schema = schema, parent = parent, logger = logger)
+	def __init__(self, schema = None, endpoint = None, logger = None, extra_args = None):
+		super().__init__(my_class = 'formalizer', schema = schema, endpoint = endpoint, logger = logger)
 
 		if extra_args is not None:
 			self.conf = extra_args

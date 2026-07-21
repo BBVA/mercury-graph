@@ -41,8 +41,8 @@ class Source(Agentic):
 
 	"""
 
-	def __init__(self, schema = None, parent = None, logger = None, extra_args = None):
-		super().__init__(my_class = 'source', schema = schema, parent = parent, logger = logger)
+	def __init__(self, schema = None, endpoint = None, logger = None, extra_args = None):
+		super().__init__(my_class = 'source', schema = schema, endpoint = endpoint, logger = logger)
 
 		self.states = SourceState
 
