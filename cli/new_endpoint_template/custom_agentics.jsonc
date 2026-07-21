@@ -1,0 +1,70 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+
+// A custom_agentics is any Python class that descends from Agentic provided as source to be loaded by the endpoint.
+
+// Each entry has 4 fields: name, class_name, source, and config. The name is a unique identifier for the agentic.
+// The class_name is the name of the class that implements the agentic. The source is the name of the Python file that contains the class.
+// The config is a dictionary of configuration parameters that will be passed to the constructor of the agentic class.
+
+// An example:
+// -----------
+
+    // (file) my_agentic.py:
+    // ---------------------
+    // from mercury.graph.agentics import Agentic
+
+    // class MyAgentic(Agentic):
+    //     def __init__(self, name, config):
+    //          ...
+
+    // (file) another_agentic.py:
+    // --------------------------
+    // from mercury.graph.agentics import Agentic
+
+    // class AnotherAgentic(Agentic):
+    //     def __init__(self, name, config):
+    //          ...
+
+    // The custom agentics definition in this file would look like this:
+
+    // "my_custom_agentic": {
+    //     "name": "my_agentic_number_one",
+    //     "class_name": "MyAgentic",
+    //     "source": "my_agentic.py",
+    //     "config": {
+    //         "param1": "value1",
+    //         "param2": "value2"
+    //     }
+    // },
+
+    // "another_my_agentic": {
+    //     "name": "my_agentic_number_two",
+    //     "class_name": "MyAgentic",
+    //     "source": "my_agentic.py",
+    //     "config": {
+    //         "param1": "value1",
+    //         "param2": "value2"
+    //     }
+    // },
+
+    // "another_custom_agentic": {
+    //     "name": "another_agentic",
+    //     "class_name": "AnotherAgentic",
+    //     "source": "another_agentic.py",
+    //     "config": {
+    //         "paramA": "valueA",
+    //         "paramB": "valueB"
+    //     }
+    // }
+
+}
