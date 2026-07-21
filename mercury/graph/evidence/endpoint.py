@@ -2,7 +2,12 @@ import json, os, re
 
 from enum import Enum
 
+from .agent   import Agent
 from .agentic import Agentic
+from .agentic_graph import AgenticGraph
+from .evidence_graph import EvidenceGraph
+from .formalizer import Formalizer
+from .source import Source
 
 
 class LockState(Enum):
@@ -19,14 +24,21 @@ class LockState(Enum):
 class EndPointState(Enum):
 	""" The `EndPointState` is an enumeration that defines the possible states of the Endpoint.
 	"""
-	INITIAL		=  0	# The initial state of the source.
-	READY		=  100	# The source is ready to be processed.
-
-
+	ERR_IN_OBJECT	= -5	# Some loaded object in the Endpoint is in an error state.
+	ERR_PILOTING	= -4	# The Endpoint failed to pilot some objects.
+	ERR_EXPOSING	= -3	# The Endpoint failed to building its API.
+	ERR_LINKING		= -2	# The Endpoint failed to link some of its objects.
+	ERR_LOADING_OBJ	= -1	# The Endpoint failed to load some of its objects.
+	INITIAL			=  0	# The initial state of the source.
+	LOADED_OBJ		=  1	# The Endpoint has loaded all the objects in its architecture. It is not ready to process queries yet.
+	LINKED_OBJ		=  2	# The Endpoint has satisfied all the inter-dependencies of its objects.
+	EXPOSED_API		=  3	# The Endpoint has exposed its Agentic API to the outside world.
+	PILOT_REQUIRED	=  4	# The Endpoint has loaded all its architecture but some of them are not ready to process queries yet.
+	ALL_READY		=  100	# The source is ready to be processed.
 
 
 class Endpoint(Agentic):
-	""" The `Endpoint` is the class that serves an entire Agentic tree to the outside world.
+	""" The `Endpoint` is the class that serves an entire Agentic architecture to the outside world using the Agentic interface itself.
 
 	## Overview
 
@@ -34,29 +46,27 @@ class Endpoint(Agentic):
 	`mge_endpoint.jsonc` file and a file named either `mge_endpoint.free` or `mge_endpoint.locked` that acts as a write mutex.
 	`Endpoint` is the only object that owns the architecture of the tree.
 
-	For any "outside" Agentic user, an `Endpoint` is just another Agentic service. It is a tree of Agentic objects.
-	So an Agentic ecosystem is a giant graph made of trees that use trees that use trees, etc.
+	For any "outside" Agentic user, an `Endpoint` is just another Agentic service. It is a graph of Agentic objects.
 
 	### What the Endpoint manages
 
 	* The definition of the architecture. The Agentic objects are defined here but may be located anywhere.
 		The architecture can have a life cycle defined by `intent` values. An intent is a desired state for the architecture. These
 		intents can apply to each Agentic in the architecture. They will typically be ordered integer numbers with names such as "initial",
-		"ready", "busy", etc. defined as a dictionary to support human-friendly interfaces (E.g., `mge serve main_doc ready 8888').
-		Negative values represent non recoverable errors, zero is the initial state, and positive values are sorted in such a way
-		that the smallest value represents the state of the entire Endpoint. Say "ready" is 100, and the numbers 1..99 represent intents
-		that require: building indices, chunking documents, setting up vector databases, formalizing chunks of text, merging into
-		evidence graphs, etc. across multiple Agentic objects. Also, the arrival/update of new documents may require updating the Evidence
-		Graph setting back the state of some of them. So the Endpoint is not ready until all of them are.
+		"ready", "busy", etc. defined as an Enum to support human-friendly interfaces (E.g., `mge serve main_doc all_ready 8888').
+		Negative values represent non recoverable errors, zero is the initial state, and positive values are sorted. Each class can have
+		up to 99 intermediate states below READY which corresponds to 100. Those intents 1..99 represent: building indices, chunking
+		documents, setting up vector databases, formalizing chunks of text, merging into evidence graphs, etc. across multiple Agentic
+		objects. Also, the arrival/update of new documents may require updating the Evidence Graph setting back the state of some of them.
+		So the Endpoint is ALL_READY (100) only when all of them are READY (100).
 	* Saving, loading and parsing (manually edited) its own definition stored in a folder with its name and a `mge_endpoint.jsonc` file.
 		That file also contains configuration of Agentics stored as separate files in the same folder.
 	* A mechanism to `pilot` the Endpoint's state up to a desired state. This is different from the `run()` method which runs queries
 		using the Endpoint's Agentic interface. Piloting is a process typically done using the `mge` cli.
-	* The mutex providing exclusive write access to the tree. The Endpoint is locked when the cli either serves or pilots the Endpoint.
+	* The mutex providing exclusive write access to the objects. The Endpoint is locked when the cli either serves or pilots the Endpoint.
 		It can also be done programmatically by calling the `lock()` method. This is mandatory when the metadata is modified.
-	* It's own Agentic API.
-	* A map of the names of its Agentics to provide valid ids so that each Agent can see whatever Agentic it has access to as downstream
-		its own branch in the Agentic tree.
+	* It's own Agentic API. This exposes a set of functions merged from the Agentics that are marked as "exposed" in the Endpoint's conf.
+	* The interdependencies within the Agentic objects.
 
 	### Http interface
 
@@ -64,7 +74,7 @@ class Endpoint(Agentic):
 
 	### Self configuration
 
-	Endpoint can use Agents to complete and verify their configuration with or without human intervention.
+	Endpoints can use Agents to complete and verify their configuration with or without human intervention.
 
 	"""
 
@@ -87,7 +97,7 @@ class Endpoint(Agentic):
 
 		self.lock(LockState.INIT_IF_NONE)
 
-		super().__init__(my_class = 'endpoint', schema = schema, parent = None, logger = logger)
+		super().__init__(my_class = 'endpoint', schema = schema, endpoint = None, logger = logger)
 
 		self.states = EndPointState
 
@@ -99,7 +109,7 @@ class Endpoint(Agentic):
 		italic	 = '\033[3m'
 		reset	 = '\033[0m'
 		labels	 = ['name', 'creation_date', 'mge_version', 'description']
-		sections = ['sources', 'ontologies', 'formalizers', 'evidence_graphs', 'agents']
+		sections = ['sources', 'ontologies', 'formalizers', 'evidence_graphs', 'agents', 'custom_agentics']
 		unknown	 = '%sunknown%s' % (italic, reset)
 		icons	 = {
 			'endpoint': '🌐',
@@ -107,7 +117,8 @@ class Endpoint(Agentic):
 			'ontologies': '🏛️',
 			'formalizers': '🧩',
 			'evidence_graphs': '🕸️',
-			'agents': '🤖'
+			'agents': '🤖',
+			'custom_agentics': '🛠️'
 		}
 
 		txt = ['%s%s Endpoint%s' % (bold, icons['endpoint'], reset)]
@@ -192,7 +203,7 @@ class Endpoint(Agentic):
 
 
 	def _meta(self):
-		return {'state' : 100, 'message': 'Endpoint is running.'}
+		return {'state' : 0}
 
 
 	def _dry_run(self, request):
