@@ -53,6 +53,15 @@ class MgeHttpServe:
         try:
             return self.ep.run(request)
 
+        except mg.evidence.agentic.AgenticRunInvalidRequest:
+            raise HTTPException(status_code = 400, detail = 'Invalid request.')
+
+        except mg.evidence.agentic.AgenticRunInvalidState:
+            raise HTTPException(status_code = 503, detail = 'Invalid state.')
+
+        except mg.evidence.agentic.AgenticRunFailed:
+            raise HTTPException(status_code = 500, detail = 'Run failed.')
+
         except HTTPException:
             raise
 
