@@ -3,6 +3,26 @@ import datetime, re
 from abc import ABC, abstractmethod
 
 
+class AgenticRunException(Exception):
+	"""Base class for all Agentic.run() and .dry_run() exceptions."""
+	pass
+
+
+class AgenticRunInvalidRequest(AgenticRunException):
+	"""The caller supplied an invalid request."""
+	pass
+
+
+class AgenticRunInvalidState(AgenticRunException):
+	"""The Agentic is not in a state where the operation is allowed."""
+	pass
+
+
+class AgenticRunFailed(AgenticRunException):
+	"""The Agentic attempted to execute the request but failed."""
+	pass
+
+
 class Agentic(ABC):
 	""" This is the parent of any class that is called by an Agent including the Agent itself.
 
@@ -15,22 +35,21 @@ class Agentic(ABC):
 	It provides a simple interface with four main methods:
 
 	* `meta` for the object's metadata: What the class can do, what input it expects and what output it produces, what state
-		the object is in, ... That may be constant and can be cached, typically it is a dictionary and the object can provide some mix
-		of constant and variable metadata.
+		the object is in, ...
 	* `run` for the actual execution of a "query", i.e., the request is a valid dictionary created according to the meta.
 	* `dry_run` for simulating the execution of a query, without actually running it. This validates the input and returns fast and
 		descriptive feedback on errors.
-	* `pilot` for piloting the object to a desired state. This is different from `run` which runs queries. Piloting is typically class
-	specific and involves things like setting up services, loading data, etc.
+	* `pilot` for piloting the object to a desired state. Typically, an Agentic object must be in a READY state (after having set up
+		services, loaded data, etc.) before it can accept queries. The pilot() method "drives" the object to a desired state.
 
 	## Parts of a Agentic object
 
 	### ID
 
-	Architecturally, all Agentic descendants form a tree. Each Agentic has an ID that is composed of the IDs of its parents, and of its
-	own name joined by a /. Its name has the format: class_schema (schema is optional if there is only one instance
-	of the class). Each of them can find each other, but can only run its descendants. Agents are Agentics too and provide the same
-	interface. The root of the tree is an Endpoint. Endpoints are Agentic too, simplifying composing trees with other trees.
+	Architecturally, all Agentic descendants form a graph inside some Endpoint. Each Agentic has an ID that is composed of the IDs of
+	its parents, and of its own name joined by a /. Its name has the format: class_schema (schema is optional if there is only one instance
+	of the class). Agentics can use other Agentics within the same Endpoint, but they must require specific ids in the architecture.
+	When that requirement can be satisfied, the Endpoint will provide the Agentic with the tool by calling its `add_tool` method.
 
 	### Capabilities
 
@@ -44,8 +63,9 @@ class Agentic(ABC):
 	### State
 
 	State is managed internally and exposed in the `.meta` attribute as the key "state" containing an integer number. Additionally,
-	meta can also contain a "state_names" dictionary like: `{"error_xxx": -9, "initial": 0, "loaded": 1, "ready": 100}` to improve
-	readability and cli argument parsing. Additionally, state that reports errors specific to a query will be returned by the `run` method.
+	the number can have text descriptions in the `.states` attribute which is an Enum class. The name of the state can be obtained using
+	the method `state_name()`. By convention, negative numbers represent non recoverable errors, zero is the initial state, and positive
+	are sorted up to 100 which is the READY state. The states 1..99 represent intermediate states that are specific to each class.
 
 	### Intent and piloting
 
@@ -53,6 +73,12 @@ class Agentic(ABC):
 	using the `mge` cli. An Agentic that is "always ready" does not need to define its own pilot() method. The `mge` will pilot a complete
 	Endpoint and the Endpoint will pilot its Agentics. A class that overrides the `pilot()` method must set the state according to the
 	success or failure of the piloting process.
+
+	### Running queries
+
+	This is done using the `run()` and `dry_run()` methods. Their arguments are identical, but their logic and return values are different.
+	The `run()` method executes and raises exceptions on errors. The `dry_run()` checks the request and the state of the object and
+	returns a dictionary with a status code and a description. (See the docstrings of the methods for details.)
 
 	## Validation and Debugging
 
@@ -69,10 +95,10 @@ class Agentic(ABC):
 
 	Attributes:
 
-	* `id` (str): the ID of the Agentic, composed of the IDs of its parents and its own name.
+	* `id` (str): the ID of the Agentic, composed of the IDs of its endpoint, class, its own name and an optional schema.
 	* `logger`: the logger to use for logging events. It must provide an `append()` method to add new events. It is optional.
-	* `root` (Agentic): the root of the tree. It is used to find other Agentics in the tree.
-	* `children` (dict): a dictionary of child Agentics, keyed by their IDs.
+	* `endpoint` (Agentic): the Endpoint at the root of the architecture.
+	* `tools` (dict): a dictionary of the Agentics it can use as tools, keyed by their IDs.
 	* `states` (Enum): an optional Enum class that defines names for the states of an Agentic. It is used to improve readability and cli
 	argument parsing.
 
@@ -82,28 +108,26 @@ class Agentic(ABC):
 	it is the name of the class in lowercase.
 	* `schema`: an optional string to distinguish different instances of the same class. It is a schema (like a database, a graph,
 	ontology, etc.) that the class is serving.
-	* `parent`: an optional parent Agentic. If not provided, the Agentic is the root of the tree.
+	* `endpoint`: an optional endpoint Agentic. If not provided, the Agentic is the Endpoint itself.
 	* `logger`: an optional logger. If not provided, no logging will be done.
 
 	"""
 
-	def __init__(self, my_class, schema = None, parent = None, logger = None):
+	def __init__(self, my_class, schema = None, endpoint = None, logger = None):
 		self.id		  = my_class
 		self.logger	  = logger
 		self.seq_num  = 0
-		self.root	  = self
-		self.children = {}
+		self.endpoint = self
+		self.tools	  = {}
 		self.states	  = None
 		self._meta_	  = None
 
 		if schema is not None:
 			self.id += '_' + schema
 
-		if parent is not None:
-			self.id	  = parent.id + '/' + self.id
-			self.root = parent.root
-
-			parent.add_child(self)
+		if endpoint is not None:
+			self.id		  = endpoint.id + '/' + self.id
+			self.endpoint = endpoint
 
 
 	@abstractmethod
@@ -126,25 +150,29 @@ class Agentic(ABC):
 
 	@property
 	def meta(self):
-		""" This the object's metadata as a dictionary. It is cached after the first call. """
+		""" This the object's metadata as a dictionary.
+
+		It is cached after the first call, but classes can modify the ._meta_ dictionary directly to change the metadata.
+		"""
 		if self._meta_ is None:
 			self._meta_ = self._meta()
 
 		return self._meta_
 
 
-	def add_child(self, child):
-		""" Adds a child to the Agentic.
+	def add_tool(self, agentic):
+		""" Adds a tool (another Agentic this one can use) to the Agentic.
 
 		Arguments:
-		* `child` (Agentic): the child Agentic to add. It must be an instance of Agentic and its parent must be the current Agentic.
+		* `agentic` (Agentic): the tool to add. It must be an Agentic and its endpoint must be the same as the current Agentic's.
 		"""
-
-		self.children[child.id] = child
+		self.tools[agentic.id] = agentic
 
 
 	def log_error(self, message):
 		""" Logs an error message.
+
+		The class can use this to introduce events in the logger.
 
 		Arguments:
 		* `message` (str): the error message to log.
@@ -157,6 +185,13 @@ class Agentic(ABC):
 
 	def run(self, request):
 		""" Runs a query.
+
+		The request is a valid (ChatGPT/litellm function call) dictionary. The argument evaluation can be done by the class or delegated
+		to litellm in the case of agents. This method does not provide user feedback on errors, other than raising exceptions that
+		are descendants of AgenticRunException (e.g., AgenticRunInvalidRequest, AgenticRunInvalidState, AgenticRunFailed).
+		The returned value does not provide any status key, it just assumes the request was successful.
+		The returned value is a dictionary similar to a response.choices[0] in the OpenAI API, something with a "message" key and a
+		"finish_reason" key. The "message" can be a string or a dictionary with anything.
 
 		Arguments:
 		* `request` (dict): the request to run.
@@ -179,6 +214,13 @@ class Agentic(ABC):
 
 	def dry_run(self, request):
 		""" Simulates the execution of a query.
+
+		The request is a valid (ChatGPT/litellm function call) dictionary identical to the one that would be passed to `run()` if validated.
+		This method does not raise exceptions, it provides feedback. It should not just validate the request, but also anticipate
+		the readiness of the Agentic whenever possible to prevent an AgenticRunInvalidState on run().
+
+		The return value is a {'status': 0, 'description': 'Ok.'} dictionary. The status is 0 for success. 1 for busy, 2 for invalid
+		request with an appropriate description.
 
 		Arguments:
 		* `request` (dict): the request to simulate.
