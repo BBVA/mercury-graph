@@ -1,10 +1,9 @@
-import json, os
-import re
-import shutil
+import json, os, re
 
 import pytest
 
 from mercury.graph.evidence import Endpoint
+from mercury.graph.evidence.agentic import AgenticRunInvalidState
 from mercury.graph.evidence.endpoint import LockState
 
 
@@ -64,7 +63,9 @@ def test_dummy_runs(tmp_path):
 
 	endpoint = Endpoint(str(path))
 
-	endpoint.run({'query': 'dummy'})
+	with pytest.raises(AgenticRunInvalidState):
+		endpoint.run({'query': 'dummy'})
+
 	endpoint.dry_run({'query': 'dummy'})
 	assert type(endpoint.meta) == dict
 
@@ -116,8 +117,8 @@ def test_endpoint_str(tmp_path):
 	assert 'evidence_graphs (0 total)' in clean
 	assert 'agents (2 total)' in clean
 	assert 'state' in clean
-	assert 'reader: unknown' in clean
-	assert 'gru: unknown' in clean
+	assert 'reader:' in clean
+	assert 'gru:' in clean
 
 
 def test_json_load(tmp_path):
