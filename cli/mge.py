@@ -9,6 +9,33 @@ from fastapi import Body, FastAPI, HTTPException
 import mercury.graph as mg
 
 
+class MgeFileLogger:
+    """ A minimal append-only file logger for Agentic events.
+    """
+
+    def __init__(self, path):
+        """ Initializes the logger and checks that its file can be written.
+
+        Arguments:
+            path (str): The path of the log file.
+        """
+
+        self.path = path
+        with open(self.path, 'a'):
+            pass
+
+
+    def append(self, event):
+        """ Appends an Agentic event dictionary to the log file.
+
+        Arguments:
+            event (dict): The Agentic event to log.
+        """
+
+        with open(self.path, 'a') as f:
+            f.write('%s\n' % event)
+
+
 class MgeHttpServe:
     """ The MgeHttpServe class exposes an Endpoint Agentic API over HTTP.
     """
@@ -128,6 +155,15 @@ class MgeCli:
 
         self.intent = args['intent']
         self.just_once = args['just_once']
+        self.logger = None
+
+        if args.get('log_file') is not None:
+            try:
+                self.logger = MgeFileLogger(args['log_file'])
+
+            except (OSError, TypeError, ValueError):
+                print('Error: The log file "%s" cannot be written to.' % args['log_file'])
+                sys.exit(1)
 
         if cmd != 'serve':
             return
@@ -221,7 +257,7 @@ class MgeCli:
     def pilot(self):
         """ Executes the "pilot" command after the arguments have been checked to exist. """
         try:
-            ep = mg.evidence.Endpoint(self.name)
+            ep = mg.evidence.Endpoint(self.name, logger = self.logger)
 
         except Exception:
             print('Error: Could not load the Endpoint object from "%s". Please check the path and try again.' % self.name)
@@ -251,7 +287,7 @@ class MgeCli:
         """ Executes the "serve" command after the arguments have been checked to exist. """
 
         try:
-            ep = mg.evidence.Endpoint(self.name)
+            ep = mg.evidence.Endpoint(self.name, logger = self.logger)
 
         except Exception:
             print('Error: Could not load the Endpoint object from "%s". Please check the path and try again.' % self.name)
@@ -298,7 +334,7 @@ class MgeCli:
     def complete(self):
         """ Executes the "complete". The argument self.name is ignored. Should be "bash" because it is a mandatory argument. """
 
-        print('complete -W "new summary pilot serve unlock complete --just_once --help --version" -A directory mge')
+        print('complete -W "new summary pilot serve unlock complete --just_once --log_file --help --version" -A directory mge')
 
 
 # An argparse.ArgumentParser to manage the command line interface.
@@ -326,6 +362,7 @@ parser.add_argument('name', help = 'name of new Endpoint \033[3m(for new)\033[0m
 parser.add_argument('intent', help = 'desired final state \033[3m(for pilot)\033[0m or required state \033[3m(for serve)\033[0m', nargs = '?')
 parser.add_argument('port', help = 'port to serve the Endpoint \033[3m(only for serve)\033[0m', nargs = '?')
 parser.add_argument('--just_once', action = 'store_true', help = 'stop at first run instead of until intent is reached \033[3m(only for pilot)\033[0m')
+parser.add_argument('--log_file', help = 'path of the Agentic event log file \033[3m(only for pilot and serve)\033[0m')
 parser.add_argument('--version', action = 'version', version = mg.__version__)
 
 
