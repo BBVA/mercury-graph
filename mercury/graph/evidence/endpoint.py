@@ -3,7 +3,7 @@ import json, os, re
 from enum import Enum
 
 from .agent   import Agent
-from .agentic import Agentic
+from .agentic import Agentic, AgenticRunInvalidRequest, AgenticRunInvalidState, AgenticRunFailed
 from .agentic_graph import AgenticGraph
 from .evidence_graph import EvidenceGraph
 from .formalizer import Formalizer
@@ -76,10 +76,26 @@ class Endpoint(Agentic):
 
 	Endpoints can use Agents to complete and verify their configuration with or without human intervention.
 
+	Attributes:
+
+	* `id` (str): the Agentic ID of the Endpoint.
+	* `logger`: the logger to use for logging events. It must provide an `append()` method to add new events. It is optional.
+	* `tools` (dict): a dictionary of the Agentics in the Endpoint, keyed by their IDs.
+	* `ids` (dict): a dictionary of the Agentics in the Endpoint, keyed by their types. This connects the Agentic from their category and
+		name in the architecture to IDs of the loaded objects.
+	* `states` (Enum): an optional Enum class that defines names for the states of an Agentic. It is used to improve readability and cli
+	argument parsing.
+	* `meta` (dict): a dictionary of metadata about the Agentic. It is used to store the current state of the Agentic and other information.
+
+	Arguments:
+
+	* `path`: the path to the Endpoint's home directory. The final name (the folder inside whatever path) must be identical to its
+		._normalize_name() value, that is, a name with only letters, numbers or underscores.
+	* `logger`: an optional logger. If not provided, no logging will be done.
+
 	"""
 
 	def __init__(self, path = None, logger = None):
-
 		if not os.path.isdir(path):
 			raise ValueError('The path "%s" is not a valid directory.' % path)
 
@@ -100,6 +116,7 @@ class Endpoint(Agentic):
 		super().__init__(my_class = 'endpoint', schema = schema, endpoint = None, logger = logger)
 
 		self.states = EndPointState
+		self.ids = {'sources': {}, 'ontologies': {}, 'formalizers': {}, 'evidence_graphs': {}, 'agents': {}, 'custom_agentics': {}}
 
 
 	def __str__(self):
@@ -110,7 +127,8 @@ class Endpoint(Agentic):
 		reset	 = '\033[0m'
 		labels	 = ['name', 'creation_date', 'mge_version', 'description']
 		sections = ['sources', 'ontologies', 'formalizers', 'evidence_graphs', 'agents', 'custom_agentics']
-		unknown	 = '%sunknown%s' % (italic, reset)
+		no_name	 = '%sno name%s' % (italic, reset)
+		no_obj	 = '%snot loaded%s' % (italic, reset)
 		icons	 = {
 			'endpoint': '🌐',
 			'sources': '📚',
@@ -131,7 +149,7 @@ class Endpoint(Agentic):
 		state = self.meta['state']
 		name  = self.state_name(state)
 		if name is None:
-			name = 'no name'
+			name = no_name
 
 		txt.append('   %-14s: %s %s(%s)%s' % ('state', state, italic, name, reset))
 
@@ -145,13 +163,33 @@ class Endpoint(Agentic):
 				continue
 
 			for item_name in sorted(items.keys()):
-# TODO: Get the state of each item.
-				txt.append('     - %s: %s' % (item_name, unknown))
+				id = self.ids[section_name].get(item_name, None)
+
+				if id is None:
+					txt.append('     - %s: %s' % (item_name, no_obj))
+				else:
+					agentic = self.tools[id]
+					state   = agentic.meta['state']
+					name	= agentic.state_name(state)
+					if name is None:
+						name = no_name
+
+					txt.append('     - %s: %3d (%s) id: %s' % (item_name, state, name, id))
 
 		return '\n'.join(txt)
 
 
 	def lock(self, cmd):
+		""" Locks or unlocks the Endpoint's mutex. The mutex is used to provide exclusive write access to the Endpoint's metadata for
+		piloting and serving.
+
+		Arguments:
+		* `cmd`: the lock command. It must be one of the values of the `LockState` Enum. (See source code for details.)
+
+		Returns:
+		* The final state of the mutex after the command is executed. A value in the `LockState` Enum. (See source code for details.)
+		"""
+
 		if cmd == LockState.FREE:
 			try:
 				os.rename(self.lock_fn, self.free_fn)
@@ -199,22 +237,99 @@ class Endpoint(Agentic):
 
 
 	def _run(self, request):
-		return {'status': 'ok', 'message': 'Endpoint is running.'}
+		""" The Agentic run() method. (See the Agentic class for details.) """
+
+		if self.meta['state'] < self.states.ALL_READY.value:
+			raise AgenticRunInvalidState
+
+# TODO: Implement this once the code the get the state EXPOSED_API is in place.
 
 
 	def _meta(self):
-		return {'state' : 0}
+		""" The Agentic meta() method. (See the Agentic class for details.) """
+
+		return {'state' : 0}	# Anything else is created in the different stages of pilot()
 
 
 	def _dry_run(self, request):
-		return {'status': 'ok', 'message': 'Endpoint is running.'}
+		""" The Agentic dry_run() method. (See the Agentic class for details.) """
+
+		if self.meta['state'] < self.states.ALL_READY.value:
+			return {'status': 1, 'description': 'Not ready.'}
+
+		issues = self._request_issues(request)
+
+		if issues is None:
+			return {'status': 0, 'description': 'Valid request.'}
+
+		else:
+			return {'status': 2, 'description': str(issues)}
 
 
 	def pilot(self, intent, just_once = False):
-		pass
+		""" The Agentic pilot() method. (See the Agentic class for details.) """
+
+		if self.meta['state'] < 0:					# Irrecoverable error.
+			return
+
+		try:
+			intent = int(intent)
+
+		except Exception:
+			intent = self.states[intent.upper()].value
+
+		while self.meta['state'] < intent:
+			if self.meta['state'] == self.states.INITIAL.value:
+				if self._load_objects():
+					self.meta['state'] = self.states.LOADED_OBJ.value
+				else:
+					self.meta['state'] = self.states.ERR_LOADING_OBJ.value
+					break
+
+				continue
+
+			if self.meta['state'] == self.states.LOADED_OBJ.value:
+				if self._link_objects():
+					self.meta['state'] = self.states.LINKED_OBJ.value
+				else:
+					self.meta['state'] = self.states.ERR_LINKING.value
+					break
+
+				continue
+
+			if self.meta['state'] == self.states.LINKED_OBJ.value:
+				if self._expose_api():
+					self.meta['state'] = self.states.EXPOSED_API.value
+				else:
+					self.meta['state'] = self.states.ERR_EXPOSING.value
+					break
+
+				continue
+
+			next_agentic = self._next_agentic_below(intent)
+			if next_agentic is not None:
+				next_agentic.pilot(intent, just_once = just_once)
+
+				if self._next_agentic_below(intent) is None and intent == self.states.ALL_READY.value:
+					self.meta['state'] = self.states.ALL_READY.value
+				else:
+					self.meta['state'] = self.states.PILOT_REQUIRED.value
+
+			if just_once:
+				break
 
 
 	def _json_load(self, fn, recursion_depth = 0):
+		""" Loads a JSONC file and returns the corresponding object. It also removes comments and recursively loads any referenced
+		JSONC files. The recursion depth is limited to 8 to avoid infinite loops.
+
+		Arguments:
+		* `fn`: the path to the JSONC file to load.
+		* `recursion_depth`: the current recursion depth used internally in recursive calls.
+
+		Returns:
+		* The object loaded from the JSONC file.
+		"""
 
 		if recursion_depth > 8:
 			raise ValueError('Recursion depth exceeded while loading JSON file "%s".' % fn)
@@ -242,3 +357,27 @@ class Endpoint(Agentic):
 					ret[key] = r_ret
 
 		return ret
+
+
+	def _request_issues(self, request):
+		pass
+# TODO: Implement this.
+
+
+	def _load_objects(self):
+		pass
+# TODO: Implement this.
+
+	def _link_objects(self):
+		pass
+# TODO: Implement this.
+
+	def _expose_api(self):
+		pass
+
+# TODO: Implement this.
+
+	def _next_agentic_below(self, intent):
+		pass
+
+# TODO: Implement this.
