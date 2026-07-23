@@ -85,6 +85,8 @@ def test_pilot():
 	dummy.pilot(42)
 	assert dummy.meta['state'] == 0x7fffFFFF
 
+	dummy.close(False)
+
 
 def test_run_and_log_error_write_events():
 	""" Verifies request, response, and error logging fields. """
@@ -96,7 +98,7 @@ def test_run_and_log_error_write_events():
 	response = dummy.run(request)
 
 	assert response == {'request': request, 'run_count': 1}
-	assert dummy.seq_num == 1
+	assert dummy.seq_num == 2
 	assert len(logger) == 3
 	assert logger[0]['type'] == 'error'
 	assert logger[0]['id'] == 'dummy_audit'
@@ -104,16 +106,16 @@ def test_run_and_log_error_write_events():
 	assert logger[0]['error'] == 'bad request'
 	assert logger[1]['type'] == 'request'
 	assert logger[1]['request'] is request
-	assert logger[1]['seq_num'] == 0
+	assert logger[1]['seq_num'] == 1
 	assert logger[2]['type'] == 'response'
 	assert logger[2]['response'] == response
-	assert logger[2]['seq_num'] == 0
+	assert logger[2]['seq_num'] == 1
 
 	dummy.run({'query': 'again'})
 
-	assert dummy.seq_num == 2
-	assert logger[3]['seq_num'] == 1
-	assert logger[4]['seq_num'] == 1
+	assert dummy.seq_num == 3
+	assert logger[3]['seq_num'] == 2
+	assert logger[4]['seq_num'] == 2
 
 
 def test_dry_run_and_normalize_name():
