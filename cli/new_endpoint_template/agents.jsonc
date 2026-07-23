@@ -10,11 +10,34 @@
 //
 
 	"reader": {
+		"name": "reader",
 
+		"extra_args": {
+			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
+			"description": "This Agentic does the reading.",
+
+			"api_base": "http://localhost:11434",
+			"model_name": "ollama_chat/qwen3:8b"
+		},
+
+		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
+		// Provide a list of tool names
+		"tools": ["demo", "GLiNER2", "e_graph"]
 	},
 
 	"gru": {
+		"name": "gru",
 
+		"extra_args": {
+			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
+			"description": "This Agentic does the supervision.",
+
+			"api_base": "http://localhost:11434",
+			"model_name": "ollama_chat/qwen3:8b"
+		},
+
+		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
+		// Provide a list of tool names
+		"tools": ["demo", "GLiNER2", "e_graph"]
 	}
-
 }

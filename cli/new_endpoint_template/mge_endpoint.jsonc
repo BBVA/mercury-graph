@@ -36,5 +36,11 @@
 	},
 
 	// The Endpoint's Agentic API is merged from exposed Agentics (at least one is mandatory).
-	"expose" : ["gru"]
+	"expose": ["gru"],
+
+	// When loading, if the file exists, the Endpoint will pilot itself to the state of the last save.
+	"auto_pilot": {"load" : ["state"], "file_name" : "mge_endpoint_autopilot.pickle"},
+
+	// When closing, the Endpoint will save its state.
+	"auto_save": {"save" : ["state"], "file_name" : "mge_endpoint_autopilot.pickle"}
 }

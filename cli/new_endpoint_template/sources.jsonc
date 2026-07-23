@@ -9,7 +9,7 @@
 // You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
 //
 
-	"demo_source": {
+	"demo": {
 		"name": "demo",
 
 		// "extra_args" is given to the source's constructor.

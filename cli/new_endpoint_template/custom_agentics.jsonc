@@ -12,8 +12,9 @@
 
 // A custom_agentics is any Python class that descends from Agentic provided as source to be loaded by the endpoint.
 
-// Each entry has 5 fields: name, class_name, source, extra_args and tools. The name is a unique identifier for the agentic.
-// The class_name is the name of the class that implements the agentic. The source is the name of the Python file that contains the class.
+// Each entry has 5 fields: name, class_name, $path, extra_args and tools. The name is a unique identifier for the agentic.
+// The class_name is the name of the class that implements the agentic. The $path is the name of the Python file that contains the class.
+// It is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
 // The extra_args is a dictionary of configuration parameters that will be passed to the constructor of the agentic class.
 // The tools is a list of Agentic names that the agentic can use as tools.
 
@@ -43,7 +44,7 @@
 	// "my_custom_agentic": {
 	// 	"name": "my_agentic_number_one",
 	// 	"class_name": "MyAgentic",
-	// 	"source": "my_agentic.py",
+	// 	"$path": "my_agentic.py",
 	// 	"extra_args": {
 	// 		"param1": "value1",
 	// 		"param2": "value2"
@@ -54,7 +55,7 @@
 	// "another_my_agentic": {
 	// 	"name": "my_agentic_number_two",
 	// 	"class_name": "MyAgentic",
-	// 	"source": "my_agentic.py",
+	// 	"$path": "my_agentic.py",
 	// 	"extra_args": {
 	// 		"param1": "value1",
 	// 		"param2": "value2"
@@ -65,7 +66,7 @@
 	// "another_custom_agentic": {
 	// 	"name": "another_agentic",
 	// 	"class_name": "AnotherAgentic",
-	// 	"source": "another_agentic.py",
+	// 	"$path": "another_agentic.py",
 	// 	"extra_args": {
 	// 		"paramA": "valueA",
 	// 		"paramB": "valueB"
@@ -76,7 +77,7 @@
 	"myEGraph": {
 		"name": "myEGraph",
 		"class_name": "MyCustomGraph",
-		"source": "my_egraph.py",
+		"$path": "my_e_graph.py",
 		"extra_args": {
 			"param1": "value1",
 			"param2": "value2"
