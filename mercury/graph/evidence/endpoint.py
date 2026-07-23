@@ -179,6 +179,27 @@ class Endpoint(Agentic):
 		return '\n'.join(txt)
 
 
+	def __del__(self):
+		""" Destructor. It calls the close() of each Agentic in the Endpoint. """
+
+		endpoint_locked = self.lock(LockState.INIT_IF_NONE) == LockState.LOCK
+
+		for a in self.tools.values():
+			if self.logger is not None:
+				msg	  = 'Closing Agentic "%s" endpoint_locked = %s.' % (a.id, endpoint_locked)
+				event = {'type': 'message', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'message': msg}
+
+				self.logger.append(event)
+
+			a.close(endpoint_locked)
+
+		if self.logger is not None:
+			msg	  = 'Closing Endpoint "%s".' % self.id
+			event = {'type': 'message', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'message': msg}
+
+			self.logger.append(event)
+
+
 	def lock(self, cmd):
 		""" Locks or unlocks the Endpoint's mutex. The mutex is used to provide exclusive write access to the Endpoint's metadata for
 		piloting and serving.
