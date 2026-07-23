@@ -2,7 +2,7 @@ import importlib, json, os, pickle, re
 
 from enum import Enum
 
-from .agent   import Agent
+from .agent import Agent
 from .agentic import Agentic, AgenticRunInvalidRequest, AgenticRunInvalidState, AgenticRunFailed
 from .agentic_graph import AgenticGraph
 from .evidence_graph import EvidenceGraph
@@ -516,11 +516,22 @@ class Endpoint(Agentic):
 
 
 	def _link_objects(self):
-		pass
+		""" This method is called by pilot() when all the Agentic objects have been loaded. It just looks for what tools each one requires
+		as defined in the configuration field 'tools'. It checks that every tool is found and the resulting graph does not have cycles.
+
+		Once that is done, it calls the add_tool() method of each Agentic which required tools to make them available.
+
+		The pilot() method calls this method when appropriate and sets the state according to the success.
+
+		Returns:
+		* True if all objects were linked successfully, False otherwise.
+		"""
 # TODO: Implement this.
+
 
 	def _expose_api(self):
 		pass
+
 
 # TODO: Implement this.
 
