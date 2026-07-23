@@ -1,4 +1,4 @@
-import json, os, re
+import importlib, json, os, pickle, re
 
 from enum import Enum
 
@@ -426,8 +426,94 @@ class Endpoint(Agentic):
 
 
 	def _load_objects(self):
-		pass
-# TODO: Implement this.
+		""" This method parses the self.conf dictionary, category by category: sources, ontologies, formalizers, evidence_graphs,
+		agents and custom_agentics.
+
+		It creates and instance of each, passing extra arguments to the constructor if they are present in the configuration.
+		These instances are verified to have unique IDs and are stored in self.ids.
+
+		The pilot() method calls this method when appropriate and sets the state according to the success.
+
+		Returns:
+		* True if all objects were loaded successfully, False otherwise.
+		"""
+
+		def _resolve_conf_paths(arg):
+			"""Resolve endpoint-relative paths inside configuration objects."""
+
+			new_arg = {}
+
+			for key, value in arg.items():
+				if key == '$path':
+					new_arg['path'] = os.path.abspath(os.path.join(self.home, value))
+				elif type(value) == dict:
+					new_arg[key] = _resolve_conf_paths(value)
+				else:
+					new_arg[key] = value
+
+			return new_arg
+
+		def _load_custom_agentic_class(class_name, file_path):
+			"""Load a custom Agentic class from a Python source file."""
+
+			module_name = os.path.splitext(os.path.basename(file_path))[0]
+
+			spec = importlib.util.spec_from_file_location(module_name, file_path)
+
+			if spec is None or spec.loader is None:
+				return None
+
+			module = importlib.util.module_from_spec(spec)
+			spec.loader.exec_module(module)
+			custom_class = getattr(module, class_name, None)
+
+			if custom_class is None or not issubclass(custom_class, Agentic):
+				return None
+
+			return custom_class
+
+		section_classes = {
+			'sources': Source,
+			'ontologies': AgenticGraph,
+			'formalizers': Formalizer,
+			'evidence_graphs': EvidenceGraph,
+			'agents': Agent,
+			'custom_agentics': None
+		}
+		for section in self.ids.keys():
+			for value in self.conf[section].values():
+				agentic_def = _resolve_conf_paths(value)
+
+				name = agentic_def['name']
+				extra_args = agentic_def.get('extra_args', {})
+				tools = agentic_def.get('tools', [])
+
+				agentic_class = section_classes[section]
+
+				if agentic_class is None:
+					agentic_class = _load_custom_agentic_class(agentic_def['class_name'], agentic_def['path'])
+
+					if agentic_class is None:
+						return False
+
+				agentic = agentic_class(schema = name, endpoint = self, logger = self.logger, extra_args = extra_args)
+
+				id = agentic.id
+
+				if name in self.ids[section]:
+					self.log_error('Duplicate name (%s) in section "%s"' % (name, section))
+					return False
+
+				self.ids[section][name] = id
+
+				if id in self.tools:
+					self.log_error('Duplicate ID (%s) in section "%s"' % (id, section))
+					return False
+
+				self.tools[id] = agentic
+
+		return True
+
 
 	def _link_objects(self):
 		pass
