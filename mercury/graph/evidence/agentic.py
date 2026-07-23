@@ -188,6 +188,7 @@ class Agentic(ABC):
 			event = {'type': 'error', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'error': message}
 
 			self.logger.append(event)
+			self.seq_num += 1
 
 
 	def run(self, request):
@@ -252,7 +253,7 @@ class Agentic(ABC):
 		self._meta_['state'] = 0x7fffFFFF	# This is higher than any state. That means the object is always "more than ready".
 
 
-	def close(self, endpoint_locked = False):
+	def close(self, endpoint_locked):
 		""" Closes the Agentic.
 
 		This method is called just once when the Endpoint is closing. The Agentic can track its own state to know if it was modified and
