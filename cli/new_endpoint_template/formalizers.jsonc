@@ -9,4 +9,20 @@
 // You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
 //
 
+	"GLiNER2": {
+		"name": "GLiNER2",
+
+		// "extra_args" is given to the formalizer's constructor.
+		"extra_args": {
+			// The description will be exposed in the Formalizer's Agentic API. It can be a string or a list of strings.
+			"description": "This Agentic Formalizer extracts entities and relationships from text.",
+
+			// The model_name is the name of the GLiNER2. In the future, we may support other models.
+			"model_name": "microsoft/GLiNER2"
+		},
+
+		// "tools" declares what tools does the formalizer expect. The endpoint will find them an provide them via `add_tool()`.
+		// Provide a list of tool names
+		"tools": ["entities", "relationships"]
+	}
 }
