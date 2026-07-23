@@ -273,6 +273,7 @@ class MgeCli:
             ep.pilot(self.intent, just_once = self.just_once)
 
         finally:
+            ep.close(True)
             ep.lock(mg.evidence.endpoint.LockState.FREE)
 
         state = ep.meta['state']
@@ -313,6 +314,7 @@ class MgeCli:
             MgeHttpServe(ep).serve(self.port)
 
         finally:
+            ep.close(True)
             ep.lock(mg.evidence.endpoint.LockState.FREE)
 
 
