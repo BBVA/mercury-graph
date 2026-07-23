@@ -185,7 +185,7 @@ class Agentic(ABC):
 		* `message` (str): the error message to log.
 		"""
 		if self.logger is not None:
-			event = {'type': 'error', 'timestamp': datetime.datetime.now(), 'id': self.id, 'seq_num': self.seq_num, 'error': message}
+			event = {'type': 'error', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'error': message}
 
 			self.logger.append(event)
 
@@ -204,14 +204,14 @@ class Agentic(ABC):
 		* `request` (dict): the request to run.
 		"""
 		if self.logger is not None:
-			event = {'type': 'request', 'timestamp': datetime.datetime.now(), 'id': self.id, 'seq_num': self.seq_num, 'request': request}
+			event = {'type': 'request', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'request': request}
 
 			self.logger.append(event)
 
 		ret = self._run(request)
 
 		if self.logger is not None:
-			event = {'type': 'response', 'timestamp': datetime.datetime.now(), 'id': self.id, 'seq_num': self.seq_num, 'response': ret}
+			event = {'type': 'response', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'response': ret}
 
 			self.logger.append(event)
 			self.seq_num += 1
@@ -294,3 +294,9 @@ class Agentic(ABC):
 		name = re.sub('[^a-zA-Z0-9_]', '', name)
 
 		return name
+
+
+	@staticmethod
+	def _now():
+		""" Returns the current time as a formatted string. """
+		return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
