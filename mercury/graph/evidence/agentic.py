@@ -80,6 +80,13 @@ class Agentic(ABC):
 	The `run()` method executes and raises exceptions on errors. The `dry_run()` checks the request and the state of the object and
 	returns a dictionary with a status code and a description. (See the docstrings of the methods for details.)
 
+	### Closing the Agentic
+
+	The agentic has a method `close()` that is called just once when the Endpoint is closing. The Agentic can track its own state
+	to know if it was modified and is informed by the Endpoint if it was locked for writing. The Endpoint is locked during the pilot
+	and serve phases. It that case, if the Agentic was modified, it should persist its state to disk or a database. (see the docstring
+	of close() for details.)
+
 	## Validation and Debugging
 
 	The descendants are responsible for validating the input and returning/logging errors. Additionally, they can use the method
@@ -243,6 +250,19 @@ class Agentic(ABC):
 			self._meta_ = self._meta()
 
 		self._meta_['state'] = 0x7fffFFFF	# This is higher than any state. That means the object is always "more than ready".
+
+
+	def close(self, endpoint_locked = False):
+		""" Closes the Agentic.
+
+		This method is called just once when the Endpoint is closing. The Agentic can track its own state to know if it was modified and
+		is informed by the Endpoint if it was locked for writing. The Endpoint is locked during the pilot and serve phases. It that case,
+		if the Agentic was modified, it should persist its state to disk or a database.
+
+		Arguments:
+		* `endpoint_locked` (bool): True if the Endpoint is locked for writing, False otherwise.
+		"""
+		pass
 
 
 	def state_name(self, state):
