@@ -129,6 +129,7 @@ class Endpoint(Agentic):
 		sections = ['sources', 'ontologies', 'formalizers', 'evidence_graphs', 'agents', 'custom_agentics']
 		no_name	 = '%sno name%s' % (italic, reset)
 		no_obj	 = '%snot loaded%s' % (italic, reset)
+		no_state = '%sno state%s' % (italic, reset)
 		icons	 = {
 			'endpoint': '🌐',
 			'sources': '📚',
@@ -169,12 +170,16 @@ class Endpoint(Agentic):
 					txt.append('     - %s: %s' % (item_name, no_obj))
 				else:
 					agentic = self.tools[id]
-					state   = agentic.meta['state']
-					name	= agentic.state_name(state)
-					if name is None:
-						name = no_name
+					state   = agentic.meta.get('state', None)
+					if state is None:
+						state = no_state
+						name  = no_name
+					else:
+						name = agentic.state_name(state)
+						if name is None:
+							name = no_name
 
-					txt.append('     - %s: %3d (%s) id: %s' % (item_name, state, name, id))
+					txt.append('     - %s: %s (%s) id: %s' % (item_name, state, name, id))
 
 		return '\n'.join(txt)
 
