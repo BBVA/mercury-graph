@@ -118,6 +118,26 @@ class Endpoint(Agentic):
 		self.states = EndPointState
 		self.ids = {'sources': {}, 'ontologies': {}, 'formalizers': {}, 'evidence_graphs': {}, 'agents': {}, 'custom_agentics': {}}
 
+		auto_pilot = self.conf.get('auto_pilot', None)
+		if auto_pilot is not None:
+			path = os.path.abspath(os.path.join(self.home, auto_pilot['file_name']))
+
+			if os.path.isfile(path):
+				with open(path, 'rb') as f:
+					obj = pickle.load(f)
+
+				intent = obj.get('state', self.meta['state'])
+
+				if intent > self.meta['state']:
+					if self.logger is not None:
+						msg	  = 'Auto-piloting Endpoint "%s" to state %d.' % (self.id, intent)
+						event = {'type': 'message', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'message': msg}
+
+						self.logger.append(event)
+						self.seq_num += 1
+
+					self.pilot(intent)
+
 
 	def __str__(self):
 		""" Returns a console friendly summary of the Endpoint state. """
@@ -184,10 +204,8 @@ class Endpoint(Agentic):
 		return '\n'.join(txt)
 
 
-	def __del__(self):
-		""" Destructor. It calls the close() of each Agentic in the Endpoint. """
-
-		endpoint_locked = self.lock(LockState.INIT_IF_NONE) == LockState.LOCK
+	def close(self, endpoint_locked):
+		""" It calls the close() of each Agentic in the Endpoint. And persists itself to disk. """
 
 		for a in self.tools.values():
 			if self.logger is not None:
@@ -203,6 +221,23 @@ class Endpoint(Agentic):
 			event = {'type': 'message', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'message': msg}
 
 			self.logger.append(event)
+			self.seq_num += 1
+
+		if endpoint_locked:
+			auto_save = self.conf.get('auto_save', None)
+
+			if auto_save is None:
+				return
+
+			path = os.path.abspath(os.path.join(self.home, self.conf['auto_save']['file_name']))
+
+			obj = {}
+
+			for key in self.conf['auto_save']['save']:
+				obj[key] = self.meta[key]
+
+			with open(path, 'wb') as f:
+				pickle.dump(obj, f)
 
 
 	def lock(self, cmd):
