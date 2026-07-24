@@ -174,6 +174,10 @@ class Endpoint(Agentic):
 
 		txt.append('   %-14s: %s %s(%s)%s' % ('state', state, italic, name, reset))
 
+		capabilities = self.meta.get('capabilities', None)
+		if capabilities is not None:
+			txt.append('   %-14s: %s' % ('capabilities', '(%d total) %s' % (len(capabilities), list(self.agentic_by_capability.keys()))))
+
 		for section_name in sections:
 			items = self.conf.get(section_name, {})
 			txt.append('')
