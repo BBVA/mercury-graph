@@ -1,4 +1,4 @@
-from .agentic import Agentic
+from .agentic import Agentic, AgenticRunInvalidState, AlwaysReadyState
 
 
 class Formalizer(Agentic):
@@ -25,12 +25,12 @@ class Formalizer(Agentic):
 
 
 	def _run(self, request):
-		return {'status': 'ok'}
+		raise AgenticRunInvalidState
 
 
 	def _meta(self):
-		return {'status': 'ok'}
+		return {'state' : AlwaysReadyState.INITIAL.value}
 
 
 	def _dry_run(self, request):
-		return {'status': 'ok'}
+		return {'status': 1, 'description': 'Not ready.'}
