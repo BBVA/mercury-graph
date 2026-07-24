@@ -123,5 +123,5 @@ class Source(Agentic):
 						"type": "string"
 					}
 				}
-			},
+			}
 		]
