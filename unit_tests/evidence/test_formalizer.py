@@ -1,6 +1,7 @@
 import pytest
 
 from mercury.graph.evidence import Formalizer
+from mercury.graph.evidence.agentic import AgenticRunInvalidState
 
 
 def test_formalizer():
@@ -8,7 +9,9 @@ def test_formalizer():
 	assert type(f) is Formalizer
 	assert Formalizer(extra_args = {'test': True}).conf == {'test': True}
 
-	f.run({'cmd': 'test'})
+	with pytest.raises(AgenticRunInvalidState):
+		f.run({'cmd': 'test'})
+
 	f._dry_run({'cmd': 'test'})
 	assert type(f.meta) == dict
 

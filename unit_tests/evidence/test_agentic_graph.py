@@ -1,6 +1,7 @@
 import pytest
 
 from mercury.graph.evidence import AgenticGraph
+from mercury.graph.evidence.agentic import AgenticRunInvalidState
 
 
 def test_agentic_graph():
@@ -8,7 +9,9 @@ def test_agentic_graph():
 	assert type(ag) is AgenticGraph
 	assert AgenticGraph(extra_args = {'test': True}).conf == {'test': True}
 
-	ag.run({'cmd': 'test'})
+	with pytest.raises(AgenticRunInvalidState):
+		ag.run({'cmd': 'test'})
+
 	ag._dry_run({'cmd': 'test'})
 	assert type(ag.meta) == dict
 
