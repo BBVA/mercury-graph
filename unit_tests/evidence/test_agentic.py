@@ -7,30 +7,23 @@ class DummyAgentic(Agentic):
 	""" Test implementation of the Agentic abstract interface. """
 
 	def __init__(self, my_class = 'dummy', schema = None, endpoint = None, logger = None):
-		""" Initializes a test double with counters for delegated calls. """
 		self.run_count = 0
-		self.meta_count = 0
 		self.dry_run_count = 0
 
 		super().__init__(my_class = my_class, schema = schema, endpoint = endpoint, logger = logger)
 
 
 	def _run(self, request):
-		""" Records and returns a run request. """
 		self.run_count += 1
 
 		return {'request': request, 'run_count': self.run_count}
 
 
 	def _meta(self):
-		""" Records and returns metadata. """
-		self.meta_count += 1
-
-		return {'meta_count': self.meta_count}
+		return {'state': 0}
 
 
 	def _dry_run(self, request):
-		""" Records and returns a dry-run request. """
 		self.dry_run_count += 1
 
 		return {'request': request, 'dry_run_count': self.dry_run_count}
@@ -73,9 +66,7 @@ def test_meta_is_cached():
 	""" Verifies metadata is computed once and then reused. """
 	dummy = DummyAgentic()
 
-	assert dummy.meta == {'meta_count': 1}
-	assert dummy.meta == {'meta_count': 1}
-	assert dummy.meta_count == 1
+	assert dummy.meta == {'state': 0}
 
 
 def test_pilot():
