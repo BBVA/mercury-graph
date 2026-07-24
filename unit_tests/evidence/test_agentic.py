@@ -83,7 +83,7 @@ def test_pilot():
 	dummy = DummyAgentic()
 
 	dummy.pilot(42)
-	assert dummy.meta['state'] == 0x7fffFFFF
+	assert dummy.meta['state'] == 100
 
 	dummy.close(False)
 

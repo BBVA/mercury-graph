@@ -1,6 +1,7 @@
 import datetime, re
 
 from abc import ABC, abstractmethod
+from enum import Enum
 
 
 class AgenticRunException(Exception):
@@ -21,6 +22,13 @@ class AgenticRunInvalidState(AgenticRunException):
 class AgenticRunFailed(AgenticRunException):
 	"""The Agentic attempted to execute the request but failed."""
 	pass
+
+
+class AlwaysReadyState(Enum):
+	""" The `AlwaysReadyState` is valid for any Agentic that does not need piloting.
+	"""
+	INITIAL	=  0	# The initial state of the Agentic.
+	READY	=  100	# The Agentic is ready. Calling the parent's pilot() method will set that state, doing nothing else.
 
 
 class Agentic(ABC):
@@ -126,7 +134,7 @@ class Agentic(ABC):
 		self.seq_num  = 0
 		self.endpoint = self
 		self.tools	  = {}
-		self.states	  = None
+		self.states	  = AlwaysReadyState
 		self._meta_	  = None
 
 		if schema is not None:
@@ -250,7 +258,7 @@ class Agentic(ABC):
 		if self._meta_ is None:
 			self._meta_ = self._meta()
 
-		self._meta_['state'] = 0x7fffFFFF	# This is higher than any state. That means the object is always "more than ready".
+		self._meta_['state'] = AlwaysReadyState.READY.value
 
 
 	def close(self, endpoint_locked):
