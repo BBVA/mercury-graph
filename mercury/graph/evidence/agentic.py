@@ -27,8 +27,9 @@ class AgenticRunFailed(AgenticRunException):
 class AlwaysReadyState(Enum):
 	""" The `AlwaysReadyState` is valid for any Agentic that does not need piloting.
 	"""
-	INITIAL	=  0	# The initial state of the Agentic.
-	READY	=  100	# The Agentic is ready. Calling the parent's pilot() method will set that state, doing nothing else.
+	CONSTRUCTION_FAILED	= -1	# The Agentic failed to construct itself. It is not usable.
+	INITIAL				=  0	# The initial state of the Agentic.
+	READY				=  100	# The Agentic is ready. Calling the parent's pilot() method will set that state, doing nothing else.
 
 
 class Agentic(ABC):
@@ -247,7 +248,8 @@ class Agentic(ABC):
 	def pilot(self, intent, just_once = False):
 		""" Pilots the object to a desired state.
 
-		In the parent class, this method returns the object as "always ready". The classes that need piloting must override it.
+		In the parent class, this method returns the object as AlwaysReadyState.READY unless it is in an error (negative) state.
+		The classes that need piloting must override it.
 
 		Arguments:
 		* `intent` (str): the desired state to pilot to. It must be a valid state name in the object's meta.
@@ -258,7 +260,8 @@ class Agentic(ABC):
 		if self._meta_ is None:
 			self._meta_ = self._meta()
 
-		self._meta_['state'] = AlwaysReadyState.READY.value
+		if self._meta_['state'] >= 0:
+			self._meta_['state'] = AlwaysReadyState.READY.value
 
 
 	def close(self, endpoint_locked):
