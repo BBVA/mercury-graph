@@ -545,14 +545,14 @@ class Endpoint(Agentic):
 
 			return False
 
-		name_to_agentic = {}
+		self.name_to_agentic = {}
 		for section in self.ids.keys():
 			for name, id in self.ids[section].items():
-				if name in name_to_agentic:
+				if name in self.name_to_agentic:
 					self.log_error('Duplicate tool name (%s).' % name)
 					return False
 
-				name_to_agentic[name] = self.tools[id]
+				self.name_to_agentic[name] = self.tools[id]
 
 		edges = {}
 		for section in self.ids.keys():
@@ -561,7 +561,7 @@ class Endpoint(Agentic):
 				edges[name] = []
 
 				for tool_name in tool_names:
-					tool = name_to_agentic.get(tool_name, None)
+					tool = self.name_to_agentic.get(tool_name, None)
 
 					if tool is None:
 						self.log_error('Tool "%s" required by "%s" was not found.' % (tool_name, name))
@@ -580,16 +580,65 @@ class Endpoint(Agentic):
 				agentic = self.tools[id]
 
 				for tool_name in edges.get(name, []):
-					agentic.add_tool(name_to_agentic[tool_name])
+					agentic.add_tool(self.name_to_agentic[tool_name])
 
 		return True
 
 
 	def _expose_api(self):
-		pass
+		""" This method called by pilot() builds the capabilities of the Endpoint by merging the capabilities of all the Agentics that
+		in the 'expose' list of the Endpoint's configuration. It also checks that all the capabilities have unique names and
+		builds a dictionary of capabilities by name and Agentic named `agentic_by_capability` for the run() and dry_run() methods.
+		It also updates the Endpoint's meta with the capabilities.
 
+		The pilot() method calls this method when appropriate and sets the state according to the success.
 
-# TODO: Implement this.
+		Returns:
+		* True if no errors found exposing the capabilities, False otherwise.
+		"""
+		expose = self.conf.get('expose', None)
+
+		if type(expose) != list or len(expose) == 0:
+			self.log_error('The Endpoint configuration must define a non-empty "expose" list.')
+			return False
+
+		capabilities = []
+		agentic_by_capability = {}
+
+		for agentic_name in expose:
+			agentic = self.name_to_agentic.get(agentic_name, None)
+			if agentic is None:
+				self.log_error('Agentic "%s" in "expose" was not found in Endpoint architecture.' % agentic_name)
+				return False
+
+			agentic_capabilities = agentic.meta.get('capabilities', None)
+			if agentic_capabilities is None:
+				self.log_error('Agentic "%s" does not expose any capabilities.' % agentic.id)
+				return False
+
+			for capability in agentic_capabilities:
+				function = capability.get('function', None)
+				if type(function) != dict:
+					self.log_error('Agentic "%s" has a capability without a valid "function" object.' % agentic_name)
+					return False
+
+				capability_name = function.get('name', None)
+				if type(capability_name) != str or capability_name != self._normalize_name(capability_name):
+					self.log_error('Agentic "%s" has a capability without a valid function name.' % agentic_name)
+					return False
+
+				if capability_name in agentic_by_capability:
+					self.log_error('Duplicate exposed capability "%s".' % (capability_name))
+					return False
+
+				capabilities.append(capability)
+				agentic_by_capability[capability_name] = agentic
+
+		self.meta['capabilities']  = capabilities
+		self.agentic_by_capability = agentic_by_capability
+
+		return True
+
 
 	def _next_agentic_below(self, intent):
 		pass
