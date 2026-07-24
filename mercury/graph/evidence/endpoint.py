@@ -369,6 +369,10 @@ class Endpoint(Agentic):
 
 			next_agentic = self._next_agentic_below(intent)
 			if next_agentic is not None:
+				if next_agentic.meta['state'] < 0:
+					self.meta['state'] = self.states.ERR_IN_OBJECT.value
+					break
+
 				next_agentic.pilot(intent, just_once = just_once)
 
 				if self._next_agentic_below(intent) is None and intent == self.states.ALL_READY.value:
