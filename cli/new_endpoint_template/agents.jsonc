@@ -17,7 +17,35 @@
 			"description": "This Agentic does the reading.",
 
 			"api_base": "http://localhost:11434",
-			"model_name": "ollama_chat/qwen3:8b"
+			"model_name": "ollama_chat/qwen3:8b",
+
+			"capabilities": [
+				{
+					"name": "chat_with_reader",
+					"description": "Chat with READER agent.",
+					"type": "function",
+					"function": {
+						"name": "chat_with_reader",
+						"description": "Chat with READER agent.",
+						"parameters": {
+							"type": "object",
+							"properties": {
+								"message": {
+									"type": "string",
+									"description": "Message to send to the READER agent."
+								}
+							},
+							"required": ["message"]
+						},
+						"returns": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						}
+					}
+				}
+			]
 		},
 
 		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
@@ -33,7 +61,35 @@
 			"description": "This Agentic does the supervision.",
 
 			"api_base": "http://localhost:11434",
-			"model_name": "ollama_chat/qwen3:8b"
+			"model_name": "ollama_chat/qwen3:8b",
+
+			"capabilities": [
+				{
+					"name": "chat_with_gru",
+					"description": "Chat with GRU agent.",
+					"type": "function",
+					"function": {
+						"name": "chat_with_gru",
+						"description": "Chat with GRU agent.",
+						"parameters": {
+							"type": "object",
+							"properties": {
+								"message": {
+									"type": "string",
+									"description": "Message to send to the GRU agent."
+								}
+							},
+							"required": ["message"]
+						},
+						"returns": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						}
+					}
+				}
+			]
 		},
 
 		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
