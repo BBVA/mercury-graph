@@ -641,6 +641,16 @@ class Endpoint(Agentic):
 
 
 	def _next_agentic_below(self, intent):
-		pass
+		""" This method is called by pilot() to find the first Agentic in the Endpoint whose state is below the desired intent.
+		It may be and error state, in which case the Endpoint will set its state to ERR_IN_OBJECT and stop piloting.
 
-# TODO: Implement this.
+		The pilot() method calls this method when appropriate and sets the state according to the success.
+
+		Returns:
+		* The first Agentic whose state is below the desired intent, or None if all Agentics are at or above the intent.
+		"""
+		for agentic in self.tools.values():
+			if agentic.meta['state'] < intent:
+				return agentic
+
+		return None
