@@ -78,6 +78,8 @@ class Source(Agentic):
 			self.log_error('Source is in error state %d' % state)
 			return
 
+		self.meta['state'] = self.states.READY.value
+
 
 	def _capabilities(self):
 		return [
