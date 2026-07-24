@@ -526,7 +526,63 @@ class Endpoint(Agentic):
 		Returns:
 		* True if all objects were linked successfully, False otherwise.
 		"""
-# TODO: Implement this.
+
+		def _has_cycle(name, visiting, visited):
+			if name in visited:
+				return False
+
+			if name in visiting:
+				return True
+
+			visiting.add(name)
+
+			for tool_name in edges.get(name, []):
+				if _has_cycle(tool_name, visiting, visited):
+					return True
+
+			visiting.remove(name)
+			visited.add(name)
+
+			return False
+
+		name_to_agentic = {}
+		for section in self.ids.keys():
+			for name, id in self.ids[section].items():
+				if name in name_to_agentic:
+					self.log_error('Duplicate tool name (%s).' % name)
+					return False
+
+				name_to_agentic[name] = self.tools[id]
+
+		edges = {}
+		for section in self.ids.keys():
+			for name in self.conf[section].keys():
+				tool_names = self.conf[section][name].get('tools', [])
+				edges[name] = []
+
+				for tool_name in tool_names:
+					tool = name_to_agentic.get(tool_name, None)
+
+					if tool is None:
+						self.log_error('Tool "%s" required by "%s" was not found.' % (tool_name, name))
+						return False
+
+					edges[name].append(tool_name)
+
+		visited = set()
+		for name in edges.keys():
+			if _has_cycle(name, set(), visited):
+				self.log_error('Cycle detected in tool dependencies involving "%s".' % name)
+				return False
+
+		for section in self.ids.keys():
+			for name, id in self.ids[section].items():
+				agentic = self.tools[id]
+
+				for tool_name in edges.get(name, []):
+					agentic.add_tool(name_to_agentic[tool_name])
+
+		return True
 
 
 	def _expose_api(self):
