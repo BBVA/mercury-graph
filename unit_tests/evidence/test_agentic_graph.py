@@ -5,9 +5,9 @@ from mercury.graph.evidence.agentic import AgenticRunInvalidState
 
 
 def test_agentic_graph():
-	ag = AgenticGraph(schema = 'any')
+	ag = AgenticGraph(schema = 'any', extra_args = {'test': True})
 	assert type(ag) is AgenticGraph
-	assert AgenticGraph(extra_args = {'test': True}).conf == {'test': True}
+	assert AgenticGraph(schema = 'any', extra_args = {'test': True}).conf == {'test': True}
 
 	with pytest.raises(AgenticRunInvalidState):
 		ag.run({'cmd': 'test'})

@@ -4,9 +4,9 @@ from mercury.graph.evidence import Source
 
 
 def test_source():
-	s = Source(schema = 'any')
+	s = Source(schema = 'any', extra_args = {'test': True})
 	assert type(s) is Source
-	assert Source(extra_args = {'test': True}).conf == {'test': True}
+	assert Source(schema = 'any', extra_args = {'test': True}).conf == {'test': True}
 	assert s.state_name(0) == 'INITIAL'
 
 	s.run({'cmd': 'test'})

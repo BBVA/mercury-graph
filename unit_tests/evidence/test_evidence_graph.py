@@ -4,9 +4,9 @@ from mercury.graph.evidence import EvidenceGraph
 from mercury.graph.evidence.agentic import AgenticRunInvalidState
 
 def test_evidence_graph():
-	eg = EvidenceGraph(schema = 'any')
+	eg = EvidenceGraph(schema = 'any', extra_args = {'test': True})
 	assert type(eg) is EvidenceGraph
-	assert EvidenceGraph(extra_args = {'test': True}).conf == {'test': True}
+	assert EvidenceGraph(schema = 'any', extra_args = {'test': True}).conf == {'test': True}
 
 	with pytest.raises(AgenticRunInvalidState):
 		eg.run({'cmd': 'test'})

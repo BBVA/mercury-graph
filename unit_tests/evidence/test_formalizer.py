@@ -5,9 +5,9 @@ from mercury.graph.evidence.agentic import AgenticRunInvalidState
 
 
 def test_formalizer():
-	f = Formalizer(schema = 'any')
+	f = Formalizer(schema = 'any', extra_args = {'test': True})
 	assert type(f) is Formalizer
-	assert Formalizer(extra_args = {'test': True}).conf == {'test': True}
+	assert Formalizer(schema = 'any', extra_args = {'test': True}).conf == {'test': True}
 
 	with pytest.raises(AgenticRunInvalidState):
 		f.run({'cmd': 'test'})
