@@ -77,21 +77,19 @@ class Endpoint(Agentic):
 	Endpoints can use Agents to complete and verify their configuration with or without human intervention.
 
 	Attributes:
+		id (str): the Agentic ID of the Endpoint.
+		logger (list): the logger to use for logging events. It must provide an `append()` method to add new events. It is optional.
+		tools (dict): a dictionary of the Agentics in the Endpoint, keyed by their IDs.
+		ids (dict): a dictionary of the Agentics in the Endpoint, keyed by their types. This connects the Agentic from their category and
+			name in the architecture to IDs of the loaded objects.
+		states (Enum): an optional Enum class that defines names for the states of an Agentic. It is used to improve readability and cli
+			argument parsing.
+		meta (dict): a dictionary of metadata about the Agentic. It is used to store the current state of the Agentic and other information.
 
-	* `id` (str): the Agentic ID of the Endpoint.
-	* `logger`: the logger to use for logging events. It must provide an `append()` method to add new events. It is optional.
-	* `tools` (dict): a dictionary of the Agentics in the Endpoint, keyed by their IDs.
-	* `ids` (dict): a dictionary of the Agentics in the Endpoint, keyed by their types. This connects the Agentic from their category and
-		name in the architecture to IDs of the loaded objects.
-	* `states` (Enum): an optional Enum class that defines names for the states of an Agentic. It is used to improve readability and cli
-	argument parsing.
-	* `meta` (dict): a dictionary of metadata about the Agentic. It is used to store the current state of the Agentic and other information.
-
-	Arguments:
-
-	* `path`: the path to the Endpoint's home directory. The final name (the folder inside whatever path) must be identical to its
-		._normalize_name() value, that is, a name with only letters, numbers or underscores.
-	* `logger`: an optional logger. If not provided, no logging will be done.
+	Args:
+		path (str): the path to the Endpoint's home directory. The final name (the folder inside whatever path) must be identical to its
+			._normalize_name() value, that is, a name with only letters, numbers or underscores.
+		logger (list): an optional logger. If not provided, no logging will be done.
 
 	"""
 
@@ -209,7 +207,10 @@ class Endpoint(Agentic):
 
 
 	def close(self, endpoint_locked):
-		""" It calls the close() of each Agentic in the Endpoint. And persists itself to disk. """
+		""" It calls the close() of each Agentic in the Endpoint. And persists its state to disk.
+
+			(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
+		"""
 
 		for a in self.tools.values():
 			if self.logger is not None:
@@ -248,11 +249,12 @@ class Endpoint(Agentic):
 		""" Locks or unlocks the Endpoint's mutex. The mutex is used to provide exclusive write access to the Endpoint's metadata for
 		piloting and serving.
 
-		Arguments:
-		* `cmd`: the lock command. It must be one of the values of the `LockState` Enum. (See source code for details.)
+		Args:
+			cmd (LockState): the lock command. It must be one of the values of the `LockState` Enum. (See source code for details.)
 
 		Returns:
-		* The final state of the mutex after the command is executed. A value in the `LockState` Enum. (See source code for details.)
+			(LockState): the final state of the mutex after the command is executed. A value in the `LockState` Enum.
+				(See source code for details.)
 		"""
 
 		if cmd == LockState.FREE:
@@ -302,7 +304,10 @@ class Endpoint(Agentic):
 
 
 	def _run(self, request):
-		""" The Agentic run() method. (See the Agentic class for details.) """
+		""" Runs the Endpoint with the given request.
+
+		(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
+		"""
 
 		if self.meta['state'] < self.states.ALL_READY.value:
 			raise AgenticRunInvalidState
@@ -311,13 +316,19 @@ class Endpoint(Agentic):
 
 
 	def _meta(self):
-		""" The Agentic meta() method. (See the Agentic class for details.) """
+		""" Returns the metadata of the Endpoint.
+
+			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
+		"""
 
 		return {'state' : 0}	# Anything else is created in the different stages of pilot()
 
 
 	def _dry_run(self, request):
-		""" The Agentic dry_run() method. (See the Agentic class for details.) """
+		""" Runs a dry run of the Endpoint with the given request.
+
+			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+		"""
 
 		if self.meta['state'] < self.states.ALL_READY.value:
 			return {'status': 1, 'description': 'Not ready.'}
@@ -332,7 +343,10 @@ class Endpoint(Agentic):
 
 
 	def pilot(self, intent, just_once = False):
-		""" The Agentic pilot() method. (See the Agentic class for details.) """
+		""" Pilots the Endpoint to a new state based on the given intent.
+
+		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
+		"""
 
 		if self.meta['state'] < 0:					# Irrecoverable error.
 			return
@@ -392,12 +406,12 @@ class Endpoint(Agentic):
 		""" Loads a JSONC file and returns the corresponding object. It also removes comments and recursively loads any referenced
 		JSONC files. The recursion depth is limited to 8 to avoid infinite loops.
 
-		Arguments:
-		* `fn`: the path to the JSONC file to load.
-		* `recursion_depth`: the current recursion depth used internally in recursive calls.
+		Args:
+			fn (str): the path to the JSONC file to load.
+			recursion_depth (int): the current recursion depth used internally in recursive calls.
 
 		Returns:
-		* The object loaded from the JSONC file.
+			(any): The object loaded from the JSONC file.
 		"""
 
 		if recursion_depth > 8:
@@ -429,6 +443,17 @@ class Endpoint(Agentic):
 
 
 	def _request_issues(self, request):
+		""" Matches the request against the Endpoint's capabilities following the formats described in:
+		[`Agentic.run()`][mercury.graph.evidence.Agentic.run]
+
+		Args:
+			request (dict): the request to check.
+
+		Returns:
+			(None or str): None if the request is valid, or a string describing the issues found.
+
+		"""
+
 		pass
 # TODO: Implement this.
 
@@ -443,7 +468,7 @@ class Endpoint(Agentic):
 		The pilot() method calls this method when appropriate and sets the state according to the success.
 
 		Returns:
-		* True if all objects were loaded successfully, False otherwise.
+			(bool): True if all objects were loaded successfully, False otherwise.
 		"""
 
 		def _resolve_conf_paths(arg):
@@ -524,15 +549,17 @@ class Endpoint(Agentic):
 
 
 	def _link_objects(self):
-		""" This method is called by pilot() when all the Agentic objects have been loaded. It just looks for what tools each one requires
-		as defined in the configuration field 'tools'. It checks that every tool is found and the resulting graph does not have cycles.
+		""" This method is called by pilot() when all the Agentic objects have been loaded.
+
+		It just looks for what tools each one requires as defined in the configuration field 'tools'. It checks that every tool is
+		found and the resulting graph does not have cycles.
 
 		Once that is done, it calls the add_tool() method of each Agentic which required tools to make them available.
 
 		The pilot() method calls this method when appropriate and sets the state according to the success.
 
 		Returns:
-		* True if all objects were linked successfully, False otherwise.
+			(bool): True if all objects were linked successfully, False otherwise.
 		"""
 
 		def _has_cycle(name, visiting, visited):
@@ -595,15 +622,19 @@ class Endpoint(Agentic):
 
 	def _expose_api(self):
 		""" This method called by pilot() builds the capabilities of the Endpoint by merging the capabilities of all the Agentics that
-		in the 'expose' list of the Endpoint's configuration. It also checks that all the capabilities have unique names and
-		builds a dictionary of capabilities by name and Agentic named `agentic_by_capability` for the run() and dry_run() methods.
+		in the 'expose' list of the Endpoint's configuration.
+
+		It also checks that all the capabilities have unique names and builds a dictionary of capabilities by name and Agentic named
+		`agentic_by_capability` for the run() and dry_run() methods.
+
 		It also updates the Endpoint's meta with the capabilities.
 
 		The pilot() method calls this method when appropriate and sets the state according to the success.
 
 		Returns:
-		* True if no errors found exposing the capabilities, False otherwise.
+			(bool): True if no errors found exposing the capabilities, False otherwise.
 		"""
+
 		expose = self.conf.get('expose', None)
 
 		if type(expose) != list or len(expose) == 0:
@@ -650,13 +681,15 @@ class Endpoint(Agentic):
 
 	def _next_agentic_below(self, intent):
 		""" This method is called by pilot() to find the first Agentic in the Endpoint whose state is below the desired intent.
+
 		It may be and error state, in which case the Endpoint will set its state to ERR_IN_OBJECT and stop piloting.
 
 		The pilot() method calls this method when appropriate and sets the state according to the success.
 
 		Returns:
-		* The first Agentic whose state is below the desired intent, or None if all Agentics are at or above the intent.
+			(Agentic or None): The first Agentic whose state is below the desired intent, or None if all Agentics are at or above.
 		"""
+
 		for agentic in self.tools.values():
 			if agentic.meta['state'] < intent:
 				return agentic
