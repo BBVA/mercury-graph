@@ -13,24 +13,39 @@ class AgenticGraph(Agentic):
 	Ontologies, dictionaries and storages that in general will expect key/value stores are just a special case of graphs (without edges).
 	Therefore, this is also the storage for all these things.
 
+	Args:
+		schema (str): a schema (a unique name) to use for the AgenticGraph's ID.
+		extra_args (dict): the configuration for the AgenticGraph.
+		endpoint (Agentic): an optional Endpoint. It becomes part of the AgenticGraph's ID and is available via `self.endpoint`. If not
+			provided, the AgenticGraph becomes its own Endpoint.
+		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
 
-	def __init__(self, schema = None, endpoint = None, logger = None, extra_args = None):
+	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'agentic_graph', schema = schema, endpoint = endpoint, logger = logger)
 
-		if extra_args is not None:
-			self.conf = extra_args
-		else:
-			self.conf = {}
+		self.conf = extra_args
 
 
 	def _run(self, request):
+		""" Runs the AgenticGraph with the given request.
+
+			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
+		"""
 		raise AgenticRunInvalidState
 
 
 	def _meta(self):
+		""" Returns the metadata of the AgenticGraph.
+
+			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
+		"""
 		return {'state' : AlwaysReadyState.INITIAL.value}
 
 
 	def _dry_run(self, request):
+		""" Simulates running the AgenticGraph with the given request.
+
+			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+		"""
 		return {'status': 1, 'description': 'Not ready.'}

@@ -39,24 +39,39 @@ class EvidenceGraph(Agentic):
 	- Disambiguating ambiguous references.
 	- Grounding responses in traceable sources.
 
+	Args:
+		schema (str): a schema (a unique name) to use for the EvidenceGraph's ID.
+		extra_args (dict): the configuration for the EvidenceGraph.
+		endpoint (Agentic): an optional Endpoint. It becomes part of the EvidenceGraph's ID and is available via `self.endpoint`. If not
+			provided, the EvidenceGraph becomes its own Endpoint.
+		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
 
-	def __init__(self, schema = None, endpoint = None, logger = None, extra_args = None):
+	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'evidence_graph', schema = schema, endpoint = endpoint, logger = logger)
 
-		if extra_args is not None:
-			self.conf = extra_args
-		else:
-			self.conf = {}
+		self.conf = extra_args
 
 
 	def _run(self, request):
+		""" Runs the EvidenceGraph with the given request.
+
+			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
+		"""
 		raise AgenticRunInvalidState
 
 
 	def _meta(self):
+		""" Returns the metadata of the EvidenceGraph.
+
+			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
+		"""
 		return {'state' : AlwaysReadyState.INITIAL.value}
 
 
 	def _dry_run(self, request):
+		""" Simulates running the EvidenceGraph with the given request.
+
+			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+		"""
 		return {'status': 1, 'description': 'Not ready.'}
