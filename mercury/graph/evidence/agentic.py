@@ -87,7 +87,7 @@ class Agentic(ABC):
 
 	This is done using the `run()` and `dry_run()` methods. Their arguments are identical, but their logic and return values are different.
 
-	In all cases, the dictionary defines a capability (see [`Agentic.run()`](./#mercury.graph.evidence.Agentic.run) for	details.) that
+	In all cases, the dictionary defines a capability (see [`Agentic.run()`][mercury.graph.evidence.Agentic.run] for details.) that
 	must contain a valid function name in the object's capabilities.
 
 	In the case of a non-AI Agentic, the capability will be used to forward the request to the appropriate method. In the case of an Agent,
@@ -153,7 +153,11 @@ class Agentic(ABC):
 
 	@abstractmethod
 	def _run(self, request):
-		""" This is the method that actually runs the query. It MUST be implemented by the descendants. """
+		""" This is the method that actually runs the query. It MUST be implemented by the descendants.
+
+		The method [`Agentic.run()`][mercury.graph.evidence.Agentic.run] is a wrapper that logs the request and response, this method
+		does the actual work.
+		"""
 		pass
 
 
@@ -165,7 +169,11 @@ class Agentic(ABC):
 
 	@abstractmethod
 	def _dry_run(self, request):
-		""" This is the method that simulates the execution of a query. It MUST be implemented by the descendants. """
+		""" This is the method that simulates the execution of a query. It MUST be implemented by the descendants.
+
+		The method [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run] is a wrapper that logs the request and response, this
+		method does the actual work.
+		"""
 		pass
 
 
@@ -174,6 +182,10 @@ class Agentic(ABC):
 		""" This the object's metadata as a dictionary.
 
 		It is cached after the first call, but classes can modify the ._meta_ dictionary directly to change the metadata.
+
+		Returns:
+			(dict): the metadata of the object. This contains, at the minimum, the keys "state" (see
+				[`pilot()`][mercury.graph.evidence.Agentic.pilot]) and "capabilities" (see [`Agent`][mercury.graph.evidence.Agent]).
 		"""
 		if self._meta_ is None:
 			self._meta_ = self._meta()
@@ -261,7 +273,7 @@ class Agentic(ABC):
 	def dry_run(self, request):
 		""" Simulates the execution of a query.
 
-		The request is a valid argument identical to the one expected by [`Agentic.run()`](./#mercury.graph.evidence.Agentic.run).
+		The request is a valid argument identical to the one expected by [`Agentic.run()`][mercury.graph.evidence.Agentic.run].
 
 		This method does not raise exceptions, it provides feedback. It should not just validate the request, but also anticipate
 		the readiness of the Agentic whenever possible to prevent an AgenticRunInvalidState on run().
@@ -283,6 +295,8 @@ class Agentic(ABC):
 
 		In the parent class, this method returns the object as AlwaysReadyState.READY unless it is in an error (negative) state.
 		The classes that need piloting must override it.
+
+		(See [`Intent and piloting`][mercury.graph.evidence.Agentic] for details.)
 
 		Args:
 			intent (str): the desired state to pilot to. It must be a valid state name in the object's meta.
