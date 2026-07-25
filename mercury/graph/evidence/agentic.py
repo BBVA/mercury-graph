@@ -86,6 +86,14 @@ class Agentic(ABC):
 	### Running queries
 
 	This is done using the `run()` and `dry_run()` methods. Their arguments are identical, but their logic and return values are different.
+
+	In all cases, the dictionary defines a capability (see [`Agentic.run()`](./#mercury.graph.evidence.Agentic.run) for	details.) that
+	must contain a valid function name in the object's capabilities.
+
+	In the case of a non-AI Agentic, the capability will be used to forward the request to the appropriate method. In the case of an Agent,
+	the capability provides the function's description in the message list. In the case of an Endpoint, the capability is used to find
+	who will handle the request.
+
 	The `run()` method executes and raises exceptions on errors. The `dry_run()` checks the request and the state of the object and
 	returns a dictionary with a status code and a description. (See the docstrings of the methods for details.)
 
@@ -110,23 +118,20 @@ class Agentic(ABC):
 	## API:
 
 	Attributes:
+		id (str): the ID of the Agentic, composed of the IDs of its endpoint, class, its own name and an optional schema.
+		logger: the logger to use for logging events. It must provide an `append()` method to add new events. It is optional.
+		endpoint (Agentic): the Endpoint at the root of the architecture.
+		tools (dict): a dictionary of the Agentics it can use as tools, keyed by their IDs.
+		states (Enum): an optional Enum class that defines names for the states of an Agentic. It is used to improve readability and cli
+			argument parsing.
 
-	* `id` (str): the ID of the Agentic, composed of the IDs of its endpoint, class, its own name and an optional schema.
-	* `logger`: the logger to use for logging events. It must provide an `append()` method to add new events. It is optional.
-	* `endpoint` (Agentic): the Endpoint at the root of the architecture.
-	* `tools` (dict): a dictionary of the Agentics it can use as tools, keyed by their IDs.
-	* `states` (Enum): an optional Enum class that defines names for the states of an Agentic. It is used to improve readability and cli
-	argument parsing.
-
-	Arguments:
-
-	* `my_class`: the name of the class, used to build the ID. It must ba a string of letters, numbers, and underscores. Typically,
-	it is the name of the class in lowercase.
-	* `schema`: an optional string to distinguish different instances of the same class. It is a schema (like a database, a graph,
-	ontology, etc.) that the class is serving.
-	* `endpoint`: an optional endpoint Agentic. If not provided, the Agentic is the Endpoint itself.
-	* `logger`: an optional logger. If not provided, no logging will be done.
-
+	Args:
+		my_class (str): the name of the class, used to build the ID. It must ba a string of letters, numbers, and underscores. Typically,
+			it is the name of the class in lowercase.
+		schema (str): an optional string to distinguish different instances of the same class. It is a schema (like a database, a graph,
+			ontology, etc.) that the class is serving.
+		endpoint (str): an optional endpoint Agentic. If not provided, the Agentic is the Endpoint itself.
+		logger (list): an optional logger. If not provided, no logging will be done.
 	"""
 
 	def __init__(self, my_class, schema = None, endpoint = None, logger = None):
@@ -179,8 +184,8 @@ class Agentic(ABC):
 	def add_tool(self, agentic):
 		""" Adds a tool (another Agentic this one can use) to the Agentic.
 
-		Arguments:
-		* `agentic` (Agentic): the tool to add. It must be an Agentic and its endpoint must be the same as the current Agentic's.
+		Args:
+			agentic (Agentic): the tool to add. It must be an Agentic and its endpoint must be the same as the current Agentic's.
 		"""
 		self.tools[agentic.id] = agentic
 
@@ -190,8 +195,8 @@ class Agentic(ABC):
 
 		The class can use this to introduce events in the logger.
 
-		Arguments:
-		* `message` (str): the error message to log.
+		Args:
+			message (str): the error message to log.
 		"""
 		if self.logger is not None:
 			event = {'type': 'error', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'error': message}
@@ -203,16 +208,40 @@ class Agentic(ABC):
 	def run(self, request):
 		""" Runs a query.
 
-		The request is a valid (ChatGPT/litellm function call) dictionary. The argument evaluation can be done by the class or delegated
-		to litellm in the case of agents. This method does not provide user feedback on errors, other than raising exceptions that
-		are descendants of AgenticRunException (e.g., AgenticRunInvalidRequest, AgenticRunInvalidState, AgenticRunFailed).
-		The returned value does not provide any status key, it just assumes the request was successful.
-		The returned value is a dictionary similar to a response.choices[0] in the OpenAI API, something with a "message" key and a
-		"finish_reason" key. The "message" can be a string or a dictionary with anything.
+		## Expected input
 
-		Arguments:
-		* `request` (dict): the request to run.
+		The request is a valid (ChatGPT/litellm function call) that can be any of the following (from simplest to most complex):
+
+		1. A pure function call {"arguments": (mandatory), "name": (mandatory), "id": optional, "type": "function" (not used)}
+		2. A unique message {"content": (mandatory), "role": (mandatory), "id": optional, "tool_calls": optional}
+		3. A list of messages [ ... ]
+
+		###NOTES:
+		1. When the Agentic has multiple capabilities, the request must be a function call since the capability is the function name.
+		2. When an id is provided, it must be returned in the response. It is used to match requests and responses in history.
+
+		## Expected output
+
+		This method does not provide user feedback on errors, other than raising exceptions that are descendants of AgenticRunException
+		(e.g., AgenticRunInvalidRequest, AgenticRunInvalidState, AgenticRunFailed). Use the `dry_run()` method to validate the request.
+
+		The returned value does not provide any status key, it just assumes the request was successful.
+
+		The returned value is a dictionary similar to a response.choices[0] in the OpenAI API, with these keys:
+
+		* "finish_reason": A string in {'stop', 'tool_calls', 'error'}. (Anything is an ending condition, unless its lower case form starts
+			with 'tool' or 'error'.) Errors are just a "normal" ending that will be highlighted and the content will typically be an error
+			message. Tool calls are a special condition that will be handled by the Endpoint. Only Agentics with a single capability can
+			use tool calls, since the Endpoint will call them with the result in a list of messages.
+		* "message": A dictionary with {"content" (mandatory), "role" (optional), "id" (for tool calls), "tool_calls" (optional)}}
+
+		Args:
+			request (dict): the request to run.
+
+		Returns:
+			(dict): the response to the request.
 		"""
+
 		if self.logger is not None:
 			event = {'type': 'request', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'request': request}
 
@@ -232,15 +261,19 @@ class Agentic(ABC):
 	def dry_run(self, request):
 		""" Simulates the execution of a query.
 
-		The request is a valid (ChatGPT/litellm function call) dictionary identical to the one that would be passed to `run()` if validated.
+		The request is a valid argument identical to the one expected by [`Agentic.run()`](./#mercury.graph.evidence.Agentic.run).
+
 		This method does not raise exceptions, it provides feedback. It should not just validate the request, but also anticipate
 		the readiness of the Agentic whenever possible to prevent an AgenticRunInvalidState on run().
 
-		The return value is a {'status': 0, 'description': 'Ok.'} dictionary. The status is 0 for success. 1 for busy, 2 for invalid
-		request with an appropriate description.
+		The return value is a
 
-		Arguments:
-		* `request` (dict): the request to simulate.
+		Args:
+			request (dict): the request to simulate.
+
+		Returns:
+			(dict): {'status': 0, 'description': 'Ok.'} dictionary. The status is 0 for success. 1 for busy, 2 for invalid
+				request with an appropriate description.
 		"""
 		return self._dry_run(request)
 
@@ -251,11 +284,15 @@ class Agentic(ABC):
 		In the parent class, this method returns the object as AlwaysReadyState.READY unless it is in an error (negative) state.
 		The classes that need piloting must override it.
 
-		Arguments:
-		* `intent` (str): the desired state to pilot to. It must be a valid state name in the object's meta.
-		* `just_once` (bool): An optional argument to break without necessarily reaching the desired state after completing one iteration.
-			The iteration is Agentic specific and can be anything, (E.g., a complete file chunked and processed, ...) That parameter is
-			intended for when piloting can take hours or days and the user wants a finer control of the process.
+		Args:
+			intent (str): the desired state to pilot to. It must be a valid state name in the object's meta.
+			just_once (bool): An optional argument to break without necessarily reaching the desired state after completing one iteration.
+				The iteration is Agentic specific and can be anything, (E.g., a complete file chunked and processed, ...) That parameter is
+				intended for when piloting can take hours or days and the user wants a finer control of the process.
+
+		Returns:
+			(bool): True if the object is in the desired state (or advanced towards it one step when just_once is True), False otherwise.
+
 		"""
 		if self._meta_ is None:
 			self._meta_ = self._meta()
@@ -271,8 +308,8 @@ class Agentic(ABC):
 		is informed by the Endpoint if it was locked for writing. The Endpoint is locked during the pilot and serve phases. It that case,
 		if the Agentic was modified, it should persist its state to disk or a database.
 
-		Arguments:
-		* `endpoint_locked` (bool): True if the Endpoint is locked for writing, False otherwise.
+		Args:
+			endpoint_locked (bool): True if the Endpoint is locked for writing, False otherwise.
 		"""
 		pass
 
@@ -280,8 +317,11 @@ class Agentic(ABC):
 	def state_name(self, state):
 		""" Returns the name of a state given its integer value.
 
-		Arguments:
-		* `state` (int): the integer value of the state.
+		Args:
+			state (int): the integer value of the state.
+
+		Returns:
+			(str): the name of the state, or None if the state is not defined in the object's states Enum.
 		"""
 		if self.states is not None:
 			try:
@@ -299,8 +339,11 @@ class Agentic(ABC):
 
 		That replaces spaces with underscores and removes any character that is not a letter, number, or underscore.
 
-		Arguments:
-		* `name` (str): the name to normalize.
+		Args:
+			name (str): the name to normalize.
+
+		Returns:
+			(str): the normalized name.
 		"""
 		name = name.replace(' ', '_')
 		name = re.sub('[^a-zA-Z0-9_]', '', name)
@@ -310,5 +353,9 @@ class Agentic(ABC):
 
 	@staticmethod
 	def _now():
-		""" Returns the current time as a formatted string. """
+		""" Returns the current time as a formatted string.
+
+		Returns:
+			(str): the current time as %Y-%m-%d %H:%M:%S.
+		"""
 		return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
