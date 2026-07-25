@@ -42,7 +42,7 @@ class Agent(Agentic):
 		schema (str): a schema (a unique name) to use for the Agent's ID.
 		extra_args (dict): the configuration for the Agent.
 		endpoint (Agentic): an optional Endpoint to use for the Agent's ID.
-		logger: an optional logger to use for logging events. It must provide an `append()` method to add new events.
+		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
 
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
@@ -56,12 +56,17 @@ class Agent(Agentic):
 	def _run(self, request):
 		""" Runs the Agent with the given request.
 
-			(See [`Agentic.run()`](./#mercury.graph.evidence.Agentic.run))
+			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
 		raise AgenticRunInvalidState
 
 
 	def _meta(self):
+		""" Returns the metadata of the Agent.
+
+			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
+		"""
+
 		meta = {'state' : AlwaysReadyState.CONSTRUCTION_FAILED.value}
 
 		if self.conf is None or 'api_base' not in self.conf or 'capabilities' not in self.conf or 'model_name' not in self.conf:
@@ -76,6 +81,6 @@ class Agent(Agentic):
 	def _dry_run(self, request):
 		""" Simulates running the Agent with the given request.
 
-			(See [`Agentic.dry_run()`](./#mercury.graph.evidence.Agentic.dry_run))
+			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
 		"""
 		return {'status': 1, 'description': 'Not ready.'}
