@@ -41,7 +41,8 @@ class Agent(Agentic):
 	Args:
 		schema (str): a schema (a unique name) to use for the Agent's ID.
 		extra_args (dict): the configuration for the Agent.
-		endpoint (Agentic): an optional Endpoint to use for the Agent's ID.
+		endpoint (Agentic): an optional Endpoint. It becomes part of the Agent's ID and is available via `self.endpoint`. If not
+			provided, the Agent becomes its own Endpoint.
 		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
 
