@@ -504,7 +504,7 @@ class Endpoint(Agentic):
 					if agentic_class is None:
 						return False
 
-				agentic = agentic_class(schema = name, endpoint = self, logger = self.logger, extra_args = extra_args)
+				agentic = agentic_class(schema = name, extra_args = extra_args, endpoint = self, logger = self.logger)
 
 				id = agentic.id
 
