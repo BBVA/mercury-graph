@@ -37,20 +37,27 @@ class Agent(Agentic):
 	Agents are defined entirely by their configuration (model, capabilities and tools). Note that all capabilities in an Agent can
 	use all tools. If you want to restrict tool availability, just define more Agents. Agents are intentionally "narrow" in scope.
 	You can use as many as you want, either exposing them in the Endpoint or letting another Agent use them as a tool.
+
+	Args:
+		schema (str): a schema (a unique name) to use for the Agent's ID.
+		extra_args (dict): the configuration for the Agent.
+		endpoint (Agentic): an optional Endpoint to use for the Agent's ID.
+		logger: an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
 
-	def __init__(self, schema = None, endpoint = None, logger = None, extra_args = None):
+	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'agent', schema = schema, endpoint = endpoint, logger = logger)
 
-		if extra_args is not None:
-			self.conf = extra_args
-		else:
-			self.conf = {}
+		self.conf = extra_args
 
 		self.pilot(AlwaysReadyState.READY.value)	# This forces a call to _meta() to check the configuration.
 
 
 	def _run(self, request):
+		""" Runs the Agent with the given request.
+
+			(See [`Agentic.run()`](./#mercury.graph.evidence.Agentic.run))
+		"""
 		raise AgenticRunInvalidState
 
 
@@ -67,5 +74,8 @@ class Agent(Agentic):
 
 
 	def _dry_run(self, request):
-		return {'status': 1, 'description': 'Not ready.'}
+		""" Simulates running the Agent with the given request.
 
+			(See [`Agentic.dry_run()`](./#mercury.graph.evidence.Agentic.dry_run))
+		"""
+		return {'status': 1, 'description': 'Not ready.'}

@@ -5,9 +5,9 @@ from mercury.graph.evidence.agentic import AgenticRunInvalidState
 
 
 def test_agent():
-	a = Agent(schema = 'any')
+	a = Agent(schema = 'any', extra_args = {})
 	assert type(a) is Agent
-	assert Agent(extra_args = {'test': True}).conf == {'test': True}
+	assert Agent(schema = '',extra_args = {'test': True}).conf == {'test': True}
 
 	assert a.meta['state'] < 0
 
