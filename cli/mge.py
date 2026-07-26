@@ -126,7 +126,7 @@ class MgeHttpServe:
             request (dict): The JSON request body.
 
         Returns:
-			dict: The validated request body.
+			(dict): The validated request body.
         """
 
         if type(request) != dict:
@@ -187,7 +187,7 @@ class MgeCli:
             cmd (str): The command to execute.
 
         Returns:
-            list: The output of the command as a list of strings.
+            (list): The output of the command as a list of strings.
         """
 
         try:
