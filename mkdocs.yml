@@ -40,6 +40,7 @@ nav:
   - mercury.graph.evidence: reference/evidence.md
   - mercury.graph.ml: reference/ml.md
   - mercury.graph.viz: reference/viz.md
+  - mercury.graph.mge: reference/evidence_cli.md
 
 docs_dir: docs
 site_dir: site
