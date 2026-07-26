@@ -46,7 +46,9 @@ class Endpoint(Agentic):
 	`mge_endpoint.jsonc` file and a file named either `mge_endpoint.free` or `mge_endpoint.locked` that acts as a write mutex.
 	`Endpoint` is the only object that owns the architecture of the tree.
 
-	For any "outside" Agentic user, an `Endpoint` is just another Agentic service. It is a graph of Agentic objects.
+	For any "outside" Agentic user, an `Endpoint` is just another Agentic service. It is a graph of Agentic objects. There are
+	two ways to do this: Create as many Endpoints as you want in your Python code and use them as Agentics or, more commonly,
+	use the [`mge`](evidence_cli.md) cli to maintain and serve the Endpoints persisted in the file system as a folder.
 
 	### What the Endpoint manages
 
@@ -62,7 +64,7 @@ class Endpoint(Agentic):
 	* Saving, loading and parsing (manually edited) its own definition stored in a folder with its name and a `mge_endpoint.jsonc` file.
 		That file also contains configuration of Agentics stored as separate files in the same folder.
 	* A mechanism to `pilot` the Endpoint's state up to a desired state. This is different from the `run()` method which runs queries
-		using the Endpoint's Agentic interface. Piloting is a process typically done using the `mge` cli.
+		using the Endpoint's Agentic interface. Piloting is a process typically done using the [`mge`](evidence_cli.md) cli.
 	* The mutex providing exclusive write access to the objects. The Endpoint is locked when the cli either serves or pilots the Endpoint.
 		It can also be done programmatically by calling the `lock()` method. This is mandatory when the metadata is modified.
 	* It's own Agentic API. This exposes a set of functions merged from the Agentics that are marked as "exposed" in the Endpoint's conf.
