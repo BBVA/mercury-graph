@@ -11,15 +11,12 @@ import mercury.graph as mg
 
 class MgeFileLogger:
     """ A minimal append-only file logger for Agentic events.
+
+    Args:
+		path (str): The path to the log file.
     """
 
     def __init__(self, path):
-        """ Initializes the logger and checks that its file can be written.
-
-        Arguments:
-            path (str): The path of the log file.
-        """
-
         self.path = path
         with open(self.path, 'a'):
             pass
@@ -38,15 +35,12 @@ class MgeFileLogger:
 
 class MgeHttpServe:
     """ The MgeHttpServe class exposes an Endpoint Agentic API over HTTP.
+
+    Args:
+		ep (Endpoint): The Endpoint to expose.
     """
 
     def __init__(self, ep):
-        """ Initializes the HTTP server object.
-
-        Arguments:
-            ep (Endpoint): The Endpoint to expose.
-        """
-
         self.ep = ep
         self.app = FastAPI(title = 'Mercury-graph Evidence Endpoint', version = mg.__version__)
 
@@ -71,7 +65,7 @@ class MgeHttpServe:
     def run(self, request = Body(...)):
         """ Runs a request against the Endpoint.
 
-        Arguments:
+        Args:
             request (dict): The JSON request body.
         """
 
@@ -99,7 +93,7 @@ class MgeHttpServe:
     def dry_run(self, request = Body(...)):
         """ Simulates running a request against the Endpoint.
 
-        Arguments:
+        Args:
             request (dict): The JSON request body.
         """
 
@@ -118,7 +112,7 @@ class MgeHttpServe:
     def serve(self, port):
         """ Starts the HTTP server.
 
-        Arguments:
+        Args:
             port (int): The TCP port to listen on.
         """
 
@@ -128,8 +122,11 @@ class MgeHttpServe:
     def __validated_request(self, request):
         """ Checks that a request body is a JSON object.
 
-        Arguments:
+        Args:
             request (dict): The JSON request body.
+
+        Returns:
+			dict: The validated request body.
         """
 
         if type(request) != dict:
@@ -140,6 +137,9 @@ class MgeHttpServe:
 
 class MgeCli:
     """ The MgeCli class is a command line interface for managing Mercury-graph Evidence Endpoint objects.
+
+    Args:
+		args (dict): The command line arguments as parsed by argparse.
     """
 
     def __init__(self, args):
@@ -185,6 +185,7 @@ class MgeCli:
 
         Args:
             cmd (str): The command to execute.
+
         Returns:
             list: The output of the command as a list of strings.
         """
@@ -256,6 +257,7 @@ class MgeCli:
 
     def pilot(self):
         """ Executes the "pilot" command after the arguments have been checked to exist. """
+
         try:
             ep = mg.evidence.Endpoint(self.name, logger = self.logger)
 
