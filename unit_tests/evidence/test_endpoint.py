@@ -1,4 +1,4 @@
-import json, os, pickle, re
+import builtins, json, os, pickle, re
 
 from unittest.mock import Mock
 
@@ -238,6 +238,69 @@ def test_endpoint_str_loaded_objects_and_capabilities(tmp_path):
 	assert 'empty: no state' in text
 	assert 'unknown: 99 (no name)' in text
 	assert 'ready: 100 (ALL_READY)' in text
+
+
+def test_endpoint_dry_run_request_issues(tmp_path, monkeypatch):
+	endpoint = _make_endpoint(tmp_path, 'dry_run_request_issues')
+	endpoint._meta_ = {'state': EndPointState.ALL_READY.value, 'capabilities': []}
+
+	assert endpoint.dry_run({}) == {'status': 2, 'description': 'Endpoint has no capabilities.'}
+
+	monkeypatch.setattr(endpoint, '_request_issues', lambda request: None)
+	assert endpoint.dry_run({}) == {'status': 0, 'description': 'Valid request.'}
+	monkeypatch.setattr(endpoint, '_request_issues', lambda request: 'bad request')
+	assert endpoint.dry_run({}) == {'status': 2, 'description': 'bad request'}
+
+
+def test_endpoint_request_issues(tmp_path, monkeypatch):
+	endpoint = _make_endpoint(tmp_path, 'request_issues')
+
+	endpoint._meta_ = {'state': EndPointState.ALL_READY.value, 'capabilities': [{}]}
+	endpoint.capabilities_by_name = {}
+	assert endpoint._request_issues(123) == 'Request must be a dictionary with "content" and "role".'
+	assert endpoint._request_issues({}) == 'Request must be a dictionary with "content" and "role".'
+	assert endpoint._request_issues({'content': 'hello'}) is None
+	assert endpoint._request_issues([{'role': 'user'}, {'content': 'hello'}]) is None
+	assert endpoint._request_issues([{'role': 'user'}, 'invalid']) == 'Request must be a dictionary with "content" and "role".'
+
+	endpoint._meta_['capabilities'] = [{}, {}]
+	assert endpoint._request_issues([]) == 'Request must be a dictionary with a "name" (of a capability) and "arguments".'
+
+	endpoint._meta_['capabilities'] = [{}]
+	endpoint.capabilities_by_name = {
+		'valid': {'function': {'parameters': {'required': ['required']}}},
+		'no_function': {},
+		'bad_function': {'function': 'invalid'},
+		'no_parameters': {'function': {}},
+		'bad_parameters': {'function': {'parameters': []}}
+	}
+
+	assert endpoint._request_issues({'name': 1, 'arguments': {}}) == 'Request must have a "name" key with a string value.'
+	assert endpoint._request_issues({'name': 'missing', 'arguments': {}}) == 'Capability "missing" not found in Endpoint.'
+	assert endpoint._request_issues({'name': 'valid', 'arguments': []}) == 'Request must have an "arguments" key with a dictionary value.'
+	assert endpoint._request_issues({'name': 'no_function', 'arguments': {}}) == 'Definition of capability "no_function" is malformed. No function details given. Edit its configuration to fix it.'
+	assert endpoint._request_issues({'name': 'bad_function', 'arguments': {}}) == 'Definition of capability "bad_function" is malformed. No function details given. Edit its configuration to fix it.'
+	assert endpoint._request_issues({'name': 'no_parameters', 'arguments': {}}) == 'Definition of capability "no_parameters" is malformed. No parameters given. Edit its configuration to fix it.'
+	assert endpoint._request_issues({'name': 'bad_parameters', 'arguments': {}}) == 'Definition of capability "bad_parameters" is malformed. No parameters given. Edit its configuration to fix it.'
+	assert endpoint._request_issues({'name': 'valid', 'arguments': {}}) == 'Request is missing required argument "required".'
+	assert endpoint._request_issues({'name': 'valid', 'arguments': {'required': True}}) is None
+
+	class ArgumentsRemovedByGet(dict):
+		def get(self, key, default = None):
+			value = super().get(key, default)
+			if key == 'arguments':
+				self.pop(key, None)
+			return value
+
+	real_type = builtins.type
+	def fake_type(value):
+		if isinstance(value, ArgumentsRemovedByGet):
+			return dict
+		return real_type(value)
+
+	monkeypatch.setattr(endpoint_module, 'type', fake_type, raising = False)
+	request = ArgumentsRemovedByGet(name = 'valid', arguments = {'required': True})
+	assert endpoint._request_issues(request) == 'Request must have an "arguments" key.'
 
 
 def test_endpoint_pilot_states(tmp_path, monkeypatch):
