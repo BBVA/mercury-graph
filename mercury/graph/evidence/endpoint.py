@@ -3,16 +3,29 @@ import importlib, json, os, pickle, re
 from enum import Enum
 
 from .agent import Agent
-from .agentic import Agentic, AgenticRunInvalidRequest, AgenticRunInvalidState, AgenticRunFailed
+from .agentic import Agentic, AgenticRunException, AgenticRunInvalidRequest, AgenticRunInvalidState, AgenticRunFailed
 from .agentic_graph import AgenticGraph
 from .evidence_graph import EvidenceGraph
 from .formalizer import Formalizer
 from .source import Source
 
 
+class AgenticFailedToFindCapability(AgenticRunException):
+	""" The Endpoint could not identify which Agentic and/or which capability to call. """
+
+	pass
+
+
+class AgenticFailedToParseOutput(AgenticRunException):
+	""" The Endpoint could not parse the output of an Agentic call. No {'finish_reason': ...} was found. """
+
+	pass
+
+
+
 class LockState(Enum):
-	""" The `LockState` is an enumeration that defines the possible states of the Endpoint lock.
-	"""
+	""" The `LockState` is an enumeration that defines the possible states of the Endpoint lock. """
+
 	FORCE_FREE	 = -2	# Special command to force the mutex to be free. This is a dangerous operation that should be used with caution.
 	INIT_IF_NONE = -1	# Special command create the mutex if it does not exist. Just returns the state if it does.
 	FREE		 =  0	# The command to free the mutex and the state when free.
@@ -22,8 +35,8 @@ class LockState(Enum):
 
 
 class EndPointState(Enum):
-	""" The `EndPointState` is an enumeration that defines the possible states of the Endpoint.
-	"""
+	""" The `EndPointState` is an enumeration that defines the possible states of the Endpoint. """
+
 	ERR_IN_OBJECT	= -5	# Some loaded object in the Endpoint is in an error state.
 	ERR_PILOTING	= -4	# The Endpoint failed to pilot some objects.
 	ERR_EXPOSING	= -3	# The Endpoint failed to building its API.
@@ -92,7 +105,6 @@ class Endpoint(Agentic):
 		path (str): the path to the Endpoint's home directory. The final name (the folder inside whatever path) must be identical to its
 			._normalize_name() value, that is, a name with only letters, numbers or underscores.
 		logger (list): an optional logger. If not provided, no logging will be done.
-
 	"""
 
 	def __init__(self, path = None, logger = None):
@@ -309,6 +321,21 @@ class Endpoint(Agentic):
 		""" Runs the Endpoint with the given request.
 
 		(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
+
+		This can raise its own AgenticRunException:
+
+		* AgenticFailedToFindCapability When the Endpoint could not identify which Agentic and/or which capability to call.
+		* AgenticFailedToParseOutput When the Endpoint could not parse the output.
+
+		Notes:
+			* Unlike _dry_run(), _run() does not call _request_issues(). The Agentic, not the Endpoint validates the call.
+			* The Endpoint is responsible of handling Tool calls. If an Agentic (typically an Agent) calls a Tool, the Endpoint has
+				to accept or reject the call based on resources (preventing infinite loops, etc.). If the call is rejected, the Endpoint
+				provides a reason and a message history if possible. If accepted, the Endpoint, calls the tool and then calls the same
+				Agentic with a message history that includes the result of the tool call.
+			* In an Endpoint with more than one capability (the typical case), the request must be a pure function to identify the Agent.
+				When tool calls are made, conversation becomes a message history assuming Agentics that call tools can behave as (or are)
+				Agents. This is normal behavior, the First tool call is actually passing a message to a function.
 		"""
 
 		if self.meta['state'] < self.states.ALL_READY.value:
@@ -453,11 +480,59 @@ class Endpoint(Agentic):
 
 		Returns:
 			(None or str): None if the request is valid, or a string describing the issues found.
-
 		"""
 
-		pass
-# TODO: Implement this.
+		num_capabilities = len(self.meta['capabilities'])	# If more than one, pure function call is required.
+
+		if num_capabilities == 0:
+			return 'Endpoint has no capabilities.'
+
+		pure_function_call = (num_capabilities > 1) or (type(request) == dict and 'name' in request and 'arguments' in request)
+
+		if pure_function_call:
+			if type(request) != dict:
+				return 'Request must be a dictionary with a "name" (of a capability) and "arguments".'
+
+			name = request.get('name', None)
+
+			if type(name) != str:
+				return 'Request must have a "name" key with a string value.'
+
+			cap = self.capabilities_by_name.get(name, None)
+			if cap is None:
+				return 'Capability "%s" not found in Endpoint.' % name
+
+			args = request.get('arguments', None)
+			if type(args) != dict:
+				return 'Request must have an "arguments" key with a dictionary value.'
+
+			if 'arguments' not in request:
+				return 'Request must have an "arguments" key.'
+
+			fun = cap.get('function', None)
+			if type(fun) != dict:
+				return 'Definition of capability "%s" is malformed. No function details given. Edit its configuration to fix it.' % name
+
+			par = fun.get('parameters', None)
+			if type(par) != dict:
+				return 'Definition of capability "%s" is malformed. No parameters given. Edit its configuration to fix it.' % name
+
+			for key in par.get('required', []):
+				if key not in args:
+					return 'Request is missing required argument "%s".' % key
+
+			return None					# No issues found.
+
+		# From here on, the request can only be a message or a list of messages.
+
+		if type(request) != list:
+			request = [request]
+
+		for msg in request:
+			if type(msg) != dict or ('content' not in msg and 'role' not in msg):
+				return 'Request must be a dictionary with "content" and "role".'
+
+		return None						# No issues found.
 
 
 	def _load_objects(self):
@@ -474,7 +549,7 @@ class Endpoint(Agentic):
 		"""
 
 		def _resolve_conf_paths(arg):
-			"""Resolve endpoint-relative paths inside configuration objects."""
+			""" Resolve endpoint-relative paths inside configuration objects. """
 
 			new_arg = {}
 
@@ -489,7 +564,7 @@ class Endpoint(Agentic):
 			return new_arg
 
 		def _load_custom_agentic_class(class_name, file_path):
-			"""Load a custom Agentic class from a Python source file."""
+			""" Load a custom Agentic class from a Python source file. """
 
 			module_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -626,8 +701,9 @@ class Endpoint(Agentic):
 		""" This method called by pilot() builds the capabilities of the Endpoint by merging the capabilities of all the Agentics that
 		in the 'expose' list of the Endpoint's configuration.
 
-		It also checks that all the capabilities have unique names and builds a dictionary of capabilities by name and Agentic named
-		`agentic_by_capability` for the run() and dry_run() methods.
+		It also checks that all the capabilities have unique names and builds two dictionaries one of capabilities by name and one of
+		Agentic by capability name. These dictionaries `capabilities_by_name` and `agentic_by_capability` are used  by the run() and
+		dry_run() methods.
 
 		It also updates the Endpoint's meta with the capabilities.
 
@@ -645,6 +721,7 @@ class Endpoint(Agentic):
 
 		capabilities = []
 		agentic_by_capability = {}
+		capabilities_by_name  = {}
 
 		for agentic_name in expose:
 			agentic = self.name_to_agentic.get(agentic_name, None)
@@ -674,9 +751,11 @@ class Endpoint(Agentic):
 
 				capabilities.append(capability)
 				agentic_by_capability[capability_name] = agentic
+				capabilities_by_name[capability_name]  = capability
 
 		self.meta['capabilities']  = capabilities
 		self.agentic_by_capability = agentic_by_capability
+		self.capabilities_by_name  = capabilities_by_name
 
 		return True
 

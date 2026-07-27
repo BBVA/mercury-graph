@@ -5,28 +5,32 @@ from enum import Enum
 
 
 class AgenticRunException(Exception):
-	"""Base class for all Agentic.run() and .dry_run() exceptions."""
+	""" Base class for all Agentic.run() and .dry_run() exceptions. """
+
 	pass
 
 
 class AgenticRunInvalidRequest(AgenticRunException):
-	"""The caller supplied an invalid request."""
+	""" The caller supplied an invalid request. """
+
 	pass
 
 
 class AgenticRunInvalidState(AgenticRunException):
-	"""The Agentic is not in a state where the operation is allowed."""
+	""" The Agentic is not in a state where the operation is allowed. """
+
 	pass
 
 
 class AgenticRunFailed(AgenticRunException):
-	"""The Agentic attempted to execute the request but failed."""
+	""" The Agentic attempted to execute the request but failed. """
+
 	pass
 
 
 class AlwaysReadyState(Enum):
-	""" The `AlwaysReadyState` is valid for any Agentic that does not need piloting.
-	"""
+	""" The `AlwaysReadyState` is valid for any Agentic that does not need piloting. """
+
 	CONSTRUCTION_FAILED	= -1	# The Agentic failed to construct itself. It is not usable.
 	INITIAL				=  0	# The initial state of the Agentic.
 	READY				=  100	# The Agentic is ready. Calling the parent's pilot() method will set that state, doing nothing else.
@@ -158,12 +162,14 @@ class Agentic(ABC):
 		The method [`Agentic.run()`][mercury.graph.evidence.Agentic.run] is a wrapper that logs the request and response, this method
 		does the actual work.
 		"""
+
 		pass
 
 
 	@abstractmethod
 	def _meta(self):
 		""" This is the method that returns the metadata of the class. It MUST be implemented by the descendants. """
+
 		pass
 
 
@@ -174,6 +180,7 @@ class Agentic(ABC):
 		The method [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run] is a wrapper that logs the request and response, this
 		method does the actual work.
 		"""
+
 		pass
 
 
@@ -187,6 +194,7 @@ class Agentic(ABC):
 			(dict): the metadata of the object. This contains, at the minimum, the keys "state" (see
 				[`pilot()`][mercury.graph.evidence.Agentic.pilot]) and "capabilities" (see [`Agent`][mercury.graph.evidence.Agent]).
 		"""
+
 		if self._meta_ is None:
 			self._meta_ = self._meta()
 
@@ -199,6 +207,7 @@ class Agentic(ABC):
 		Args:
 			agentic (Agentic): the tool to add. It must be an Agentic and its endpoint must be the same as the current Agentic's.
 		"""
+
 		self.tools[agentic.id] = agentic
 
 
@@ -210,6 +219,7 @@ class Agentic(ABC):
 		Args:
 			message (str): the error message to log.
 		"""
+
 		if self.logger is not None:
 			event = {'type': 'error', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'error': message}
 
@@ -287,6 +297,7 @@ class Agentic(ABC):
 			(dict): {'status': 0, 'description': 'Ok.'} dictionary. The status is 0 for success. 1 for busy, 2 for invalid
 				request with an appropriate description.
 		"""
+
 		return self._dry_run(request)
 
 
@@ -306,8 +317,8 @@ class Agentic(ABC):
 
 		Returns:
 			(bool): True if the object is in the desired state (or advanced towards it one step when just_once is True), False otherwise.
-
 		"""
+
 		if self._meta_ is None:
 			self._meta_ = self._meta()
 
@@ -325,6 +336,7 @@ class Agentic(ABC):
 		Args:
 			endpoint_locked (bool): True if the Endpoint is locked for writing, False otherwise.
 		"""
+
 		pass
 
 
@@ -337,6 +349,7 @@ class Agentic(ABC):
 		Returns:
 			(str): the name of the state, or None if the state is not defined in the object's states Enum.
 		"""
+
 		if self.states is not None:
 			try:
 				ret = self.states(int(state)).name
@@ -359,6 +372,7 @@ class Agentic(ABC):
 		Returns:
 			(str): the normalized name.
 		"""
+
 		name = name.replace(' ', '_')
 		name = re.sub('[^a-zA-Z0-9_]', '', name)
 
@@ -372,4 +386,5 @@ class Agentic(ABC):
 		Returns:
 			(str): the current time as %Y-%m-%d %H:%M:%S.
 		"""
+
 		return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
