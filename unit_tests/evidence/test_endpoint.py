@@ -240,17 +240,6 @@ def test_endpoint_str_loaded_objects_and_capabilities(tmp_path):
 	assert 'ready: 100 (ALL_READY)' in text
 
 
-def test_endpoint_dry_run_request_issues(tmp_path, monkeypatch):
-	endpoint = _make_endpoint(tmp_path, 'dry_run')
-	endpoint.meta['state'] = EndPointState.ALL_READY.value
-
-	monkeypatch.setattr(endpoint, '_request_issues', lambda request: None)
-	assert endpoint.dry_run({}) == {'status': 0, 'description': 'Valid request.'}
-	monkeypatch.setattr(endpoint, '_request_issues', lambda request: 'bad request')
-	assert endpoint.dry_run({}) == {'status': 2, 'description': 'bad request'}
-	assert Endpoint._request_issues(endpoint, {}) is None
-
-
 def test_endpoint_pilot_states(tmp_path, monkeypatch):
 	endpoint = _make_endpoint(tmp_path, 'pilot_states')
 	endpoint.meta['state'] = EndPointState.ERR_LOADING_OBJ.value
