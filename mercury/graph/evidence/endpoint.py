@@ -869,3 +869,34 @@ class Endpoint(Agentic):
 
 		return True
 
+
+	def _response_loop(self, agentic, request, response):
+		""" This method is called by _run() to handle the case when an Agentic returns a response with finish_reason = 'tool_calls'.
+
+		First it examines if the tool call can be made:
+			- There are enough remaining resources. (According to the configured "max_tool_calls_per_query")
+			- The tool call expects a tool that is available. (According to self.tools_by_capability)
+			- It does not check arguments, if it can make the call, the Agentic will check.
+
+		If if calling the tool is not allowed or failed, it returns a response with finish_reason = 'error' and a message history that
+		includes the reason for the failure, immediately.
+
+		If the tool call works:
+			- It builds or continues a message history as a list of messages.
+			- It appends the request as a message with the role of the Agent who required, and storing the id of the call if there is one.
+			- It appends the result of tool call with: 'role': 'tool', 'tool_call_id': <id of the call>, 'content': <result of the call>
+			- It passes the message history to calling agentic's run() method.
+			- It stops if the response is not another tool call, or continues the loop if it is.
+
+		Args:
+			agentic (Agentic): The Agentic that made the initial request.
+			request (dict): The initial request made to the Agentic.
+			response (dict): The initial response from the Agentic.
+
+		Returns:
+			(dict): The final response from the Agentic after handling tool calls with possibly some error messages if the tool calls
+				failed or were not allowed.
+		"""
+
+		pass
+
