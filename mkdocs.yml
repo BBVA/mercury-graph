@@ -74,6 +74,7 @@ plugins:
           show_submodules: true
           merge_init_into_class: true
           docstring_style: google
+          filters: []
 
 watch:
     - mercury/graph
