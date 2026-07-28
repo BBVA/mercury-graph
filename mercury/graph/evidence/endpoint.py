@@ -341,7 +341,52 @@ class Endpoint(Agentic):
 		if self.meta['state'] < self.states.ALL_READY.value:
 			raise AgenticRunInvalidState
 
-# TODO: Implement this once the code the get the state EXPOSED_API is in place.
+		is_pure_call = type(request) == dict and 'name' in request and 'arguments' in request
+
+		if is_pure_call or (self.num_capabilities > 1):
+			if not is_pure_call:
+				raise AgenticFailedToFindCapability
+
+			name = request['name']
+
+			agentic = self.agentic_by_capability.get(name, None)
+
+			if agentic is None:
+				raise AgenticFailedToFindCapability
+
+			response = agentic.run(request)
+
+			finish_reason = response.get('finish_reason', None)
+
+			if finish_reason is None:
+				raise AgenticFailedToParseOutput
+
+			if finish_reason == 'stop' or finish_reason == 'error':		# Canonical 'finish_reason' values first.
+				return response
+
+			if finish_reason != 'tool_calls':							# Try to guess other names
+				if not finish_reason.lower().startswith('tool'):
+					return response										# Non-canonical finish_reason, let the caller handle it.
+
+			return self._response_loop(agentic, request, response)
+
+		agentic = next(iter(self.agentic_by_capability.values()))
+
+		response = agentic.run(request)
+
+		finish_reason = response.get('finish_reason', None)
+
+		if finish_reason is None:
+			raise AgenticFailedToParseOutput
+
+		if finish_reason == 'stop' or finish_reason == 'error':		# Canonical 'finish_reason' values first.
+			return response
+
+		if finish_reason != 'tool_calls':							# Try to guess other names
+			if not finish_reason.lower().startswith('tool'):
+				return response										# Non-canonical finish_reason, let the caller handle it.
+
+		return self._response_loop(agentic, request, response)
 
 
 	def _meta(self):
@@ -482,12 +527,7 @@ class Endpoint(Agentic):
 			(None or str): None if the request is valid, or a string describing the issues found.
 		"""
 
-		num_capabilities = len(self.meta['capabilities'])	# If more than one, pure function call is required.
-
-		if num_capabilities == 0:
-			return 'Endpoint has no capabilities.'
-
-		pure_function_call = (num_capabilities > 1) or (type(request) == dict and 'name' in request and 'arguments' in request)
+		pure_function_call = (self.num_capabilities > 1) or (type(request) == dict and 'name' in request and 'arguments' in request)
 
 		if pure_function_call:
 			if type(request) != dict:
@@ -756,8 +796,9 @@ class Endpoint(Agentic):
 		self.meta['capabilities']  = capabilities
 		self.agentic_by_capability = agentic_by_capability
 		self.capabilities_by_name  = capabilities_by_name
+		self.num_capabilities	   = len(capabilities)
 
-		return True
+		return self.num_capabilities > 0
 
 
 	def _next_agentic_below(self, intent):
