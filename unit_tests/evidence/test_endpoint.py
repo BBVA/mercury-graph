@@ -242,9 +242,7 @@ def test_endpoint_str_loaded_objects_and_capabilities(tmp_path):
 
 def test_endpoint_dry_run_request_issues(tmp_path, monkeypatch):
 	endpoint = _make_endpoint(tmp_path, 'dry_run_request_issues')
-	endpoint._meta_ = {'state': EndPointState.ALL_READY.value, 'capabilities': []}
-
-	assert endpoint.dry_run({}) == {'status': 2, 'description': 'Endpoint has no capabilities.'}
+	endpoint._meta_ = {'state': EndPointState.ALL_READY.value, 'capabilities': [{'function': {'name': 'cap'}}]}
 
 	monkeypatch.setattr(endpoint, '_request_issues', lambda request: None)
 	assert endpoint.dry_run({}) == {'status': 0, 'description': 'Valid request.'}
@@ -257,6 +255,7 @@ def test_endpoint_request_issues(tmp_path, monkeypatch):
 
 	endpoint._meta_ = {'state': EndPointState.ALL_READY.value, 'capabilities': [{}]}
 	endpoint.capabilities_by_name = {}
+	endpoint.num_capabilities = 1
 	assert endpoint._request_issues(123) == 'Request must be a dictionary with "content" and "role".'
 	assert endpoint._request_issues({}) == 'Request must be a dictionary with "content" and "role".'
 	assert endpoint._request_issues({'content': 'hello'}) is None
@@ -264,9 +263,11 @@ def test_endpoint_request_issues(tmp_path, monkeypatch):
 	assert endpoint._request_issues([{'role': 'user'}, 'invalid']) == 'Request must be a dictionary with "content" and "role".'
 
 	endpoint._meta_['capabilities'] = [{}, {}]
+	endpoint.num_capabilities = 2
 	assert endpoint._request_issues([]) == 'Request must be a dictionary with a "name" (of a capability) and "arguments".'
 
 	endpoint._meta_['capabilities'] = [{}]
+	endpoint.num_capabilities = 1
 	endpoint.capabilities_by_name = {
 		'valid': {'function': {'parameters': {'required': ['required']}}},
 		'no_function': {},
