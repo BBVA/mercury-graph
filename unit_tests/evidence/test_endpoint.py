@@ -343,7 +343,7 @@ def test_endpoint_pilot_states(tmp_path, monkeypatch):
 	agentic.meta = {'state': -1}
 	monkeypatch.setattr(endpoint, '_next_agentic_below', lambda intent: agentic)
 	endpoint.pilot(EndPointState.ALL_READY.value)
-	assert endpoint.meta['state'] == EndPointState.ERR_IN_OBJECT.value
+	assert endpoint.meta['state'] == EndPointState.ERR_PILOTING.value
 
 	endpoint.meta['state'] = EndPointState.EXPOSED_API.value
 	agentic.meta = {'state': 0}
