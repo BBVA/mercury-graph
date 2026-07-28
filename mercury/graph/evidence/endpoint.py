@@ -37,8 +37,8 @@ class LockState(Enum):
 class EndPointState(Enum):
 	""" The `EndPointState` is an enumeration that defines the possible states of the Endpoint. """
 
-	ERR_IN_OBJECT	= -5	# Some loaded object in the Endpoint is in an error state.
-	ERR_PILOTING	= -4	# The Endpoint failed to pilot some objects.
+	ERR_TOOL_CAPS	= -5	# Failed trying to research the capabilities of the Agentics (tools).
+	ERR_PILOTING	= -4	# Some loaded object reached an error state while trying to pilot it.
 	ERR_EXPOSING	= -3	# The Endpoint failed to building its API.
 	ERR_LINKING		= -2	# The Endpoint failed to link some of its objects.
 	ERR_LOADING_OBJ	= -1	# The Endpoint failed to load some of its objects.
@@ -47,6 +47,7 @@ class EndPointState(Enum):
 	LINKED_OBJ		=  2	# The Endpoint has satisfied all the inter-dependencies of its objects.
 	EXPOSED_API		=  3	# The Endpoint has exposed its Agentic API to the outside world.
 	PILOT_REQUIRED	=  4	# The Endpoint has loaded all its architecture but some of them are not ready to process queries yet.
+	TOOLS_ARE_READY	=  5	# The Endpoint has piloted all its Agentics to ready and can now research their capabilities.
 	ALL_READY		=  100	# The source is ready to be processed.
 
 
@@ -462,15 +463,21 @@ class Endpoint(Agentic):
 			next_agentic = self._next_agentic_below(intent)
 			if next_agentic is not None:
 				if next_agentic.meta['state'] < 0:
-					self.meta['state'] = self.states.ERR_IN_OBJECT.value
+					self.meta['state'] = self.states.ERR_PILOTING.value
 					break
 
 				next_agentic.pilot(intent, just_once = just_once)
 
-				if self._next_agentic_below(intent) is None and intent == self.states.ALL_READY.value:
-					self.meta['state'] = self.states.ALL_READY.value
+				if self._next_agentic_below(intent) is None:
+					self.meta['state'] = self.states.TOOLS_ARE_READY.value
 				else:
 					self.meta['state'] = self.states.PILOT_REQUIRED.value
+
+			if self.meta['state'] == self.states.TOOLS_ARE_READY.value:
+				if self._research_capabilities():
+					self.meta['state'] = self.states.ALL_READY.value
+				else:
+					self.meta['state'] = self.states.ERR_TOOL_CAPS.value
 
 			if just_once:
 				break
@@ -786,7 +793,7 @@ class Endpoint(Agentic):
 					return False
 
 				if capability_name in agentic_by_capability:
-					self.log_error('Duplicate exposed capability "%s".' % (capability_name))
+					self.log_error('Duplicate exposed capability "%s".' % capability_name)
 					return False
 
 				capabilities.append(capability)
@@ -804,7 +811,7 @@ class Endpoint(Agentic):
 	def _next_agentic_below(self, intent):
 		""" This method is called by pilot() to find the first Agentic in the Endpoint whose state is below the desired intent.
 
-		It may be and error state, in which case the Endpoint will set its state to ERR_IN_OBJECT and stop piloting.
+		It may be and error state, in which case the Endpoint will set its state to ERR_PILOTING and stop piloting.
 
 		The pilot() method calls this method when appropriate and sets the state according to the success.
 
@@ -817,3 +824,48 @@ class Endpoint(Agentic):
 				return agentic
 
 		return None
+
+
+	def _research_capabilities(self):
+		""" This method is called by pilot() when every tool is ready. It builds the new dictionary, self.tools_by_capability
+		(similar to self.agentic_by_capability, but for all the capabilities of all the Agentics instead of just the exposed ones).
+		And adds new entries to self.capabilities_by_name to find every capability of every tool by name. It fails if there are duplicate
+		capability names.
+
+		Note: These capabilities are only available as tools calls from the Agentics, they are not exposed via meta['capabilities'].
+
+		The pilot() method calls this method when appropriate and sets the state according to the success.
+
+		Returns:
+			(bool): True if all capabilities were researched successfully, False otherwise.
+		"""
+
+		tools_by_capability = {}
+
+		for agentic in self.tools.values():
+			agentic_capabilities = agentic.meta.get('capabilities', None)
+			if agentic_capabilities is None:
+				continue
+
+			for capability in agentic_capabilities:
+				function = capability.get('function', None)
+				if type(function) != dict:
+					self.log_error('Agentic "%s" has a capability without a valid "function" object.' % agentic.id)
+					return False
+
+				capability_name = function.get('name', None)
+				if type(capability_name) != str or capability_name != self._normalize_name(capability_name):
+					self.log_error('Agentic "%s" has a capability without a valid function name.' % agentic.id)
+					return False
+
+				if capability_name in tools_by_capability:
+					self.log_error('Duplicate capability "%s" found in Agentics.' % capability_name)
+					return False
+
+				tools_by_capability[capability_name] = agentic
+				self.capabilities_by_name[capability_name] = capability
+
+		self.tools_by_capability = tools_by_capability
+
+		return True
+
