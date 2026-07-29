@@ -31,14 +31,13 @@ class LouvainCommunities(BaseClass):
     Contributed by Arturo Soberon Cedillo, Jose Antonio Guzman Vazquez and
     Isaac Dodanim Hernandez Garcia.
 
-    [^1]:
-        Blondel V D, Guillaume J-L, Lambiotte R and Lefebvre E (2008). Fast
+    ## References:
+    1.  Blondel V D, Guillaume J-L, Lambiotte R and Lefebvre E (2008). Fast
         unfolding of communities in large networks. Journal of Statistical
         Mechanics: Theory and Experiment, 2008.
         <https://doi.org/10.1088/1742-5468/2008/10/p10008>
 
-    [^2]:
-        Aynaud T, Blondel V D, Guillaume J-L and Lambiotte R (2013). Multilevel
+    2.  Aynaud T, Blondel V D, Guillaume J-L and Lambiotte R (2013). Multilevel
         local optimization of modularity. Graph Partitioning (315--345), 2013.
 
     Args:

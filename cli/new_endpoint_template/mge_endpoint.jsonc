@@ -1,0 +1,49 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+	// name, creation_date, mge_version are overridden by the mge new command.
+	"name": "",
+	"creation_date": "",
+	"mge_version": "",
+
+	"description": "-- Add a description of your endpoint here --",
+
+	"sources": {
+		"$ref": "./sources.jsonc"
+	},
+	"ontologies": {
+		"$ref": "./ontologies.jsonc"
+	},
+	"formalizers": {
+		"$ref": "./formalizers.jsonc"
+	},
+	"evidence_graphs": {
+		"$ref": "./evidence_graphs.jsonc"
+	},
+	"agents": {
+		"$ref": "./agents.jsonc"
+	},
+	"custom_agentics": {
+		"$ref": "./custom_agentics.jsonc"
+	},
+
+	// The Endpoint's Agentic API is merged from exposed Agentics (at least one is mandatory).
+	"expose": ["gru"],
+
+	// An integer limit to keep it simple and have a target to refactor in the future.
+	"max_tool_calls_per_query": 10,
+
+	// When loading, if the file exists, the Endpoint will pilot itself to the state of the last save.
+	"auto_pilot": {"load" : ["state"], "file_name" : "mge_endpoint_autopilot.pickle"},
+
+	// When closing, the Endpoint will save its state.
+	"auto_save": {"save" : ["state"], "file_name" : "mge_endpoint_autopilot.pickle"}
+}

@@ -1,0 +1,87 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+
+// A custom_agentics is any Python class that descends from Agentic provided as source to be loaded by the endpoint.
+
+// Each entry has 5 fields: name, class_name, $path, extra_args and tools. The name is a unique identifier for the agentic.
+// The class_name is the name of the class that implements the agentic. The $path is the name of the Python file that contains the class.
+// It is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
+// The extra_args is a dictionary of configuration parameters that will be passed to the constructor of the agentic class.
+// The tools is a list of Agentic names that the agentic can use as tools.
+
+// An example:
+// -----------
+
+	// (file) my_agentic.py:
+	// ---------------------
+	// from mercury.graph.agentics import Agentic
+
+	// class MyAgentic(Agentic):
+	// 	def __init__(self, schema = None, endpoint = None, logger = None, extra_args = None):
+	// 		super().__init__(my_class = 'my_agentic', schema = schema, endpoint = endpoint, logger = logger)
+	// 		 ...
+
+	// (file) another_agentic.py:
+	// --------------------------
+	// from mercury.graph.agentics import Agentic
+
+	// class AnotherAgentic(Agentic):
+	// 	def __init__(self, schema = None, endpoint = None, logger = None, extra_args = None):
+	// 		super().__init__(my_class = 'another_agentic', schema = schema, endpoint = endpoint, logger = logger)
+	// 		 ...
+
+	// The custom agentics definition in this file would look like this:
+
+	// "my_custom_agentic": {
+	// 	"name": "my_agentic_number_one",
+	// 	"class_name": "MyAgentic",
+	// 	"$path": "my_agentic.py",
+	// 	"extra_args": {
+	// 		"param1": "value1",
+	// 		"param2": "value2"
+	// 	},
+	// 	"tools": []
+	// },
+
+	// "another_my_agentic": {
+	// 	"name": "my_agentic_number_two",
+	// 	"class_name": "MyAgentic",
+	// 	"$path": "my_agentic.py",
+	// 	"extra_args": {
+	// 		"param1": "value1",
+	// 		"param2": "value2"
+	// 	},
+	// 	"tools": []
+	// },
+
+	// "another_custom_agentic": {
+	// 	"name": "another_agentic",
+	// 	"class_name": "AnotherAgentic",
+	// 	"$path": "another_agentic.py",
+	// 	"extra_args": {
+	// 		"paramA": "valueA",
+	// 		"paramB": "valueB"
+	// 	},
+	// 	"tools": []
+	// },
+
+	"myEGraph": {
+		"name": "myEGraph",
+		"class_name": "MyCustomGraph",
+		"$path": "my_e_graph.py",
+		"extra_args": {
+			"param1": "value1",
+			"param2": "value2"
+		},
+		"tools": ["demo", "GLiNER2", "reader"]
+	}
+}

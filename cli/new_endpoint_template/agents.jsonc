@@ -1,0 +1,99 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+	"reader": {
+		"name": "reader",
+
+		"extra_args": {
+			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
+			"description": "This Agentic does the reading.",
+
+			"api_base": "http://localhost:11434",
+			"model_name": "ollama_chat/qwen3:8b",
+
+			"capabilities": [
+				{
+					"name": "chat_with_reader",
+					"description": "Chat with READER agent.",
+					"type": "function",
+					"function": {
+						"name": "chat_with_reader",
+						"description": "Chat with READER agent.",
+						"parameters": {
+							"type": "object",
+							"properties": {
+								"message": {
+									"type": "string",
+									"description": "Message to send to the READER agent."
+								}
+							},
+							"required": ["message"]
+						},
+						"returns": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						}
+					}
+				}
+			]
+		},
+
+		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
+		// Provide a list of tool names
+		"tools": ["demo", "GLiNER2", "e_graph"]
+	},
+
+	"gru": {
+		"name": "gru",
+
+		"extra_args": {
+			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
+			"description": "This Agentic does the supervision.",
+
+			"api_base": "http://localhost:11434",
+			"model_name": "ollama_chat/qwen3:8b",
+
+			"capabilities": [
+				{
+					"name": "chat_with_gru",
+					"description": "Chat with GRU agent.",
+					"type": "function",
+					"function": {
+						"name": "chat_with_gru",
+						"description": "Chat with GRU agent.",
+						"parameters": {
+							"type": "object",
+							"properties": {
+								"message": {
+									"type": "string",
+									"description": "Message to send to the GRU agent."
+								}
+							},
+							"required": ["message"]
+						},
+						"returns": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						}
+					}
+				}
+			]
+		},
+
+		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
+		// Provide a list of tool names
+		"tools": ["demo", "GLiNER2", "e_graph"]
+	}
+}

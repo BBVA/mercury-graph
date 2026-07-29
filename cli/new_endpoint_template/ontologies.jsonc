@@ -1,0 +1,56 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+
+	"entities": {
+		// An ontology is just a persisted AgenticGraph. It is typically as a key/value to hold anything in nodes or a graph.
+
+		"name": "entities",
+
+		// "extra_args" is given to the AgenticGraph's constructor.
+		"extra_args": {
+			// The description will be exposed in the AgenticGraph's Agentic API. It can be a string or a list of strings.
+			"description": [
+				"This ontology holds all the entities that can be used in the Evidence Graphs. E.g., person, organization, location ...",
+				"It uses the node ids as keys and an attribute 'description' to explain the entity. A 'is_a' relation (e.g. capital",
+				"is_a city) can be defined as an edge with the attribute 'relation' set to 'is_a'."
+			],
+
+			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
+			"persistence" : {"type" : "pickle", "$path" : "graphs/entities.pickle"}
+		},
+
+		// "tools" declares what tools does the ontology expect. The endpoint will find them an provide them via `add_tool()`.
+		// Provide a list of tool names
+		"tools": []
+	},
+
+	"relationships": {
+		"name": "relationships",
+		"extra_args": {
+			"description": [
+				"This ontology holds the relationships between entities. E.g., works_for, located_in, ...",
+				"It uses the node ids as keys and an attribute 'description' to explain the relationship."
+			],
+			"persistence" : {"type" : "pickle", "$path" : "graphs/relationships.pickle"}
+		},
+		"tools": []
+	},
+
+	"service_logic": {
+		"name": "service_logic",
+		"extra_args": {
+			"description": "This ontology holds the pipelines the root agent (gru) should enforce.",
+			"persistence" : {"type" : "pickle", "$path" : "graphs/service_logic.pickle"}
+		},
+		"tools": []
+	}
+}
