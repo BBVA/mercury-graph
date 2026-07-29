@@ -237,8 +237,7 @@ class GraphFeatures(BaseClass):
            any null values in non-'id' columns.
 
         Args:
-            vertices : DataFrame
-                A PySpark DataFrame representing vertices in a graph.
+            vertices (DataFrame): A PySpark DataFrame representing vertices in a graph.
         """
 
         # Check type
@@ -314,8 +313,7 @@ class GraphFeatures(BaseClass):
            has a numeric data type.
 
         Args:
-            edges : DataFrame
-                A PySpark DataFrame representing edges in a graph.
+            edges (DataFrame): A PySpark DataFrame representing edges in a graph.
         """
 
         # Check type
@@ -379,24 +377,14 @@ class GraphFeatures(BaseClass):
            order.
 
         Args:
-            edges : DataFrame
-                A Spark DataFrame containing the edges of the graph. It must
-                contain the columns 'src' and 'dst' corresponding to source
-                and destination nodes, respectively. An optional 'weight'
-                column can be included; if not present, it is assumed to be 1.
-            order : int, optional
-                The order of neighbors to compute (e.g., 1 for immediate
-                neighbors, 2 for neighbors of neighbors, etc.). It must be a
-                positive integer. Default is 1.
-            checkpoint : bool, optional
-                Whether to use Spark checkpointing to persist intermediate
-                results. Default is False.
-            checkpoint_dir : str, optional,
-                The directory to store checkpoint files if checkpointing is
-                enabled. Required if `checkpoint=True`. Default is None.
-            spark : SparkSession, optional
-                The active Spark session. Required if `checkpoint=True`.
-                Default is None.
+            edges (DataFrame): A Spark DataFrame containing the edges of the graph. It must contain the columns 'src' and 'dst'
+            	corresponding to source and destination nodes, respectively. An optional 'weight' column can be included; if not
+                present, it is assumed to be 1.
+            order (int): The order of neighbors to compute (e.g., 1 for immediate neighbors, 2 for neighbors of neighbors, etc.).
+            	It must be a positive integer.
+            checkpoint (bool): Whether to use Spark checkpointing to persist intermediate results.
+            checkpoint_dir (str): The directory to store checkpoint files if checkpointing is enabled. Required if `checkpoint=True`.
+            spark (SparkSession): The active Spark session. Required if `checkpoint=True`.
 
         Returns (DataFrame):
 
