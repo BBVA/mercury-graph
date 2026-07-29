@@ -442,7 +442,8 @@ def test_endpoint_run_routes_and_errors(tmp_path, monkeypatch):
 
 def test_endpoint_response_loop_placeholder(tmp_path):
 	endpoint = _make_endpoint(tmp_path, 'response_loop_placeholder')
-	assert endpoint._response_loop(Mock(), {}, {}) is None
+	with pytest.raises(AgenticFailedToParseOutput):
+		endpoint._response_loop(Mock(), {}, {})
 
 
 def test_endpoint_load_objects(tmp_path):
