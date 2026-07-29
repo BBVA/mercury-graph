@@ -6,7 +6,7 @@ import pytest
 
 from mercury.graph.evidence import Endpoint
 from mercury.graph.evidence.agentic import AgenticRunInvalidState
-from mercury.graph.evidence.endpoint import EndPointState, LockState
+from mercury.graph.evidence.endpoint import AgenticFailedToFindCapability, AgenticFailedToParseOutput, EndPointState, LockState
 
 import mercury.graph.evidence.endpoint as endpoint_module
 
@@ -350,6 +350,99 @@ def test_endpoint_pilot_states(tmp_path, monkeypatch):
 	monkeypatch.setattr(endpoint, '_next_agentic_below', Mock(side_effect = [agentic, agentic]))
 	endpoint.pilot(50, just_once = True)
 	assert endpoint.meta['state'] == EndPointState.PILOT_REQUIRED.value
+
+	endpoint.meta['state'] = EndPointState.TOOLS_ARE_READY.value
+	monkeypatch.setattr(endpoint, '_next_agentic_below', lambda intent: None)
+	monkeypatch.setattr(endpoint, '_research_capabilities', lambda: False)
+	endpoint.pilot(EndPointState.ALL_READY.value, just_once = True)
+	assert endpoint.meta['state'] == EndPointState.ERR_TOOL_CAPS.value
+
+
+def test_endpoint_research_capabilities(tmp_path):
+	endpoint = _make_endpoint(tmp_path, 'research_capabilities')
+	endpoint.capabilities_by_name = {'already_exposed': {'function': {'name': 'already_exposed'}}}
+
+	a = Mock()
+	a.id = 'a'
+	a.meta = {}
+	b = Mock()
+	b.id = 'b'
+	b.meta = {'capabilities': [{'function': 'invalid'}]}
+	endpoint.tools = {'a': a, 'b': b}
+	assert endpoint._research_capabilities() is False
+
+	b.meta = {'capabilities': [{'function': {'name': 'Not Valid'}}]}
+	assert endpoint._research_capabilities() is False
+
+	b.meta = {'capabilities': [{'function': {'name': 'dup'}}]}
+	c = Mock()
+	c.id = 'c'
+	c.meta = {'capabilities': [{'function': {'name': 'dup'}}]}
+	endpoint.tools = {'a': a, 'b': b, 'c': c}
+	assert endpoint._research_capabilities() is False
+
+	b.meta = {'capabilities': [{'function': {'name': 'tool_one'}}]}
+	c.meta = {'capabilities': [{'function': {'name': 'tool_two'}}]}
+	assert endpoint._research_capabilities() is True
+	assert set(endpoint.tools_by_capability.keys()) == {'tool_one', 'tool_two'}
+	assert 'already_exposed' in endpoint.capabilities_by_name
+
+
+def test_endpoint_run_routes_and_errors(tmp_path, monkeypatch):
+	endpoint = _make_endpoint(tmp_path, 'run_routes')
+	endpoint._meta_ = {'state': EndPointState.ALL_READY.value, 'capabilities': [{'function': {'name': 'cap'}}]}
+
+	tool_response = {'finish_reason': 'stop', 'messages': []}
+	monkeypatch.setattr(endpoint, '_response_loop', lambda agentic, request, response: tool_response)
+
+	agentic = Mock()
+	agentic.id = 'agentic'
+	endpoint.agentic_by_capability = {'cap': agentic}
+
+	endpoint.num_capabilities = 2
+	with pytest.raises(AgenticFailedToFindCapability):
+		endpoint._run({'content': 'not a pure function call'})
+
+	with pytest.raises(AgenticFailedToFindCapability):
+		endpoint._run({'name': 'missing', 'arguments': {}})
+
+	agentic.run.return_value = {}
+	with pytest.raises(AgenticFailedToParseOutput):
+		endpoint._run({'name': 'cap', 'arguments': {}})
+
+	agentic.run.return_value = {'finish_reason': 'stop'}
+	assert endpoint._run({'name': 'cap', 'arguments': {}}) == {'finish_reason': 'stop'}
+
+	agentic.run.return_value = {'finish_reason': 'error'}
+	assert endpoint._run({'name': 'cap', 'arguments': {}}) == {'finish_reason': 'error'}
+
+	agentic.run.return_value = {'finish_reason': 'done'}
+	assert endpoint._run({'name': 'cap', 'arguments': {}}) == {'finish_reason': 'done'}
+
+	agentic.run.return_value = {'finish_reason': 'tool_calls'}
+	assert endpoint._run({'name': 'cap', 'arguments': {}}) == tool_response
+
+	agentic.run.return_value = {'finish_reason': 'tool_pending'}
+	assert endpoint._run({'name': 'cap', 'arguments': {}}) == tool_response
+
+	endpoint.num_capabilities = 1
+	agentic.run.return_value = {}
+	with pytest.raises(AgenticFailedToParseOutput):
+		endpoint._run({'role': 'user', 'content': 'hi'})
+
+	agentic.run.return_value = {'finish_reason': 'error'}
+	assert endpoint._run({'role': 'user', 'content': 'hi'}) == {'finish_reason': 'error'}
+
+	agentic.run.return_value = {'finish_reason': 'done'}
+	assert endpoint._run({'role': 'user', 'content': 'hi'}) == {'finish_reason': 'done'}
+
+	agentic.run.return_value = {'finish_reason': 'tool_calls'}
+	assert endpoint._run({'role': 'user', 'content': 'hi'}) == tool_response
+
+
+def test_endpoint_response_loop_placeholder(tmp_path):
+	endpoint = _make_endpoint(tmp_path, 'response_loop_placeholder')
+	assert endpoint._response_loop(Mock(), {}, {}) is None
 
 
 def test_endpoint_load_objects(tmp_path):
