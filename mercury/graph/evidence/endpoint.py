@@ -898,5 +898,78 @@ class Endpoint(Agentic):
 				failed or were not allowed.
 		"""
 
-		pass
+		# TODO: This method has not yet passed the notebook with tool call tests. Requires debugging as a server before approval.
 
+		history = list(request) if type(request) == list else [request]
+		calls = 1	# The initial call to agentic was already made by _run().
+		max_calls = int(self.conf.get('max_tool_calls_per_query', 0))
+
+		while True:
+			message = response.get('message', {})
+			if type(message) != dict:
+				raise AgenticFailedToParseOutput
+
+			history.append(message)
+			tool_calls = message.get('tool_calls', None)
+			if type(tool_calls) != list or len(tool_calls) == 0:
+				raise AgenticFailedToParseOutput
+
+			for tool_call in tool_calls:
+				function = tool_call.get('function', {}) if type(tool_call) == dict else {}
+				name = function.get('name', None) if type(function) == dict else None
+				call_id = tool_call.get('id', None) if type(tool_call) == dict else None
+
+				if calls >= max_calls:
+					reason = 'Maximum number of tool calls per query exceeded.'
+					error_message = {'role': 'tool', 'tool_call_id': call_id, 'content': reason}
+					history.append(error_message)
+					return {'finish_reason': 'error', 'message': error_message, 'history': history}
+
+				tool = self.tools_by_capability.get(name, None)
+				if tool is None:
+					reason = 'Tool "%s" was not found.' % name
+					error_message = {'role': 'tool', 'tool_call_id': call_id, 'content': reason}
+					history.append(error_message)
+					return {'finish_reason': 'error', 'message': error_message, 'history': history}
+
+				arguments = function.get('arguments', {})
+				if type(arguments) == str:
+					try:
+						arguments = json.loads(arguments)
+					except Exception as e:
+						reason = 'Could not parse arguments for tool "%s": %s' % (name, e)
+						error_message = {'role': 'tool', 'tool_call_id': call_id, 'content': reason}
+						history.append(error_message)
+						return {'finish_reason': 'error', 'message': error_message, 'history': history}
+
+				tool_request = {'name': name, 'arguments': arguments}
+				if call_id is not None:
+					tool_request['id'] = call_id
+
+				calls += 1
+				try:
+					tool_response = tool.run(tool_request)
+				except Exception as e:
+					reason = 'Tool "%s" failed: %s' % (name, e)
+					error_message = {'role': 'tool', 'tool_call_id': call_id, 'content': reason}
+					history.append(error_message)
+					return {'finish_reason': 'error', 'message': error_message, 'history': history}
+
+				history.append({'role': 'tool', 'tool_call_id': call_id, 'content': tool_response})
+
+			if calls >= max_calls:
+				reason = 'Maximum number of tool calls per query exceeded.'
+				error_message = {'role': 'assistant', 'content': reason}
+				history.append(error_message)
+				return {'finish_reason': 'error', 'message': error_message, 'history': history}
+
+			calls += 1
+			response = agentic.run(history)
+			finish_reason = response.get('finish_reason', None)
+			if finish_reason is None:
+				raise AgenticFailedToParseOutput
+
+			if finish_reason == 'tool_calls' or finish_reason.lower().startswith('tool'):
+				continue
+
+			return response
