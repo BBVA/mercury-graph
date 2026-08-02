@@ -338,7 +338,7 @@ class MgeCli:
     def complete(self):
         """ Executes the "complete". The argument self.name is ignored. Should be "bash" because it is a mandatory argument. """
 
-        print('complete -W "new summary pilot serve unlock complete --just_once --log_file --help --version" -A directory mge')
+        print('complete -W "new summary pilot serve unlock complete ALL_READY --just_once --log_file --help --version" -A directory mge')
 
 
 # An argparse.ArgumentParser to manage the command line interface.
