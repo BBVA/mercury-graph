@@ -30,7 +30,8 @@ a **Source**. An **EvidenceGraph** is built from a **Source**, which manages and
 **Agents** within an **Endpoint** containing an **EvidenceGraph** can interact with any Agentic object in the Endpoint—including the **EvidenceGraph**, the **Source**, and the **Formalizer**—to answer questions about the underlying documents while providing precise,
 traceable references to the relevant source passages.
 
-(See [`evidence`](reference/evidence.md) for submodule reference and the [`mge`](reference/evidence_cli.md) for the cli.)
+(See [`evidence`](reference/evidence.md) for submodule reference, [`mge`](reference/evidence_cli.md) for the cli and
+[`evidence_how`](reference/evidence_how.md) for usage guidelines.)
 
 
 ## Reference
