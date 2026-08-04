@@ -154,6 +154,39 @@ class SourceMaker(SourceNode):
 
 
 
+class SourceFile(SourceNode):
+	""" The SourceFile is a SourceNode represents a single markdown file in the Source. It serves the file as a tree of SourceEntity
+	objects, one for each section, subsection, paragraph, table, figure, etc. in the markdown file.
+
+	Args:
+		index (str): the index of this SourceFile in the tree.
+		parent (SourceMaker): The SourceMaker that owns this SourceFile.
+		path (str): the path to the markdown file.
+	"""
+
+	def __init__(self, index, parent, path):
+		super().__init__(index, parent)
+
+		if not os.path.isfile(path):
+			raise ValueError('Invalid file path: %s' % path)
+
+		self._type	= 'file'
+		self._name	= path.split('/')[-1]
+		self._descr	= 'SourceFile: %s' % self._name
+
+		self.path = path
+
+
+	def get_children_idx(self):
+		pass
+	# TODO: Implement the logic to return the children indices of the SourceFile.
+
+
+	def child(self, index):
+		pass
+	# TODO: Implement the logic to return the child of the SourceFile with the given index.
+
+
 class Source(Agentic):
 	""" The Source is an Agentic interface to a corpus of documents.
 
