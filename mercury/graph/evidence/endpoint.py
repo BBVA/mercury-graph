@@ -22,7 +22,6 @@ class AgenticFailedToParseOutput(AgenticRunException):
 	pass
 
 
-
 class LockState(Enum):
 	""" The `LockState` is an enumeration that defines the possible states of the Endpoint lock. """
 
@@ -42,13 +41,13 @@ class EndPointState(Enum):
 	ERR_EXPOSING	= -3	# The Endpoint failed to building its API.
 	ERR_LINKING		= -2	# The Endpoint failed to link some of its objects.
 	ERR_LOADING_OBJ	= -1	# The Endpoint failed to load some of its objects.
-	INITIAL			=  0	# The initial state of the source.
+	INITIAL			=  0	# The initial state of the Endpoint.
 	LOADED_OBJ		=  1	# The Endpoint has loaded all the objects in its architecture. It is not ready to process queries yet.
 	LINKED_OBJ		=  2	# The Endpoint has satisfied all the inter-dependencies of its objects.
 	EXPOSED_API		=  3	# The Endpoint has exposed its Agentic API to the outside world.
 	PILOT_REQUIRED	=  4	# The Endpoint has loaded all its architecture but some of them are not ready to process queries yet.
 	TOOLS_ARE_READY	=  5	# The Endpoint has piloted all its Agentics to ready and can now research their capabilities.
-	ALL_READY		=  100	# The source is ready to be processed.
+	ALL_READY		=  100	# The Endpoint is ready to be called and all its Agentics are ready.
 
 
 class Endpoint(Agentic):
