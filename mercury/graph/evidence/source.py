@@ -32,6 +32,79 @@ class SourceState(Enum):
 	READY				=  100	# The source is ready to be processed.
 
 
+class SourceNode(ABC):
+	""" Everything in the Source is a tree of SourceNodes: A Maker, a File, an Entity, even a Chunk (a node with no children).
+
+	## Overview
+
+	This class has the common interface to manage indices in the tree. It provides:
+
+	- Attributes: type, name, description and state
+	- A mechanism to locate the SourceNodes higher in the tree via the `parent` attribute.
+	- A mechanism to index its children in the tree via the `get_children_idx()` method.
+	- A mechanism to access its children in the tree via the `child()` method.
+
+	## API:
+
+	Args:
+		index (str): the index of this SourceNode in the tree.
+		parent (SourceNode): the parent of this SourceNode in the tree.
+	"""
+
+	def __init__(self, index, parent = None):
+		self._index  = index
+		self._parent = parent
+		self._type	 = None
+		self._name	 = None
+		self._descr	 = None
+
+		self.state = SourceState.INITIAL
+
+
+	@property
+	def type(self):
+		return self._type
+
+
+	@property
+	def index(self):
+		return self._index
+
+
+	@property
+	def name(self):
+		return self._name
+
+
+	@property
+	def description(self):
+		return self._descr
+
+
+	@abstractmethod
+	def get_children_idx(self):
+		""" Returns the children of this SourceNode.
+
+		Returns:
+			(list): A list of children indices.
+		"""
+		pass
+
+
+	@abstractmethod
+	def child(self, index):
+		""" Returns the child of this SourceNode with the given index.
+
+		Args:
+			index (str): the index of the child to return.
+
+		Returns:
+			(SourceNode): The child SourceNode with the given index.
+		"""
+		pass
+
+
+
 class Source(Agentic):
 	""" The Source is an Agentic interface to a corpus of documents.
 
