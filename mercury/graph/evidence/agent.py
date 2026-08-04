@@ -1,4 +1,15 @@
+from enum import Enum
+
 from .agentic import Agentic, AgenticRunInvalidState, AlwaysReadyState
+
+
+class AgentState(Enum):
+	""" The `AgentState` is an enumeration that defines the possible states of the Agent. """
+
+	INITIAL			=  0	# The initial state of the Agent.
+	TOOLS_NO_TOOLS	=  1	# The Agent has no tools available.
+	TOOLS_VALID		=  2	# The Agent has valid tools available.
+	READY			=  100	# The Agent is ready to be called.
 
 
 class Agent(Agentic):
