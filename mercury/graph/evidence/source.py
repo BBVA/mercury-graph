@@ -187,6 +187,64 @@ class SourceFile(SourceNode):
 	# TODO: Implement the logic to return the child of the SourceFile with the given index.
 
 
+class SourceEntity(SourceNode):
+	""" The SourceEntity is a SourceNode that represents a single section, subsection, paragraph, table, figure, etc. in a markdown
+	file. It serves either smaller SourceEntity objects nested within it, or a single Chunk object (a node with no children).
+
+	## Types of SourceEntity
+
+	  * **Header1 .. Header6**: A section starting with a markdown header, until the next header of the same or lower level. It includes
+		all the content in between, including nested headers of higher levels.
+	  * **Enum1 .. EnumN**: A section starting with a markdown enumeration, possibly nested, until the enumeration ends.
+	  * **Table**: A complete markdown table, including the header and all rows.
+
+	Args:
+		index (str): the index of this SourceEntity in the tree.
+		parent (SourceFile or SourceEntity): The parent SourceNode that contains this SourceEntity.
+		content (list of str): The lines of the original SourceFile that contain this SourceEntity. The content is always a subset of
+			complete lines of the SourceFile. This may change in the future to prevent giant objects stored in a single line. The
+			SourceMaker should take care of splitting, but when the SourceMaker's type is "markdown_tree" markdown is just accepted as is.
+	"""
+
+	def __init__(self, index, parent, content):
+		super().__init__(index, parent)
+
+		self.content  = content
+		self.children = None
+
+		self.get_children_idx()		# This identifies the type, name and description from the content. Runs just one time.
+
+
+	def get_children_idx(self):
+		""" This parses the content to identify the children of this SourceEntity.
+
+		While parsing, it also sets the type, name and description of this SourceEntity. E.g., the description of a title is the title
+		itself. It builds a dictionary with the children of the next level in the tree. The children are either deeper SourceEntity objects
+		or chunks containing text, a link or a cell in a table.
+		"""
+
+		if self.children is not None:
+			return list(self.children.keys())
+
+	# TODO: Implement the logic to return the children indices of the SourceEntity.
+
+
+	def child(self, index):
+		""" Returns the child of this SourceEntity with the given index.
+
+		Args:
+			index (str): the index of the child to return.
+
+		Returns:
+			(SourceEntity or Chunk): The child with the given index.
+		"""
+		if self.children is None:
+			return None
+
+		return self.children.get(index, None)
+
+
+
 class Source(Agentic):
 	""" The Source is an Agentic interface to a corpus of documents.
 
