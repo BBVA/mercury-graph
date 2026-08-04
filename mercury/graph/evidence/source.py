@@ -1,24 +1,34 @@
+import os
+
+from abc import ABC, abstractmethod
 from enum import Enum
 
 from .agentic import Agentic
 
 
 class SourceState(Enum):
-	""" The `SourceState` is an enumeration that defines the possible states of the Source.
-	"""
-	CHUNKS_EMBED_ERR	= -6	# The chunks could not be embedded.
-	CHUNKS_STORE_ERR	= -5	# The chunks could not be stored.
-	CHUNKS_IDX_ERR		= -4	# The chunks could not be indexed.
-	SECTIONS_IDX_ERR	= -3	# The sections could not be indexed.
-	FILES_IDX_ERR		= -2	# The file names could not be indexed.
-	ERR_FS_404			= -1	# The file system path does not exist.
+	""" The `SourceState` is an enumeration that defines all possible states of any SourceNode or the Source. """
+
+	ERR_DB_SETUP		= -30	# The Source failed to setup the vector database for descriptions or chunks.
+
+	ERR_INDICES_LOAD	= -10	# The Source failed to load indices from persistence.
+
+	ERR_MAKER_ACCESS	= -3	# The SourceMaker failed with the creation of some output file.
+	ERR_MAKER_INDEX		= -2	# The SourceMaker could not index every file.
+	ERR_MAKER_INIT		= -1	# The SourceMaker could not be created and initialized.
+
 	INITIAL				=  0	# The initial state of the source.
-	FS_FOUND			=  1	# The file system has been found.
-	FILES_IDX_OK		=  2	# The file names are indexed.
-	SECTIONS_IDX_OK		=  3	# The sections (chapter, section, subsection, paragraph, ...) are indexed.
-	CHUNKS_IDX_OK		=  4	# The chunks are indexed and ready to be processed.
-	CHUNKS_STORED_OK	=  5	# The chunks are stored and ready to be processed.
-	CHUNKS_EMBEDDED_OK	=  6	# The chunks are embedded and ready to be processed.
+	MAKER_INIT_OK		=  1	# The SourceMaker could be created and initialized.
+	MAKER_INDEX_OK		=  2	# The SourceMaker could index every file.
+	MAKER_READY_OK		=  3	# The SourceMaker either created every output file or is ready to create any on demand.
+
+	INDICES_LOADED_OK	=  10	# The Source has loaded all known indices from persistence.
+
+	CACHE_READY_OK		=  20	# The Source has initialized (possibly loaded, possibly created) a cache for SourceNode objects.
+
+	DESCRIPTIONS_DB_OK	=  30	# The Source has opened a vector database all known descriptions, titles, section titles, etc.
+	CHUNKS_DB_OK		=  31	# The Source has opened a vector database all known chunks.
+
 	READY				=  100	# The source is ready to be processed.
 
 
