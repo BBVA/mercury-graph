@@ -244,6 +244,49 @@ class SourceEntity(SourceNode):
 		return self.children.get(index, None)
 
 
+class Chunk(SourceNode):
+	""" The Chunk is a SourceNode that represents a single chunk of text or a link in a markdown file. It is a node with no children.
+
+	It is the text of a paragraph, delimited by end of paragraph, a link, or a cell in a table.
+
+	Args:
+		index (str): the index of this Chunk in the tree.
+		parent (SourceEntity): The SourceEntity that contains this Chunk.
+		content (str): The text of the chunk, table cell or link.
+		is_link (bool): True if the chunk is a link, False if it is a text or table cell.
+		label (str): The label of the table column if this is a table cell or the label of the link. None for text chunks.
+		row_name (str): The name of the table row if this is a table cell. The row number if the row has no name.
+	"""
+
+	def __init__(self, index, parent, content, is_link = False, label = None, row_name = None):
+		super().__init__(index, parent)
+
+		self.content  = content
+
+		if is_link:
+			self._type	= 'link'
+			self._name	= label
+			self._descr	= content
+
+		else:
+			self._name = index.split('/')[-1]
+
+			if label is None:
+				self._type	= 'text'
+				self._descr	= 'Paragraph: %s' % self._name
+
+			else:
+				self._type	= 'table_cell'
+				self._descr	= 'row: "%s" column: "%s"' % (label, row_name)
+
+
+	def get_children_idx(self):
+		return []
+
+
+	def child(self, index):
+		return None
+
 
 class Source(Agentic):
 	""" The Source is an Agentic interface to a corpus of documents.
