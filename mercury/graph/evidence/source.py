@@ -104,6 +104,55 @@ class SourceNode(ABC):
 		pass
 
 
+class SourceMaker(SourceNode):
+	""" The SourceMaker is the root SourceNode that is responsible for creating a tree of SourceFile objects.
+
+	A Source only has one SourceMaker. An Endpoint can have as many Sources as required.
+
+	It may do nothing, when the Source is already a tree markdown files on disk, or it can mirror a tree of PDF files as their
+	corresponding markdown files, or it may dump large XML files into a tree of markdown files.
+
+	Args:
+		index (str): the index of this SourceMaker in the tree.
+		type (str): the type of this SourceMaker. It can be one of: "pdf_mirror", "xml_stream" or "markdown_tree".
+		name (str): the name of this SourceMaker.
+		src_path (str): the path to the source files. (None for "markdown_tree" type.)
+		dst_path (str): the path to the destination markdown files.
+	"""
+
+	def __init__(self, index, type, name, src_path, dst_path):
+		super().__init__(index)
+
+		if type not in ['pdf_mirror', 'xml_stream', 'markdown_tree']:
+			raise ValueError('Invalid type: %s' % type)
+
+		self._type	= type
+		self._name	= name
+		self._src	= src_path
+		self._dst	= dst_path
+		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._name, self._type, self._dst)
+
+
+	def build_indices(self):
+		pass
+	# TODO: Implement the logic to build indices for the SourceMaker.
+
+
+	def build_output(self):
+		pass
+	# TODO: Implement the logic to build output files for the SourceMaker.
+
+
+	def get_children_idx(self):
+		pass
+	# TODO: Implement the logic to return the children indices of the SourceMaker.
+
+
+	def child(self, index):
+		pass
+	# TODO: Implement the logic to return the child of the SourceMaker with the given index.
+
+
 
 class Source(Agentic):
 	""" The Source is an Agentic interface to a corpus of documents.
