@@ -43,7 +43,7 @@ class SourceNode(ABC):
 
 	This class has the common interface to manage indices in the tree. It provides:
 
-	- Attributes: type, name, description and state
+	- Attributes: type, index, description and state
 	- A mechanism to locate the SourceNodes higher in the tree via the `parent` attribute.
 	- A mechanism to index its children in the tree via the `get_children_idx()` method.
 	- A mechanism to access its children in the tree via the `child()` method.
@@ -59,7 +59,6 @@ class SourceNode(ABC):
 		self._index  = index
 		self._parent = parent
 		self._type	 = None
-		self._name	 = None
 		self._descr	 = None
 
 		self.state = SourceState.INITIAL
@@ -73,11 +72,6 @@ class SourceNode(ABC):
 	@property
 	def index(self):
 		return self._index
-
-
-	@property
-	def name(self):
-		return self._name
 
 
 	@property
@@ -119,33 +113,31 @@ class SourceMaker(SourceNode):
 	Args:
 		index (str): the index of this SourceMaker in the tree.
 		type (str): the type of this SourceMaker. It can be one of: "pdf_mirror", "xml_stream" or "markdown_tree".
-		name (str): the name of this SourceMaker.
 		src_path (str): the path to the source files. (None for "markdown_tree" type.)
 		dst_path (str): the path to the destination markdown files.
 		extensions (list of str): If given, only files with these extensions will be indexed. (A filtering mechanism for "markdown_tree".)
 	"""
 
-	def __init__(self, index, type, name, src_path, dst_path, extensions = None):
+	def __init__(self, index, type, src_path, dst_path, extensions = None):
 		super().__init__(index)
 
 		if type not in ['pdf_mirror', 'xml_stream', 'markdown_tree']:
 			raise ValueError('Invalid type: %s' % type)
 
 		self._type	= type
-		self._name	= name
 		self._src	= src_path
 		self._dst	= dst_path
 		self._ext	= extensions
-		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._name, self._type, self._dst)
+		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._index, self._type, self._dst)
 
 
 	def build_indices(self):
-		pass
+		return True
 	# TODO: Implement the logic to build indices for the SourceMaker.
 
 
 	def build_output(self):
-		pass
+		return True
 	# TODO: Implement the logic to build output files for the SourceMaker.
 
 
@@ -177,8 +169,7 @@ class SourceFile(SourceNode):
 			raise ValueError('Invalid file path: %s' % path)
 
 		self._type	= 'file'
-		self._name	= path.split('/')[-1]
-		self._descr	= 'SourceFile: %s' % self._name
+		self._descr	= 'SourceFile: %s' % self._index
 
 		self.path = path
 
@@ -218,13 +209,13 @@ class SourceEntity(SourceNode):
 		self.content  = content
 		self.children = None
 
-		self.get_children_idx()		# This identifies the type, name and description from the content. Runs just one time.
+		self.get_children_idx()		# This identifies the type, index and description from the content. Runs just one time.
 
 
 	def get_children_idx(self):
 		""" This parses the content to identify the children of this SourceEntity.
 
-		While parsing, it also sets the type, name and description of this SourceEntity. E.g., the description of a title is the title
+		While parsing, it also sets the type, index and description of this SourceEntity. E.g., the description of a title is the title
 		itself. It builds a dictionary with the children of the next level in the tree. The children are either deeper SourceEntity objects
 		or chunks containing text, a link or a cell in a table.
 		"""
