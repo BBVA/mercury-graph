@@ -118,9 +118,10 @@ class SourceMaker(SourceNode):
 		name (str): the name of this SourceMaker.
 		src_path (str): the path to the source files. (None for "markdown_tree" type.)
 		dst_path (str): the path to the destination markdown files.
+		extensions (list of str): If given, only files with these extensions will be indexed. (A filtering mechanism for "markdown_tree".)
 	"""
 
-	def __init__(self, index, type, name, src_path, dst_path):
+	def __init__(self, index, type, name, src_path, dst_path, extensions = None):
 		super().__init__(index)
 
 		if type not in ['pdf_mirror', 'xml_stream', 'markdown_tree']:
@@ -130,6 +131,7 @@ class SourceMaker(SourceNode):
 		self._name	= name
 		self._src	= src_path
 		self._dst	= dst_path
+		self._ext	= extensions
 		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._name, self._type, self._dst)
 
 
