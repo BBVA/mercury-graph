@@ -448,6 +448,44 @@ class Source(Agentic):
 		self._maker	 = None
 
 
+	def _setup_cache(self):
+		""" Sets up the cache for the Source.
+
+		The cache keeps an LRU (Least Recently Used) dictionary of SourceNode objects by index. Optionally, it can be persisted to disk
+		as a pickle file. The cache size and path are configured in the Source's configuration.
+
+		Returns:
+			(bool): True if the cache was set up successfully, False if the Source does not have a cache.
+		"""
+
+		self._cache = None
+
+		self._cache_path = self.conf.get('cache_path', '')
+		if not self._cache_path.endswith('.pickle'):
+			self._cache_path = None
+
+		self._cache_size = self.conf.get('cache_size', 0)
+
+		if self._cache_size > 0:
+			if self._cache_path is not None and os.path.isfile(self._cache_path):
+				try:
+					with open(self._cache_path, 'rb') as f:
+						self._cache = pickle.load(f)
+
+				except:
+					self.log_error('Source could not load cache from "%s".' % (self._cache_path))
+					self._cache = OrderedDict()
+
+			else:
+				self._cache = OrderedDict()
+
+			while len(self._cache) > self._cache_size:
+				self._cache.popitem(last = False)
+
+		return self._cache is not None
+
+
+
 	def _capabilities(self):
 		""" Returns the capabilities of the Source.
 
