@@ -10,7 +10,7 @@ that run on commodity GPUs. The architecture is easy to extend, but to achieve p
 ## The power of OSS
 
 Hopefully, `mercury.graph.EvidenceGraph` is being released early enough to become the core of a community effort and enough people see the
-value of evidence graphs to contribute to the project. You are all more than welcome [CONTRIBUTING.md](CONTRIBUTING.md).
+value of evidence graphs to contribute to the project. You are all more than welcome [CONTRIBUTING](https://github.com/BBVA/mercury-graph#contributing).
 
 
 ## Some lessons on maintaining systems that explicitly handle evidence from literature
