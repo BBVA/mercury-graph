@@ -485,6 +485,52 @@ class Source(Agentic):
 		return self._cache is not None
 
 
+	def _setup_chroma_db(self):
+		""" Sets up the Chroma vector database for the Source.
+
+		The Chroma vector database is used to store embeddings of chunks for later retrieval. It is configured in the Source's
+		configuration.
+
+		Returns:
+			(bool): True if the Chroma vector database was set up successfully or is not used, False if setup failed.
+		"""
+		self._chroma = None
+
+		chroma_path = self.conf.get('chroma_path', None)
+
+		if chroma_path is None:
+			return True			# This is the neat way to disable ChromaDB.
+
+		if len(chroma_path) == 0 or not os.path.isdir(chroma_path):
+			self.log_error('Source could not setup Chroma vector database. Invalid path: "%s".' % (chroma_path))
+
+			return False
+
+		try:
+			settings = chroma.config.Settings(chroma_db_impl = 'duckdb+parquet', persist_directory = chroma_path)
+			self._chroma = chroma.Client(settings)
+
+		except:
+			self.log_error('Source failed to create Chroma client at path: "%s".' % (chroma_path))
+
+			return False
+
+		try:
+			name = self.conf['chroma_descriptions_collection_name']
+
+			self._chroma_descr = self._chroma.get_or_create_collection(name)
+
+			name = self.conf['chroma_chunks_collection_name']
+
+			self._chroma_chunks = self._chroma.get_or_create_collection(name)
+
+		except:
+			self.log_error('Source failed to create Chroma collections at path: "%s".' % (chroma_path))
+
+			return False
+
+		return True
+
 
 	def _capabilities(self):
 		""" Returns the capabilities of the Source.
