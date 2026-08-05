@@ -22,6 +22,6 @@
 
 		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
 		// Provide a list of tool names
-		"tools": ["demo", "GLiNER2"]
+		"tools": ["wikipedia_2025", "GLiNER2"]
 	}
 }
