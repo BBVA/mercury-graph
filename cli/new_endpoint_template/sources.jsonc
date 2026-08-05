@@ -9,46 +9,78 @@
 // You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
 //
 
-	"demo": {
-		"name": "demo",
+	"wikipedia_2025": {
+		"name": "wikipedia_2025",
 
 		// "extra_args" is given to the source's constructor.
 		"extra_args": {
 			// The description will be exposed in the Sources's Agentic API. It can be a string or a list of strings.
-			"description": "This source is a demo folder for development and testing.",
+			"description": "This is the wikipedia dump enwiki-20260101-pages-articles-multistream.xml in markdown format.",
 
-			// Possible types are: fs_markdown, fs_text, fs_convert_to_markdown, fs_codebase, fs_dataframe
-			// fs_ stands for filesystem, all types are filesystem based. fs_convert_to_markdown requires a conversion tool,
-			// fs_dataframe requires pandas_read_args, fs_codebase requires file_extensions.
-			"type": "fs_markdown",
-			// The conversion tool is used to convert files to markdown. It is only required for fs_convert_to_markdown.
-			"conversion_tool": {},
-			// The pandas_read_args are used to read dataframes from files. It is only required for fs_dataframe.
-			"pandas_read_args": {},
-			// The file_extensions are used to filter files in the filesystem.
-			"file_extensions": ["md", "txt"],
-			// This applies to fs_markdown, fs_text, fs_convert_to_markdown.
-			"chunk_on": ["sections", "paragraphs"],
-			// In characters
-			"max_chunk_size": 1000,
-			// The root path of the source.
-			"source_path": "./sandbox/mge/demo",
-			// A cache path where the source is allowed to write to store metadata.
-			"source_cache": "./sandbox/mge/demo/.mge_cache",
+			// The arguments passed to the SourceMaker
+			"type": "xml_stream",
+			"src_path": "/storage/nlp/corpora/en_wiki_20260101/enwiki-20260101-pages-articles-multistream.xml",
+			"dst_path": "/storage/temp/markdown/wiki_20260101/",
 
-			// As more technologies are added, replace each by a {"$ref": "./<technology>.jsonc"} to hold configuration for that technology.
-			// The value "python" means, as a PoC, we use Python lists and dicts, cached as a pickle file.
-			"persistence": {
-				"indices": "python",
-				"text_chunks": "python",
-				"embedding_model": null,
-				"vector_storage": null,
-				"vector_query": null
-			}
+			// No need to filter by extensions, since "xml_stream" creates only markdown files.
+			"extensions": [],
+
+			// Cache options: cache_size (in objects) = 0, prevents caching, cache_save = null prevents saving the cache to disk.
+			"cache_size": 1024,
+			"cache_save": "/storage/temp/cache/wikipedia_2025.pickle",
+
+			// ChromaDB options:
+
+			"chroma_persist_path": "/storage/temp/chroma/wikipedia_2025",
+			"chroma_descriptions_collection_name": "descriptions",
+			"chroma_chunks_collection_name": "chunks"
 		},
 
-		// "tools" declares what tools does the source expect. The endpoint will find them an provide them via `add_tool()`.
-		// Provide a list of tool names
+		// "tools" is expected by the Endpoint to make all Agentic configurations consistent. Sources do not use tools.
+		"tools": []
+	},
+
+	"bertrand_russell_works": {
+		"name": "bertrand_russell_works",
+
+		"extra_args": {
+			"description": "This is a collection of Bertrand Russell's works in pdf format.",
+
+			"type": "pdf_mirror",
+			"src_path": "/storage/temp/pdf_examples/bertrand_russell/",
+			"dst_path": "/storage/temp/markdown/bertrand_russell/",
+
+			"extensions": [".pdf"],
+
+			"cache_size": 0,
+			"cache_save": null,
+
+			"chroma_persist_path": null,
+			"chroma_descriptions_collection_name": null,
+			"chroma_chunks_collection_name": null
+		},
+		"tools": []
+	},
+
+	"markdown_example": {
+		"name": "markdown_example",
+
+		"extra_args": {
+			"description": "This is a collection of markdown files.",
+
+			"type": "markdown_tree",
+			"src_path": null,
+			"dst_path": "/storage/temp/markdown_examples/",
+
+			"extensions": [".md"],
+
+			"cache_size": 0,
+			"cache_save": null,
+
+			"chroma_persist_path": null,
+			"chroma_descriptions_collection_name": null,
+			"chroma_chunks_collection_name": null
+		},
 		"tools": []
 	}
 }
