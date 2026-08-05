@@ -25,12 +25,12 @@
 			// No need to filter by extensions, since "xml_stream" creates only markdown files.
 			"extensions": [],
 
-			// Cache options: cache_size (in objects) = 0, prevents caching, cache_save = null prevents saving the cache to disk.
+			// Cache options: cache_size (in objects) = 0, prevents caching, cache_save = extension must be .pickle or no saving.
 			"cache_size": 1024,
 			"cache_save": "/storage/temp/cache/wikipedia_2025.pickle",
 
-			// ChromaDB options:
-
+			// ChromaDB options: chroma_persist_path must be a directory that will be passed as the argument persist_directory to
+			//		chromadb.Settings. If not accepted, vector DB will be disabled.
 			"chroma_persist_path": "/storage/temp/chroma/wikipedia_2025",
 			"chroma_descriptions_collection_name": "descriptions",
 			"chroma_chunks_collection_name": "chunks"
