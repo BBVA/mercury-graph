@@ -320,6 +320,7 @@ class Source(Agentic):
 		self.states = SourceState
 
 		self.conf = extra_args
+		self.name = schema
 
 		self.pilot(0)	# Just to make .meta reflect the initial state.
 
@@ -373,57 +374,57 @@ class Source(Agentic):
 		Returns:
 			(list): A list of capabilities, each represented as a dictionary with the following keys:
 
-				- "type": The type of capability (e.g., "function").
-				- "function": A dictionary containing details about the function
+				- 'type': The type of capability (e.g., 'function').
+				- 'function': A dictionary containing details about the function
 
-				The value of "function" is:
+				The value of 'function' is:
 
-				* "name": The name of the function.
-				* "description": A brief description of what the function does.
-				* "parameters": A dictionary with "type", "properties", and "required"
-				* "returns": A dictionary with "type" and "items"
+				* 'name': The name of the function.
+				* 'description': A brief description of what the function does.
+				* 'parameters': A dictionary with 'type', 'properties', and 'required'
+				* 'returns': A dictionary with 'type' and 'items'
 		"""
 		return [
 			{
-				"type": "function",
-				"function": {
-					"name": "get_items_by_index",
-					"description": "Get indices of the children of an index. Indices are either folders, files, sections or chunks.",
-					"parameters": {
-						"type": "object",
-						"properties": {
-							"index": {
-								"type": "string",
-								"description": "Index whose children indices are required."
+				'type': 'function',
+				'function': {
+					'name': 'get_items_by_index_%s' % self.name,
+					'description': 'Get indices of the children of an index. Indices are either folders, files, sections or chunks.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'index': {
+								'type': 'string',
+								'description': 'Index whose children indices are required.'
 							}
 						},
-						"required": ["index"]
+						'required': ['index']
 					},
-					"returns": {
-						"type": "array",
-						"items": {
-							"type": "string"
+					'returns': {
+						'type': 'array',
+						'items': {
+							'type': 'string'
 						}
 					}
 				}
 			},
 			{
-				"type": "function",
-				"function": {
-					"name": "get_text_chunk_by_index",
-					"description": "Get the text at a given chunk index.",
-					"parameters": {
-						"type": "object",
-						"properties": {
-							"index": {
-								"type": "string",
-								"description": "Index of the text chunk."
+				'type': 'function',
+				'function': {
+					'name': 'get_text_by_index_%s' % self.name,
+					'description': 'Get the text at a given chunk index.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'index': {
+								'type': 'string',
+								'description': 'Index of the text chunk.'
 							}
 						},
-						"required": ["index"]
+						'required': ['index']
 					},
-					"returns": {
-						"type": "string"
+					'returns': {
+						'type': 'string'
 					}
 				}
 			}
