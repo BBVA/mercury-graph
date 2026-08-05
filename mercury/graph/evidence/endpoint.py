@@ -472,11 +472,14 @@ class Endpoint(Agentic):
 				else:
 					self.meta['state'] = self.states.PILOT_REQUIRED.value
 
+				continue
+
 			if self.meta['state'] == self.states.TOOLS_ARE_READY.value:
 				if self._research_capabilities():
 					self.meta['state'] = self.states.ALL_READY.value
 				else:
 					self.meta['state'] = self.states.ERR_TOOL_CAPS.value
+					break
 
 			if just_once:
 				break
