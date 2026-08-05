@@ -301,6 +301,17 @@ class Source(Agentic):
 	- A persistence backend that possibly includes vectorization and embedding of the chunks for later retrieval.
 	- An Agentic interface to everything above.
 
+	## Source Components
+
+	The Source uses the following components to manage file conversion, chunking, indexing and to represent the parts of a document:
+
+	- [`SourceNode`][mercury.graph.evidence.SourceNode]: The base class to manage the index logic of all components.
+	- [`SourceMaker`][mercury.graph.evidence.SourceMaker]: The root SourceNode responsible for managing a tree of markdown files.
+	- [`SourceFile`][mercury.graph.evidence.SourceFile]: Each individual file as a SourceNode.
+	- [`SourceEntity`][mercury.graph.evidence.SourceEntity]: Each section, subsection, paragraph, table, figure, etc. in a markdown
+		file as a SourceNode.
+	- [`Chunk`][mercury.graph.evidence.Chunk]: Each chunk of text, table cell or link in a markdown file as a SourceNode.
+
 	Args:
 		schema (str): a schema (a unique name) to use for the Source's ID.
 		endpoint (Agentic): an optional Endpoint. It becomes part of the Source's ID and is available via `self.endpoint`. If not
