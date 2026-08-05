@@ -328,7 +328,11 @@ class Source(Agentic):
 		self.conf = extra_args
 		self.name = schema
 
-		self.pilot(0)	# Just to make .meta reflect the initial state.
+		self._maker	 = None
+		self._cache	 = None
+		self._chroma = None
+
+		self._meta_	 = self._meta()	# Just to make .meta reflect the initial state.
 
 
 	def _run(self, request):
@@ -337,6 +341,7 @@ class Source(Agentic):
 			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
 		return {'status': 'ok'}
+		# TODO: Implement the logic to run the Source with the given request.
 
 
 	def _meta(self):
@@ -358,6 +363,7 @@ class Source(Agentic):
 			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
 		"""
 		return {'status': 'ok'}
+		# TODO: Implement the logic to simulate running the Source with the given request.
 
 
 	def pilot(self, intent, just_once = False):
