@@ -13,9 +13,7 @@ from .agentic import Agentic
 class SourceState(Enum):
 	""" The `SourceState` is an enumeration that defines all possible states of any SourceNode or the Source. """
 
-	ERR_DB_SETUP		= -30	# The Source failed to setup the vector database for descriptions or chunks.
-
-	ERR_INDICES_LOAD	= -10	# The Source failed to load indices from persistence.
+	ERR_DB_SETUP		= -20	# The Source failed to setup the vector database for descriptions or chunks.
 
 	ERR_MAKER_ACCESS	= -3	# The SourceMaker failed with the creation of some output file.
 	ERR_MAKER_INDEX		= -2	# The SourceMaker could not index every file.
@@ -26,12 +24,7 @@ class SourceState(Enum):
 	MAKER_INDEX_OK		=  2	# The SourceMaker could index every file.
 	MAKER_READY_OK		=  3	# The SourceMaker either created every output file or is ready to create any on demand.
 
-	INDICES_LOADED_OK	=  10	# The Source has loaded all known indices from persistence.
-
-	CACHE_READY_OK		=  20	# The Source has initialized (possibly loaded, possibly created) a cache for SourceNode objects.
-
-	DESCRIPTIONS_DB_OK	=  30	# The Source has opened a vector database all known descriptions, titles, section titles, etc.
-	CHUNKS_DB_OK		=  31	# The Source has opened a vector database all known chunks.
+	CACHE_READY_OK		=  10	# The Source has initialized (possibly loaded, possibly created) a cache for SourceNode objects.
 
 	READY				=  100	# The source is ready to be processed.
 
@@ -371,13 +364,68 @@ class Source(Agentic):
 
 			(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
-		state = self.meta['state']
 
-		if state < 0:
-			self.log_error('Source is in error state %d' % state)
+		if self.meta['state'] < 0:
+			self.log_error('Source is in error state %d' % self.meta['state'])
 			return
 
-		self.meta['state'] = self.states.READY.value
+		while self.meta['state'] < intent:
+			if self.meta['state'] == self.states.INITIAL.value:
+				try:
+					typ = self.conf['type']
+					src = self.conf['src_path']
+					dst = self.conf['dst_path']
+					self._maker = SourceMaker(self.name, typ, src, dst, self.conf.get('extensions', None))
+
+				except:
+					self.log_error('SourceMaker could not be created and initialized for Source "%s".' % self.name)
+					self.meta['state'] = self.states.ERR_MAKER_INIT.value
+					break
+
+				self.meta['state'] = self.states.MAKER_INIT_OK.value
+
+				if just_once:
+					break
+
+			if self.meta['state'] == self.states.MAKER_INIT_OK.value:
+				if self._maker.build_indices():
+					self.meta['state'] = self.states.MAKER_INDEX_OK.value
+				else:
+					self.log_error('SourceMaker could not build indices for Source "%s".' % self.name)
+					self.meta['state'] = self.states.ERR_MAKER_INDEX.value
+					break
+
+				if just_once:
+					break
+
+			if self.meta['state'] == self.states.MAKER_INDEX_OK.value:
+				if self._maker.build_output():
+					self.meta['state'] = self.states.MAKER_READY_OK.value
+				else:
+					self.log_error('SourceMaker could not build output for Source "%s".' % self.name)
+					self.meta['state'] = self.states.ERR_MAKER_ACCESS.value
+					break
+
+				if just_once:
+					break
+
+			if self.meta['state'] == self.states.MAKER_READY_OK.value:
+				self._setup_cache()		# No error condition. Worst case is no cache.
+				self.meta['state'] = self.states.CACHE_READY_OK.value
+
+				if just_once:
+					break
+
+			if self.meta['state'] == self.states.CACHE_READY_OK.value:
+				if self._setup_chroma_db():
+					self.meta['state'] = self.states.READY.value
+
+				else:
+					self.log_error('Source could not setup the vector database for Source "%s".' % self.name)
+					self.meta['state'] = self.states.ERR_DB_SETUP.value
+
+				break
+
 
 
 	def _capabilities(self):
