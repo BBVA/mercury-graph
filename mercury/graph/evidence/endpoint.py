@@ -439,7 +439,8 @@ class Endpoint(Agentic):
 					self.meta['state'] = self.states.ERR_LOADING_OBJ.value
 					break
 
-				continue
+				if just_once:
+					break
 
 			if self.meta['state'] == self.states.LOADED_OBJ.value:
 				if self._link_objects():
@@ -448,7 +449,8 @@ class Endpoint(Agentic):
 					self.meta['state'] = self.states.ERR_LINKING.value
 					break
 
-				continue
+				if just_once:
+					break
 
 			if self.meta['state'] == self.states.LINKED_OBJ.value:
 				if self._expose_api():
@@ -457,7 +459,8 @@ class Endpoint(Agentic):
 					self.meta['state'] = self.states.ERR_EXPOSING.value
 					break
 
-				continue
+				if just_once:
+					break
 
 			next_agentic = self._next_agentic_below(intent)
 			if next_agentic is not None:
@@ -472,16 +475,15 @@ class Endpoint(Agentic):
 				else:
 					self.meta['state'] = self.states.PILOT_REQUIRED.value
 
-				continue
+				if just_once:
+					break
 
 			if self.meta['state'] == self.states.TOOLS_ARE_READY.value:
 				if self._research_capabilities():
 					self.meta['state'] = self.states.ALL_READY.value
 				else:
 					self.meta['state'] = self.states.ERR_TOOL_CAPS.value
-					break
 
-			if just_once:
 				break
 
 
