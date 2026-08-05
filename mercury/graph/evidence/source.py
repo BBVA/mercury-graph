@@ -427,6 +427,26 @@ class Source(Agentic):
 				break
 
 
+	def close(self, endpoint_locked):
+		""" Closes the Source and releases any resources it holds.
+
+			(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
+		"""
+
+		if endpoint_locked:
+			if self._cache is not None and self._cache_path is not None:
+				fn = os.path.abspath(self._cache_path)
+
+				pat = Path(fn).parent
+				pat.mkdir(parents = True, exist_ok = True)
+
+				with open(fn, 'wb') as f:
+					pickle.dump(self._cache, f)
+
+		self._cache	 = None
+		self._chroma = None		# There is no need to explicitly .close(), .flush() ... That persists changes.
+		self._maker	 = None
+
 
 	def _capabilities(self):
 		""" Returns the capabilities of the Source.
