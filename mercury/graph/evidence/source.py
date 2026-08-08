@@ -129,28 +129,93 @@ class SourceMaker(SourceNode):
 
 	Args:
 		index (str): the index of this SourceMaker in the tree.
-		type (str): the type of this SourceMaker. It can be one of: "pdf_mirror", "xml_stream" or "markdown_tree".
+		typ (str): the type of this SourceMaker. It can be one of: "pdf_mirror", "xml_stream" or "markdown_tree".
 		src_path (str): the path to the source files. (None for "markdown_tree" type.)
 		dst_path (str): the path to the destination markdown files.
 		extensions (list of str): If given, only files with these extensions will be indexed. (A filtering mechanism for "markdown_tree".)
 	"""
 
-	def __init__(self, index, type, src_path, dst_path, extensions = None):
+	def __init__(self, index, typ, src_path, dst_path, extensions = None):
 		super().__init__(index)
 
-		if type not in ['pdf_mirror', 'xml_stream', 'markdown_tree']:
-			raise ValueError('Invalid type: %s' % type)
+		if typ not in ['pdf_mirror', 'xml_stream', 'markdown_tree']:
+			raise ValueError('Invalid type: %s' % typ)
 
-		self._type	= type
-		self._src	= src_path
-		self._dst	= dst_path
-		self._ext	= extensions
+		self._type = typ
+		self._src  = src_path
+		self._dst  = dst_path
+
+		ext = extensions
+		if type(ext) is not list:
+			ext = [ext]
+
+		if len(ext) == 0:
+			self._ext = None
+		else:
+			self._ext = set()
+
+			for e in ext:
+				if not e.startswith('.'):
+					e = '.' + e
+				self._ext.add(e)
+
 		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._index, self._type, self._dst)
 
 
 	def build_indices(self):
+		""" Builds the indices of the SourceMaker. It builds a dictionary with all the indices of the SourceFile objects, but without
+		creating the object (that is done by build_output())
+
+		There is different behavior depending on the type of the SourceMaker:
+
+		  * **markdown_tree**: Does nothing, just exposes the files with appropriate extensions in the destination.
+		  * **pdf_mirror**: Mirrors the source tree of PDF files into the destination tree of markdown files, creating the directories.
+		  	It returns the indices of (non existing) markdown files via get_children_idx(). When the files is requested via child(), it
+			is created on demand by calling the PDF to markdown conversion tool.
+		  * **xml_stream**: Creates the destination tree of markdown files from the source XML file. Since it doesn't have an efficient
+		  	way to access the XML file randomly, it creates all the markdown files in the destination. Those files will not be created
+			again unless the source XML file is updated.
+
+		Returns:
+			(bool): True if the indices were successfully built, False otherwise.
+		"""
+
+		if self._type == 'markdown_tree':
+			if not os.path.isdir(self._dst):
+				return False
+
+			self._children = self._recurse_tree()
+
+			return True
+
+		if self._type == 'pdf_mirror':
+			if not os.path.isdir(self._src):
+				return False
+
+			if not os.path.isdir(self._dst):
+				os.makedirs(self._dst, exist_ok = True)
+
+			self._children = self._recurse_tree(self._src)
+
+			return True
+
+		if not os.path.isfile(self._src):
+			return False
+
+		src_time = int(os.path.getmtime(self._src))
+
+		if os.path.isdir(self._dst):
+			self._children = self._recurse_tree(abort_if_before = src_time)
+
+			if type(self._children) is dict:
+				return True
+
+		if not self._create_markdown_from_xml():
+			return False
+
+		self._children = self._recurse_tree()
+
 		return True
-	# TODO: Implement the logic to build indices for the SourceMaker.
 
 
 	def build_output(self):
