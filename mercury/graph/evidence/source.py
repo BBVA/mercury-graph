@@ -699,14 +699,8 @@ class Source(Agentic):
 		if chroma_path is None:
 			return True			# This is the neat way to disable ChromaDB.
 
-		if len(chroma_path) == 0 or not os.path.isdir(chroma_path):
-			self.log_error('Source could not setup Chroma vector database. Invalid path: "%s".' % (chroma_path))
-
-			return False
-
 		try:
-			settings = chroma.config.Settings(chroma_db_impl = 'duckdb+parquet', persist_directory = chroma_path)
-			self._chroma = chroma.Client(settings)
+			self._chroma = chroma.PersistentClient(path = chroma_path)
 
 		except:
 			self.log_error('Source failed to create Chroma client at path: "%s".' % (chroma_path))
