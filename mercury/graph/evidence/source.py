@@ -28,6 +28,8 @@ class SourceState(Enum):
 
 	READY				=  100	# The source is ready to be processed.
 
+	FILE_NEEDS_UPDATE	=  404	# The file needs to be updated because the source file is more recent than the output file.
+
 
 class SourceNode(ABC):
 	""" Everything in the Source is a tree of SourceNodes: A Maker, a File, an Entity, even a Chunk (a node with no children).
@@ -219,19 +221,104 @@ class SourceMaker(SourceNode):
 
 
 	def build_output(self):
+		""" Creates the SourceFile objects for each index in the self._children dictionary. This is efficient since the constructor of
+		SourceFile does not read the file. The file is read when its content is requested via the SourceFile's get_children_idx() method.
+
+		There is different behavior depending on the type of the SourceMaker:
+
+		* **markdown_tree**: Create a SourceFile object for each file in the index (the index was built by parsing the destination).
+		* **pdf_mirror**: Check if the markdown file exists and it more recent than the source PDF file. In that case, create a SourceFile
+			object for it, if not it just sets the value to 404 (SourceState.FILE_NEEDS_UPDATE.value) and if the file is requested via
+			child() it will be created on demand by calling the PDF to markdown conversion tool.
+		* **xml_stream**: Create a SourceFile object for each file in the index. In that case, either the files already existed and were
+			more recent than the source XML file, or they were created by the build_indices() method.
+
+		Returns:
+			(bool): True if the output files were successfully built, False otherwise.
+		"""
+
+		if self._type != 'pdf_mirror':
+			# Just create the SourceFile objects for each dst file.
+			return True
+			# TODO: Implement the logic to build output files for the SourceMaker.
+
+		# Mirror the PDF files (the relative paths are identical, the extension are .md instead of whatever the source file extension is).
+		# If the file exists and is more recent than the source file, just create the SourceFile object for it. If not, erase the
+		# destination file and set the value to 404.
+
 		return True
-	# TODO: Implement the logic to build output files for the SourceMaker.
+		# TODO: Implement the logic to build output files for the SourceMaker.
 
 
 	def get_children_idx(self):
-		pass
-	# TODO: Implement the logic to return the children indices of the SourceMaker.
+		""" Returns the children indices following the SourceNode interface.
+
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
+
+		"""
+
+		return list(self._children.keys())
 
 
 	def child(self, index):
-		pass
-	# TODO: Implement the logic to return the child of the SourceMaker with the given index.
+		""" Returns the corresponding SourceFile object following the SourceNode interface.
 
+		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
+		"""
+
+		if not index in self._children:
+			return None
+
+		ret = self._children[index]
+		if type(ret) is SourceFile:
+			return ret
+
+		self._children[index] = self._build_child_at(index)
+
+		return self._children[index]
+
+
+	def _recurse_tree(self, root = None, abort_if_before = None):
+		""" Recursively builds a dictionary of indices for the SourceMaker. It is used by build_indices() to build the indices of the
+		SourceFile objects.
+
+		Args:
+			root (str): the path to the source files. If None, it uses self._dst.
+			abort_if_before (int): If given, it will abort the recursion returning None if it finds a file with a modification time
+				older than this value. This is used to check if the source XML file is more recent than the output files.
+
+		Returns:
+			(dict): A dictionary with the indices of the SourceFile objects. The keys are the indices and the values None.
+		"""
+
+		return {}
+		# TODO: Implement the logic to recursively build a dictionary of indices for the SourceMaker.
+
+
+	def _create_markdown_from_xml(self):
+		""" Creates the markdown files from the source XML file. It is used by build_indices() to create the output files for the
+		SourceMaker.
+
+		Returns:
+			(bool): True if the markdown files were successfully created, False otherwise.
+		"""
+
+		return True
+		# TODO: Implement the logic to create markdown files from the source XML file for the SourceMaker.
+
+
+	def _build_child_at(self, index):
+		""" Builds a SourceFile object for the given index. It is used by child() to create the SourceFile objects on demand.
+
+		Args:
+			index (str): the index of the SourceFile to create.
+
+		Returns:
+			(SourceFile): The SourceFile object for the given index.
+		"""
+
+		return None
+		# TODO: Implement the logic to build a SourceFile object for the given index for the SourceMaker.
 
 
 class SourceFile(SourceNode):
