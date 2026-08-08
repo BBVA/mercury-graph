@@ -529,8 +529,9 @@ class Source(Agentic):
 	def _run(self, request):
 		""" Runs the Source with the given request.
 
-			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
+		(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
+
 		return {'status': 'ok'}
 		# TODO: Implement the logic to run the Source with the given request.
 
@@ -538,7 +539,7 @@ class Source(Agentic):
 	def _meta(self):
 		""" Returns the metadata of the Source.
 
-			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
+		(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
 		meta = {}
 		meta['state'] = 0
@@ -551,8 +552,9 @@ class Source(Agentic):
 	def _dry_run(self, request):
 		""" Simulates running the Source with the given request.
 
-			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+		(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
 		"""
+
 		return {'status': 'ok'}
 		# TODO: Implement the logic to simulate running the Source with the given request.
 
@@ -560,7 +562,7 @@ class Source(Agentic):
 	def pilot(self, intent, just_once = False):
 		""" Pilots the Source to a new state based on the given intent.
 
-			(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
+		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
 
 		if self.meta['state'] < 0:
@@ -628,7 +630,7 @@ class Source(Agentic):
 	def close(self, endpoint_locked):
 		""" Closes the Source and releases any resources it holds.
 
-			(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
+		(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
 		"""
 
 		if endpoint_locked:
@@ -692,6 +694,7 @@ class Source(Agentic):
 		Returns:
 			(bool): True if the Chroma vector database was set up successfully or is not used, False if setup failed.
 		"""
+
 		self._chroma = None
 
 		chroma_path = self.conf.get('chroma_path', None)
@@ -740,6 +743,7 @@ class Source(Agentic):
 				* 'parameters': A dictionary with 'type', 'properties', and 'required'
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
+
 		return [
 			{
 				'type': 'function',
