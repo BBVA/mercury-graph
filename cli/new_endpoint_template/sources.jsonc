@@ -29,9 +29,9 @@
 			"cache_size": 1024,
 			"cache_save": "/storage/temp/cache/wikipedia_2025.pickle",
 
-			// ChromaDB options: chroma_persist_path must be a directory that will be passed as the argument persist_directory to
+			// ChromaDB options: chroma_path must be a directory that will be passed as the argument persist_directory to
 			//		chromadb.Settings. If not accepted, vector DB will be disabled.
-			"chroma_persist_path": "/storage/temp/chroma/wikipedia_2025",
+			"chroma_path": "/storage/temp/chroma/wikipedia_2025",
 			"chroma_descriptions_collection_name": "descriptions",
 			"chroma_chunks_collection_name": "chunks"
 		},
@@ -55,7 +55,7 @@
 			"cache_size": 0,
 			"cache_save": null,
 
-			"chroma_persist_path": null,
+			"chroma_path": null,
 			"chroma_descriptions_collection_name": null,
 			"chroma_chunks_collection_name": null
 		},
@@ -77,7 +77,7 @@
 			"cache_size": 0,
 			"cache_save": null,
 
-			"chroma_persist_path": null,
+			"chroma_path": null,
 			"chroma_descriptions_collection_name": null,
 			"chroma_chunks_collection_name": null
 		},
