@@ -344,13 +344,24 @@ class SourceFile(SourceNode):
 
 
 	def get_children_idx(self):
+		""" Returns the children indices following the SourceNode interface.
+
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
+
+		"""
+
 		pass
-	# TODO: Implement the logic to return the children indices of the SourceFile.
+		# TODO: Implement the logic to return the children indices of the SourceFile.
 
 
 	def child(self, index):
+		""" Returns the corresponding SourceEntity object following the SourceNode interface.
+
+		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
+		"""
+
 		pass
-	# TODO: Implement the logic to return the child of the SourceFile with the given index.
+		# TODO: Implement the logic to return the child of the SourceFile with the given index.
 
 
 class SourceEntity(SourceNode):
@@ -387,23 +398,24 @@ class SourceEntity(SourceNode):
 		While parsing, it also sets the type, index and description of this SourceEntity. E.g., the description of a title is the title
 		itself. It builds a dictionary with the children of the next level in the tree. The children are either deeper SourceEntity objects
 		or chunks containing text, a link or a cell in a table.
+
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
 		"""
 
 		if self.children is not None:
 			return list(self.children.keys())
 
-	# TODO: Implement the logic to return the children indices of the SourceEntity.
+		# TODO: Implement the logic to return the children indices of the SourceEntity.
 
 
 	def child(self, index):
 		""" Returns the child of this SourceEntity with the given index.
 
-		Args:
-			index (str): the index of the child to return.
+		The child can be either a deeper SourceEntity or a Chunk.
 
-		Returns:
-			(SourceEntity or Chunk): The child with the given index.
+		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
 		"""
+
 		if self.children is None:
 			return None
 
@@ -427,7 +439,7 @@ class Chunk(SourceNode):
 	def __init__(self, index, parent, content, is_link = False, label = None, row_name = None):
 		super().__init__(index, parent)
 
-		self.content  = content
+		self.content = content
 
 		if is_link:
 			self._type	= 'link'
@@ -447,10 +459,20 @@ class Chunk(SourceNode):
 
 
 	def get_children_idx(self):
+		""" Following the SourceNode interface, returns an empty list as Chunks have no children.
+
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
+		"""
+
 		return []
 
 
 	def child(self, index):
+		""" Following the SourceNode interface, returns None as Chunks have no children.
+
+		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
+		"""
+
 		return None
 
 
