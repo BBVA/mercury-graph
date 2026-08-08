@@ -157,8 +157,7 @@ class SourceMaker(SourceNode):
 			self._ext = set()
 
 			for e in ext:
-				if not e.startswith('.'):
-					e = '.' + e
+				e = e.replace('.', '').lower()
 				self._ext.add(e)
 
 		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._index, self._type, self._dst)
@@ -188,7 +187,7 @@ class SourceMaker(SourceNode):
 
 			self._children = self._recurse_tree()
 
-			return True
+			return type(self._children) is dict
 
 		if self._type == 'pdf_mirror':
 			if not os.path.isdir(self._src):
@@ -199,7 +198,7 @@ class SourceMaker(SourceNode):
 
 			self._children = self._recurse_tree(self._src)
 
-			return True
+			return type(self._children) is dict
 
 		if not os.path.isfile(self._src):
 			return False
@@ -217,7 +216,7 @@ class SourceMaker(SourceNode):
 
 		self._children = self._recurse_tree()
 
-		return True
+		return type(self._children) is dict
 
 
 	def build_output(self):
@@ -291,8 +290,43 @@ class SourceMaker(SourceNode):
 			(dict): A dictionary with the indices of the SourceFile objects. The keys are the indices and the values None.
 		"""
 
-		return {}
-		# TODO: Implement the logic to recursively build a dictionary of indices for the SourceMaker.
+		if root is None:
+			root = self._dst
+
+		if not os.path.isdir(root):
+			return None
+
+		children = {}
+
+		def recurse(root, folder_file_idx):
+			for name in os.listdir(root):
+				fn		 = '%s/%s' % (root, name)
+				file_idx = '%s/%s' % (folder_file_idx, name) if folder_file_idx is not None else name
+
+				if os.path.isdir(fn):
+					if recurse(fn, file_idx) is None:
+						return None
+
+					continue
+
+				if not os.path.isfile(fn):
+					continue
+
+				if self._ext is not None:
+					ext = str(name).lower().split('.')[-1]
+					if ext not in self._ext:
+						continue
+
+				if abort_if_before is not None:
+					tim = os.path.getmtime(fn)
+					if tim < abort_if_before:
+						return None
+
+				children[self._index + '|' + file_idx] = 404
+
+		recurse(root, None)
+
+		return children
 
 
 	def _create_markdown_from_xml(self):
@@ -302,6 +336,9 @@ class SourceMaker(SourceNode):
 		Returns:
 			(bool): True if the markdown files were successfully created, False otherwise.
 		"""
+
+		if not os.path.isdir(self._dst):
+			os.makedirs(self._dst, exist_ok = True)
 
 		return True
 		# TODO: Implement the logic to create markdown files from the source XML file for the SourceMaker.
