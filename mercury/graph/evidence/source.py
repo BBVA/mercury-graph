@@ -1,4 +1,4 @@
-import os, pickle
+import os, regex, pickle
 
 from abc import ABC, abstractmethod
 from collections import OrderedDict
@@ -6,6 +6,7 @@ from enum import Enum
 from pathlib import Path
 
 import chromadb as chroma
+from lxml import etree
 
 from .agentic import Agentic
 
@@ -161,6 +162,8 @@ class SourceMaker(SourceNode):
 				self._ext.add(e)
 
 		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._index, self._type, self._dst)
+
+		self.rex_neat = regex.compile('[^\\p{Latin}\\p{N}_-]')
 
 
 	def build_indices(self):
@@ -340,8 +343,38 @@ class SourceMaker(SourceNode):
 		if not os.path.isdir(self._dst):
 			os.makedirs(self._dst, exist_ok = True)
 
+		# The file has 25,275,933 pages.
+
+		top_n = 1000	# For testing, write only the first 1000 pages.
+
+		PAGE_TAG = '%shttp://www.mediawiki.org/xml/export-0.11/}page' % '{'
+		NS		 = {'mw': 'http://www.mediawiki.org/xml/export-0.11/'}
+
+		for event, elem in etree.iterparse(self._src, events = ('end',), tag = PAGE_TAG):
+			title = elem.findtext('mw:title', namespaces = NS)
+
+			idx = self._write_xml_page_as_md(title, elem)
+
+			elem.clear()	# Clear the element to free memory.
+
+			while elem.getprevious() is not None:	# Also clear the previous siblings of the element to free memory.
+				del elem.getparent()[0]
+
+			top_n -= 1
+			if top_n == 0:
+				break
+
 		return True
-		# TODO: Implement the logic to create markdown files from the source XML file for the SourceMaker.
+
+
+	def _write_xml_page_as_md(self, title, elem):
+		fn = '%s/%s.md' % (self._dst, self.rex_neat.sub('', title))
+
+		with open(fn, 'w', encoding = 'utf-8') as f:
+			f.write('# %s\n\n' % title)
+			f.write('Bla, bla, bla.\n\n')
+
+		return fn
 
 
 	def _build_child_at(self, index):
