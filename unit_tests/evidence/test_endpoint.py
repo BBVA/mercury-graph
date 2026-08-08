@@ -8,6 +8,8 @@ from mercury.graph.evidence import Endpoint
 from mercury.graph.evidence.agentic import AgenticRunInvalidState
 from mercury.graph.evidence.endpoint import AgenticFailedToFindCapability, AgenticFailedToParseOutput, EndPointState, LockState
 
+from cli.mge import MgeCli
+
 import mercury.graph.evidence.endpoint as endpoint_module
 
 
@@ -582,6 +584,60 @@ def test_endpoint_next_agentic_below(tmp_path):
 	assert endpoint._next_agentic_below(2) is below
 	below.meta['state'] = 2
 	assert endpoint._next_agentic_below(2) is None
+
+
+def test_end_to_end_using_cli(tmp_path, capsys):
+	args = {'command': 'complete', 'name': '', 'just_once': False}
+	cli = MgeCli(args)
+	cli.complete()
+	assert 'new summary pilot serve unlock complete' in capsys.readouterr().out
+
+	endpoint = '%s/%s' % (tmp_path, 'test_ep')
+	log_file = '%s/%s' % (tmp_path, 'test_ep.log')
+
+	args = {'command': 'new', 'name': endpoint, 'just_once': False, 'log_file': log_file}
+	cli = MgeCli(args)
+	cli.new()
+	assert 'Created a new Endpoint object' in capsys.readouterr().out
+
+	args = {'command': 'summary', 'name': endpoint, 'just_once': False}
+	cli = MgeCli(args)
+	cli.summary()
+	output = capsys.readouterr().out
+	assert '🌐 Endpoint' in output
+	assert '   state         : 0 \x1b[3m(INITIAL)\x1b[0m\n' in output
+	assert ': \x1b[3mnot loaded\x1b[0m\n' in output
+
+	args = {'command': 'unlock', 'name': endpoint, 'just_once': False}
+	cli = MgeCli(args)
+	cli.unlock()
+	assert 'forcefully unlocked.' in capsys.readouterr().out
+
+	args = {'command': 'pilot', 'name': endpoint, 'intent': 'ALL_READY', 'just_once': True, 'log_file': log_file}
+	cli = MgeCli(args)
+	cli.pilot()
+	assert 'Final state is 1 "LOADED_OBJ"' in capsys.readouterr().out
+
+	args = {'command': 'summary', 'name': endpoint, 'just_once': False}
+	cli = MgeCli(args)
+	cli.summary()
+	output = capsys.readouterr().out
+	assert '🌐 Endpoint' in output
+	assert '   state         : 4 \x1b[3m(PILOT_REQUIRED)\x1b[0m\n' in output
+	assert ': 0 (INITIAL) id: endpoint' in output
+
+	args = {'command': 'pilot', 'name': endpoint, 'intent': 'ALL_READY', 'just_once': False}
+	cli = MgeCli(args)
+	cli.pilot()
+	assert 'Final state is 100 "ALL_READY"' in capsys.readouterr().out
+
+	args = {'command': 'summary', 'name': endpoint, 'just_once': False}
+	cli = MgeCli(args)
+	cli.summary()
+	output = capsys.readouterr().out
+	assert '🌐 Endpoint' in output
+	assert '   state         : 100 \x1b[3m(ALL_READY)\x1b[0m\n' in output
+	assert ': 100 (READY) id: endpoint' in output
 
 
 # if __name__ == "__main__":
