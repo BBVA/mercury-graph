@@ -59,32 +59,55 @@ class SourceNode(ABC):
 
 	@property
 	def type(self):
+		""" Returns the type of this SourceNode. A type is more specific than the class name. E.g. A SourceMaker can have 'pdf_mirror',
+			'xml_stream', 'markdown_tree'. A SourceEntity can be a paragraph, a table, a figure, etc. A Chunk can be a text, a link or
+			a table cell.
+		"""
+
 		return self._type
 
 
 	@property
 	def index(self):
+		""" Returns the index of this SourceNode in the tree. Indices are separated by | and can include relative paths and
+			sections, sub-sections, sub-sub-sections as different SourceNodes. E.g., `"maker|a/b/file.md|sec3|sec3.1|sec3.1.2|para5"`
+
+			This allows, on top of any other caching mechanisms (the Source has both a cache and a vector database with a key/value store),
+			any SourceNode can be retrieved from its index by just parsing it left to right, starting from the SourceMaker, then the
+			SourceFile, ... This is implemented in the Source. The SourceNode can retrieve any valid SourceNode by its index via its
+			Agentic interface.
+		"""
+
 		return self._index
 
 
 	@property
 	def description(self):
+		""" Returns the description of the SourceNode. It is a string that describes each SourceNode. If there is a title or
+			section title, it will the title with some numbering. The text in the descriptions can be searched independently of
+			the text in the chunks.
+		"""
+
 		return self._descr
 
 
 	@abstractmethod
 	def get_children_idx(self):
-		""" Returns the children of this SourceNode.
+		""" Returns the children of a SourceNode.
+
+		All SourceNodes are a large tree of SourceNodes with the SourceMaker as the root. This method is identical across all SourceNode
+		descendants and returns the children of any node. To get the corresponding SourceNode object, use the `child()` method.
 
 		Returns:
 			(list): A list of children indices.
 		"""
+
 		pass
 
 
 	@abstractmethod
 	def child(self, index):
-		""" Returns the child of this SourceNode with the given index.
+		""" Returns the child of the SourceNode with the given index.
 
 		Args:
 			index (str): the index of the child to return.
@@ -92,6 +115,7 @@ class SourceNode(ABC):
 		Returns:
 			(SourceNode): The child SourceNode with the given index.
 		"""
+
 		pass
 
 
