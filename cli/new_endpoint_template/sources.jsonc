@@ -21,6 +21,10 @@
 			"type": "xml_stream",
 			"src_path": "/storage/nlp/corpora/en_wiki_20260101/enwiki-20260101-pages-articles-multistream.xml",
 			"dst_path": "/storage/temp/markdown/wiki_20260101/",
+			// 300^3 = 27,000,000, which is > number of pages in the wikipedia dump (25,275,933). This will generate 2-level clusters.
+			// 300 files per cluster, 300 secondary clusters per primary cluster, 300 primary clusters can hold 27,000,000 files.
+			// Default value is 256.
+			"cluster_size": 300,
 
 			// No need to filter by extensions, since "xml_stream" creates only markdown files.
 			"extensions": [],

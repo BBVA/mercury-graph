@@ -131,23 +131,31 @@ class SourceMaker(SourceNode):
 	It may do nothing, when the Source is already a tree markdown files on disk, or it can mirror a tree of PDF files as their
 	corresponding markdown files, or it may dump large XML files into a tree of markdown files.
 
+	Since it may potentially manage a large number of files, it will not provide the full list via `get_children_idx()`, but it will
+	cluster them. A cluster defines a section in the index tree that is managed by the same SourceMaker. So, instead of having an index
+	'maker|file25000000.md', pointing to some SourceFile, it will have an index 'maker|@023|@19|file17.md', where '@023' and '@19'
+	are handled by the SourceMaker. Meaning: maker.child('maker|@023') will return the same SourceMaker, maker.child('maker|@023|@19') too,
+	but maker.child('maker|@023|@19|file17.md') will return a SourceFile.
+
 	Args:
 		index (str): the index of this SourceMaker in the tree.
 		typ (str): the type of this SourceMaker. It can be one of: "pdf_mirror", "xml_stream" or "markdown_tree".
 		src_path (str): the path to the source files. (None for "markdown_tree" type.)
 		dst_path (str): the path to the destination markdown files.
+		cluster_size (int): the maximum number of files per cluster. It is used to create clusters as explained above.
 		extensions (list of str): If given, only files with these extensions will be indexed. (A filtering mechanism for "markdown_tree".)
 	"""
 
-	def __init__(self, index, typ, src_path, dst_path, extensions = None):
+	def __init__(self, index, typ, src_path, dst_path, cluster_size, extensions = None):
 		super().__init__(index)
 
 		if typ not in ['pdf_mirror', 'xml_stream', 'markdown_tree']:
 			raise ValueError('Invalid type: %s' % typ)
 
-		self._type = typ
-		self._src  = src_path
-		self._dst  = dst_path
+		self._type	  = typ
+		self._src	  = src_path
+		self._dst	  = dst_path
+		self._cl_size = cluster_size
 
 		ext = extensions
 		if type(ext) is not list:
@@ -346,7 +354,8 @@ class SourceMaker(SourceNode):
 
 		# The file has 25,275,933 pages.
 
-		top_n = 1000	# For testing, write only the first 1000 pages.
+		top_n = 25276	# For testing, write only the first 25276 pages.	(Roughly 1/1000 of the total pages.)
+		# TODO: Remove the top_n limit!
 
 		PAGE_TAG = '%shttp://www.mediawiki.org/xml/export-0.11/}page' % '{'
 		NS		 = {'mw': 'http://www.mediawiki.org/xml/export-0.11/'}
@@ -673,7 +682,8 @@ class Source(Agentic):
 					typ = self.conf['type']
 					src = self.conf['src_path']
 					dst = self.conf['dst_path']
-					self._maker = SourceMaker(self.name, typ, src, dst, self.conf.get('extensions', None))
+					siz = self.conf.get('cluster_size', 256)
+					self._maker = SourceMaker(self.name, typ, src, dst, siz, self.conf.get('extensions', None))
 
 				except:
 					self.log_error('SourceMaker could not be created and initialized for Source "%s".' % self.name)
