@@ -1,4 +1,4 @@
-import os, regex, pickle
+import os, re, pickle
 
 from abc import ABC, abstractmethod
 from collections import OrderedDict
@@ -153,8 +153,8 @@ class SourceMaker(SourceNode):
 			raise ValueError('Invalid type: %s' % typ)
 
 		self._type	  = typ
-		self._src	  = src_path
-		self._dst	  = dst_path
+		self._src	  = src_path.rstrip('/')
+		self._dst	  = dst_path.rstrip('/')
 		self._cl_size = cluster_size
 
 		ext = extensions
@@ -172,7 +172,7 @@ class SourceMaker(SourceNode):
 
 		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._index, self._type, self._dst)
 
-		self.rex_neat = regex.compile('[^\\p{Latin}\\p{N}_-]')
+		self.rex_kwap = re.compile('(^ |[<>:"/\\\\|?*\\x00-\\x1f])')
 
 
 	def build_indices(self):
@@ -393,12 +393,14 @@ class SourceMaker(SourceNode):
 			(str): Path of the written Markdown file.
 		"""
 
-		fn = '%s/%s.md' % (self._dst, self.rex_neat.sub('', title))
+		fn = '%s/%s.md' % (self._dst, self.rex_kwap.sub(lambda m: '%%%02X' % ord(m.group()), title).rstrip(' '))
+
 		page_text = ''
 		for child in elem.iter():
 			if type(child.tag) is str and etree.QName(child).localname == 'text':
 				page_text = child.text or ''
 				break
+
 		body = WikiMarkdownWriter(page_text).render()
 
 		with open(fn, 'w', encoding = 'utf-8') as f:
