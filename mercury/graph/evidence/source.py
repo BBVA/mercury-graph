@@ -9,6 +9,7 @@ import chromadb as chroma
 from lxml import etree
 
 from .agentic import Agentic
+from .formats import WikiMarkdownWriter, PdfToMarkdown
 
 
 class SourceState(Enum):
@@ -368,11 +369,32 @@ class SourceMaker(SourceNode):
 
 
 	def _write_xml_page_as_md(self, title, elem):
+		""" Writes a Wikipedia XML page as a Markdown file.
+
+		The XML export keeps the article contents as MediaWiki wikitext in the
+		``revision/text`` element. This method extracts that text, renders the
+		common document structures to Markdown, and adds the article title as the
+		level-one heading.
+
+		Args:
+			title (str): Article title from the XML page element.
+			elem (lxml.etree._Element): Completed MediaWiki ``page`` element.
+
+		Returns:
+			(str): Path of the written Markdown file.
+		"""
+
 		fn = '%s/%s.md' % (self._dst, self.rex_neat.sub('', title))
+		page_text = ''
+		for child in elem.iter():
+			if type(child.tag) is str and etree.QName(child).localname == 'text':
+				page_text = child.text or ''
+				break
+		body = WikiMarkdownWriter(page_text).render()
 
 		with open(fn, 'w', encoding = 'utf-8') as f:
 			f.write('# %s\n\n' % title)
-			f.write('Bla, bla, bla.\n\n')
+			f.write(body)
 
 		return fn
 
@@ -572,6 +594,12 @@ class Source(Agentic):
 	- [`SourceEntity`][mercury.graph.evidence.SourceEntity]: Each section, subsection, paragraph, table, figure, etc. in a markdown
 		file as a SourceNode.
 	- [`Chunk`][mercury.graph.evidence.Chunk]: Each chunk of text, table cell or link in a markdown file as a SourceNode.
+
+	## Known Limitations
+
+	See:
+		- [Warning](evidence_formats.md#warning)
+		- [Limitations](evidence_source.md#known-limitations)
 
 	Args:
 		schema (str): a schema (a unique name) to use for the Source's ID.
