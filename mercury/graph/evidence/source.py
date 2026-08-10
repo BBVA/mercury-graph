@@ -283,14 +283,28 @@ class SourceMaker(SourceNode):
 		return True
 
 
-	def get_children_idx(self):
+	def get_children_idx(self, index = None):
 		""" Returns the children indices following the SourceNode interface.
 
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
-
 		"""
 
-		return list(self._children.keys())
+		if index is None:	# The index is mandatory for the SourceMaker.
+			return None
+
+		idx_stack = index.split('|')
+
+		if idx_stack.pop(0) != self._index:
+			return None
+
+		keys = self._children
+		for ky in idx_stack:
+			if ky not in keys:
+				return None
+
+			keys = keys[ky]
+
+		return list(keys.keys())
 
 
 	def child(self, index):
