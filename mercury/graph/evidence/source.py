@@ -198,7 +198,7 @@ class SourceMaker(SourceNode):
 
 	def build_indices(self):
 		""" Builds the indices of the SourceMaker. It builds a dictionary with all the indices of the SourceFile objects, but without
-		creating the object (that is done by build_output())
+		creating the object. (That is done on demand by child().)
 
 		There is different behavior depending on the type of the SourceMaker:
 
@@ -220,9 +220,10 @@ class SourceMaker(SourceNode):
 
 			self._children = self._recurse_tree()
 
-			return type(self._children) is dict
+			if type(self._children) is not dict:
+				return False
 
-		if self._type == 'pdf_mirror':
+		elif self._type == 'pdf_mirror':
 			if not os.path.isdir(self._src):
 				return False
 
@@ -231,52 +232,48 @@ class SourceMaker(SourceNode):
 
 			self._children = self._recurse_tree(self._src)
 
-			return type(self._children) is dict
+			if type(self._children) is not dict:
+				return False
 
-		if not os.path.isfile(self._src):
-			return False
+		else:	# self._type == 'xml_stream'
+			if not os.path.isfile(self._src):
+				return False
 
-		src_time = int(os.path.getmtime(self._src))
+			src_time = int(os.path.getmtime(self._src))
 
-		if os.path.isdir(self._dst):
-			self._children = self._recurse_tree(abort_if_before = src_time)
+			if os.path.isdir(self._dst):
+				self._children = self._recurse_tree(abort_if_before = src_time)
 
-			if type(self._children) is dict:
-				return True
+			if type(self._children) is not dict:	# The destination files are not up to date and need to be created again.
+				if not self._create_markdown_from_xml():
+					return False
 
-		if not self._create_markdown_from_xml():
-			return False
+				self._children = self._recurse_tree()
 
-		self._children = self._recurse_tree()
+				if type(self._children) is not dict:
+					return False
 
-		return type(self._children) is dict
+		depth = 0
+		while len(self._children) > self._cl_size:
+			depth += 1
 
+			old_keys = list(self._children.keys())
 
-	def build_output(self):
-		""" Creates the SourceFile objects for each index in the self._children dictionary. This is efficient since the constructor of
-		SourceFile does not read the file. The file is read when its content is requested via the SourceFile's get_children_idx() method.
+			chunk_num = None
+			chunk_items = 0
+			for o_key in old_keys:
+				if chunk_num is None or chunk_items >= self._cl_size:
+					chunk_num = 1 if chunk_num is None else chunk_num + 1
+					chunk_key = '%d:%d' % (depth, chunk_num)
 
-		There is different behavior depending on the type of the SourceMaker:
+					self._children[chunk_key] = {}
+					chunk_items = 0
 
-		* **markdown_tree**: Create a SourceFile object for each file in the index (the index was built by parsing the destination).
-		* **pdf_mirror**: Check if the markdown file exists and it more recent than the source PDF file. In that case, create a SourceFile
-			object for it, if not it just sets the value to 404 (SourceState.FILE_NEEDS_UPDATE.value) and if the file is requested via
-			child() it will be created on demand by calling the PDF to markdown conversion tool.
-		* **xml_stream**: Create a SourceFile object for each file in the index. In that case, either the files already existed and were
-			more recent than the source XML file, or they were created by the build_indices() method.
+				# Move the old key to the new chunk.
+				self._children[chunk_key][o_key] = self._children[o_key]
+				del self._children[o_key]
 
-		Returns:
-			(bool): True if the output files were successfully built, False otherwise.
-		"""
-
-		if self._type != 'pdf_mirror':
-			# Just create the SourceFile objects for each dst file.
-			return True
-			# TODO: Implement the logic to build output files for the SourceMaker.
-
-		# Mirror the PDF files (the relative paths are identical, the extension are .md instead of whatever the source file extension is).
-		# If the file exists and is more recent than the source file, just create the SourceFile object for it. If not, erase the
-		# destination file and set the value to 404.
+				chunk_items += 1
 
 		return True
 
