@@ -173,8 +173,11 @@ class SourceMaker(SourceNode):
 		if typ not in ['pdf_mirror', 'xml_stream', 'markdown_tree']:
 			raise ValueError('Invalid type: %s' % typ)
 
-		self._type	  = typ
-		self._src	  = src_path.rstrip('/')
+		self._type = typ
+
+		if src_path is not None:
+			self._src = src_path.rstrip('/')
+
 		self._dst	  = dst_path.rstrip('/')
 		self._cl_size = cluster_size
 
