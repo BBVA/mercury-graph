@@ -196,7 +196,9 @@ class SourceMaker(SourceNode):
 
 		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._index, self._type, self._dst)
 
-		self.rex_kwap = re.compile('(^ |[<>:"/\\\\|?*\\x00-\\x1f])')
+		self.rex_kwap = re.compile('(^ |[<>:"/\\\\|?*\\x00-\\x1f])')	# Note the ':' is %-encoded in file names by _safe_filename(),
+																		# therefore it is used in chunk indices to make collisions with
+																		# actual file names impossible.
 
 
 	def build_indices(self):
@@ -304,9 +306,19 @@ class SourceMaker(SourceNode):
 		if type(ret) is SourceFile:
 			return ret
 
-		self._children[index] = self._build_child_at(index)
+	def _safe_filename(self, path, name):
+		""" This %-encodes the characters that are not allowed in file names (defined by self.rex_kwap). It also %-encodes leading spaces
+		and removes trailing spaces. It has been tested to avoid collisions in wikipedia dumps using titles and page file names.
 
-		return self._children[index]
+		Args:
+			path (str): The absolute path some storage tree. (Typically self.src or self.dst, but any name without a trailing / is valid.)
+			name (str): The relative name of the file within path. Only the last part of the path is encoded, path is assumed to be valid.
+
+		Returns:
+			(str): Absolute path to the file with a safe name.
+		"""
+
+		return '%s/%s.md' % (path, self.rex_kwap.sub(lambda m: '%%%02X' % ord(m.group()), name).rstrip(' '))
 
 
 	def _recurse_tree(self, root = None, abort_if_before = None):
@@ -413,7 +425,7 @@ class SourceMaker(SourceNode):
 			(str): Path of the written Markdown file.
 		"""
 
-		fn = '%s/%s.md' % (self._dst, self.rex_kwap.sub(lambda m: '%%%02X' % ord(m.group()), title).rstrip(' '))
+		fn = self._safe_filename(self._dst, title)
 
 		page_text = ''
 		for child in elem.iter():
