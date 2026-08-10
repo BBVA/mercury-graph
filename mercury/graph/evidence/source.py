@@ -468,7 +468,7 @@ class SourceFile(SourceNode):
 		self.path = path
 
 
-	def get_children_idx(self):
+	def get_children_idx(self, index = None):
 		""" Returns the children indices following the SourceNode interface.
 
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
@@ -517,7 +517,7 @@ class SourceEntity(SourceNode):
 		self.get_children_idx()		# This identifies the type, index and description from the content. Runs just one time.
 
 
-	def get_children_idx(self):
+	def get_children_idx(self, index = None):
 		""" This parses the content to identify the children of this SourceEntity.
 
 		While parsing, it also sets the type, index and description of this SourceEntity. E.g., the description of a title is the title
@@ -583,7 +583,7 @@ class Chunk(SourceNode):
 				self._descr	= 'row: "%s" column: "%s"' % (label, row_name)
 
 
-	def get_children_idx(self):
+	def get_children_idx(self, index = None):
 		""" Following the SourceNode interface, returns an empty list as Chunks have no children.
 
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
