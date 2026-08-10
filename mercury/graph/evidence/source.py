@@ -313,12 +313,36 @@ class SourceMaker(SourceNode):
 		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
 		"""
 
-		if not index in self._children:
+		idx_stack = index.split('|')
+
+		if idx_stack.pop(0) != self._index:
 			return None
 
-		ret = self._children[index]
+		ret = self._children
+		for ky in idx_stack:
+			if ky not in ret:
+				return None
+
+			dic = ret
+			ret = ret[ky]
+
+		if type(ret) is dict:
+			return self				# Index returns the SourceMaker itself, calling get_children_idx() will explore further down the tree.
+
 		if type(ret) is SourceFile:
 			return ret
+
+		ret = self._build_child_at(index)
+
+		if type(ret) is not SourceFile:
+			self.log_error('SourceMaker could not build SourceFile for index "%s".' % index)
+			self.log_error('Changed self.state to ERR_MAKER_ACCESS.')
+			self.state = SourceState.ERR_MAKER_ACCESS.value
+
+		dic[ky] = ret
+
+		return ret
+
 
 	def _safe_filename(self, path, name):
 		""" This %-encodes the characters that are not allowed in file names (defined by self.rex_kwap). It also %-encodes leading spaces
