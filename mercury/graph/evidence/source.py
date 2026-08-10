@@ -366,7 +366,7 @@ class SourceMaker(SourceNode):
 					if tim < abort_if_before:
 						return None
 
-				children[self._index + '|' + file_idx] = 404
+				children[file_idx] = 404
 
 		recurse(root, None)
 
