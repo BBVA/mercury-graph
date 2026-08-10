@@ -23,8 +23,7 @@ class SourceState(Enum):
 
 	INITIAL				=  0	# The initial state of the source.
 	MAKER_INIT_OK		=  1	# The SourceMaker could be created and initialized.
-	MAKER_INDEX_OK		=  2	# The SourceMaker could index every file.
-	MAKER_READY_OK		=  3	# The SourceMaker either created every output file or is ready to create any on demand.
+	MAKER_READY_OK		=  2	# The SourceMaker either created every output file or is ready to create any on demand.
 
 	CACHE_READY_OK		=  10	# The Source has initialized (possibly loaded, possibly created) a cache for SourceNode objects.
 
@@ -280,7 +279,6 @@ class SourceMaker(SourceNode):
 		# destination file and set the value to 404.
 
 		return True
-		# TODO: Implement the logic to build output files for the SourceMaker.
 
 
 	def get_children_idx(self):
@@ -721,21 +719,10 @@ class Source(Agentic):
 
 			if self.meta['state'] == self.states.MAKER_INIT_OK.value:
 				if self._maker.build_indices():
-					self.meta['state'] = self.states.MAKER_INDEX_OK.value
+					self.meta['state'] = self.states.MAKER_READY_OK.value
 				else:
 					self.log_error('SourceMaker could not build indices for Source "%s".' % self.name)
 					self.meta['state'] = self.states.ERR_MAKER_INDEX.value
-					break
-
-				if just_once:
-					break
-
-			if self.meta['state'] == self.states.MAKER_INDEX_OK.value:
-				if self._maker.build_output():
-					self.meta['state'] = self.states.MAKER_READY_OK.value
-				else:
-					self.log_error('SourceMaker could not build output for Source "%s".' % self.name)
-					self.meta['state'] = self.states.ERR_MAKER_ACCESS.value
 					break
 
 				if just_once:
