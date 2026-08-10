@@ -96,11 +96,33 @@ class SourceNode(ABC):
 
 
 	@abstractmethod
-	def get_children_idx(self):
+	def get_children_idx(self, index = None):
 		""" Returns the children of a SourceNode.
 
-		All SourceNodes are a large tree of SourceNodes with the SourceMaker as the root. This method is identical across all SourceNode
-		descendants and returns the children of any node. To get the corresponding SourceNode object, use the `child()` method.
+		All SourceNodes are in a large tree of SourceNodes. Each node owns at least the node in the tree whose index is its own.
+		Since some nodes can have a large number of children, they can divide the index tree into clusters, returning themselves
+		as the SourceNode pointed to by the "chunk part" of the index.
+
+		## Example:
+
+		A SourceMaker with id 'corpus' can hold millions of files and chunk them into clusters, of say 100 files per cluster.
+		So the final index to a file can be 'corpus|2:41|1:84|file_39.md'
+
+		Calling this method with index == 'corpus' will return [.., 'corpus|2:41', ..], calling it with index == 'corpus|2:41'
+		will return [.., 'corpus|2:41|1:84', ..]. The next depth will return list of files in that cluster.
+
+		In the same example, calling `child('corpus|2:41')` will return the same SourceMaker object issuing the call. Calling
+		`child('corpus|2:41|1:84')` will again return the same SourceMaker object, but calling `child('corpus|2:41|1:84|file_39.md')`
+		will return the SourceFile object for that file.
+
+		## About the index argument:
+
+		Not all SourceNodes should support this complexity. It makes sense for a SourceMaker since it can hold millions of files.
+		It is used in a SourceEntity for efficiency, to avoid making copies of parts of itself that make copies of parts of themselves.
+		The rest just ignore the index argument and return all their children in just one list.
+
+		Args:
+			index (str): An optional index to clarify which part of the SourceNode tree should be returned. (See the example above.)
 
 		Returns:
 			(list): A list of children indices.

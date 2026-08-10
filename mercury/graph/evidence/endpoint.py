@@ -395,7 +395,7 @@ class Endpoint(Agentic):
 			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
 
-		return {'state' : 0}	# Anything else is created in the different stages of pilot()
+		return {'state' : 0}			# Anything else is created in the different stages of pilot()
 
 
 	def _dry_run(self, request):
@@ -422,7 +422,7 @@ class Endpoint(Agentic):
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
 
-		if self.meta['state'] < 0:					# Irrecoverable error.
+		if self.meta['state'] < 0:		# Irrecoverable error.
 			return
 
 		try:
