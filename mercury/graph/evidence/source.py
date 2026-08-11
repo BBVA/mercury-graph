@@ -1,4 +1,4 @@
-import os, re, pickle
+import importlib, os, re, pickle
 
 from abc import ABC, abstractmethod
 from collections import OrderedDict
@@ -9,7 +9,7 @@ import chromadb as chroma
 from lxml import etree
 
 from .agentic import Agentic
-from .formats import WikiMarkdownWriter, PdfToMarkdown
+from .formats import WikiMarkdownWriter, PdfToMarkdown, MDbyPDFoxide
 
 
 class SourceState(Enum):
@@ -165,13 +165,40 @@ class SourceMaker(SourceNode):
 		dst_path (str): the path to the destination markdown files.
 		cluster_size (int): the maximum number of files per cluster. It is used to create clusters as explained above.
 		extensions (list of str): If given, only files with these extensions will be indexed. (A filtering mechanism for "markdown_tree".)
+		pdf_to_md (dict): If given, it is a dictionary with the configuration to load a custom PdfToMarkdown descendant.
 	"""
 
-	def __init__(self, index, typ, src_path, dst_path, cluster_size, extensions = None):
+	def __init__(self, index, typ, src_path, dst_path, cluster_size, extensions, pdf_to_md):
 		super().__init__(index)
 
 		if typ not in ['pdf_mirror', 'xml_stream', 'markdown_tree']:
 			raise ValueError('Invalid type: %s' % typ)
+
+		if typ == 'pdf_mirror':
+			if pdf_to_md is None:
+				self._pdf_to_md = MDbyPDFoxide
+				self._pdf_extra = None
+			else:
+				class_name	= pdf_to_md['class_name']
+				module_path	= pdf_to_md['path']
+				extra_args	= pdf_to_md.get('extra_args', None)
+
+				module_name = os.path.splitext(os.path.basename(module_path))[0]
+
+				spec = importlib.util.spec_from_file_location(module_name, module_path)
+
+				if spec is None or spec.loader is None:
+					raise ValueError('Could not load module from path: %s' % module_path)
+
+				module = importlib.util.module_from_spec(spec)
+				spec.loader.exec_module(module)
+				custom_conv = getattr(module, class_name, None)
+
+				if custom_conv is None or not issubclass(custom_conv, PdfToMarkdown):
+					raise ValueError('Invalid class: %s in module: %s' % (class_name, module_path))
+
+				self._pdf_to_md = custom_conv
+				self._pdf_extra = extra_args
 
 		self._type = typ
 
@@ -755,7 +782,9 @@ class Source(Agentic):
 					src = self.conf['src_path']
 					dst = self.conf['dst_path']
 					siz = self.conf.get('cluster_size', 256)
-					self._maker = SourceMaker(self.name, typ, src, dst, siz, self.conf.get('extensions', None))
+					ext = self.conf.get('extensions', None)
+					pdf = self.conf.get('pdf_to_markdown', None)
+					self._maker = SourceMaker(self.name, typ, src, dst, siz, ext, pdf)
 
 				except:
 					self.log_error('SourceMaker could not be created and initialized for Source "%s".' % self.name)
