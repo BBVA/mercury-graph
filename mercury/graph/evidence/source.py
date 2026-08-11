@@ -435,7 +435,10 @@ class SourceMaker(SourceNode):
 
 				children[file_idx] = SourceState.FILE_NEEDS_UPDATE.value
 
-		recurse(root, None)
+			return True
+
+		if recurse(root, None) is None:
+			return None
 
 		return children
 
