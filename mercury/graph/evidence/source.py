@@ -362,8 +362,6 @@ class SourceMaker(SourceNode):
 		ret = self._build_child_at(index)
 
 		if type(ret) is not SourceFile:
-			self.log_error('SourceMaker could not build SourceFile for index "%s".' % index)
-			self.log_error('Changed self.state to ERR_MAKER_ACCESS.')
 			self.state = SourceState.ERR_MAKER_ACCESS.value
 
 		dic[ky] = ret
@@ -431,7 +429,7 @@ class SourceMaker(SourceNode):
 					if tim < abort_if_before:
 						return None
 
-				children[file_idx] = 404
+				children[file_idx] = SourceState.FILE_NEEDS_UPDATE.value
 
 		recurse(root, None)
 
@@ -517,8 +515,34 @@ class SourceMaker(SourceNode):
 			(SourceFile): The SourceFile object for the given index.
 		"""
 
-		return None
-		# TODO: Implement the logic to build a SourceFile object for the given index for the SourceMaker.
+		fn_dst = '%s/%s' % (self._dst, index.split('|')[-1])
+
+		if self._type == 'pdf_mirror':	# The file must exist in self._dst
+			if os.path.isfile(fn_dst):
+				return SourceFile(index, self, fn_dst)
+
+			return SourceState.FILE_NEEDS_UPDATE.value
+
+		fn_src = '%s/%s' % (self._src, index.split('|')[-1])
+		if not os.path.isfile(fn_src):
+			return SourceState.FILE_NEEDS_UPDATE.value
+
+		if os.path.isfile(fn_dst):
+			tim_src = int(os.path.getmtime(fn_src))
+			tim_dst = int(os.path.getmtime(fn_dst))
+
+			if tim_dst >= tim_src:
+				return SourceFile(index, self, fn_dst)
+
+		cnv = self._pdf_to_md(fn_src, fn_dst, self._pdf_extra)
+
+		if cnv.ready():
+			cnv.run()
+
+			if os.path.isfile(fn_dst):
+				return SourceFile(index, self, fn_dst)
+
+		return SourceState.FILE_NEEDS_UPDATE.value
 
 
 class SourceFile(SourceNode):
