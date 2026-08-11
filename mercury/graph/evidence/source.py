@@ -208,24 +208,28 @@ class SourceMaker(SourceNode):
 		self._dst	  = dst_path.rstrip('/')
 		self._cl_size = cluster_size
 
-		ext = extensions
-		if type(ext) is not list:
-			ext = [ext]
-
-		if len(ext) == 0:
-			self._ext = None
-		else:
-			self._ext = set()
-
-			for e in ext:
-				e = e.replace('.', '').lower()
-				self._ext.add(e)
-
 		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._index, self._type, self._dst)
 
-		self.rex_kwap = re.compile('(^ |[<>:"/\\\\|?*\\x00-\\x1f])')	# Note the ':' is %-encoded in file names by _safe_filename(),
-																		# therefore it is used in chunk indices to make collisions with
-																		# actual file names impossible.
+		# Note the ':' is %-encoded in file names by _safe_filename(), therefore it is used in chunk indices to make collisions with
+		self.rex_kwap = re.compile('(^ |[<>:"/\\\\|?*\\x00-\\x1f])')	# actual file names impossible.
+
+		self._ext = extensions
+		if self._ext is None:
+			return
+
+		if type(extensions) is str:
+			extensions = [extensions]
+
+		if len(extensions) == 0:
+			self._ext = None
+
+			return
+
+		self._ext = set()
+
+		for e in extensions:
+			e = e.lstrip('.').lower()
+			self._ext.add(e)
 
 
 	def build_indices(self):
