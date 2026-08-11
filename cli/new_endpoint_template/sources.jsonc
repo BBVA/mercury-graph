@@ -59,6 +59,17 @@
 			"cache_size": 0,
 			"cache_save": null,
 
+			// PDF conversion to markdown: This is how you tell the SourceMaker to use a custom PdfToMarkdown descendant. See the
+			// "md_by_docling.py" file in the endpoint's sources directory.
+			// If you use a "type": "pdf_mirror" without providing a "pdf_to_markdown" argument, it will use MDbyPDFoxide.
+			"pdf_to_markdown": {
+				"class_name": "MDbyDocling",
+				"$path": "md_by_docling.py",
+				"extra_args": {
+					"do_ocr": false
+				}
+			},
+
 			"chroma_path": null,
 			"chroma_descriptions_collection_name": null,
 			"chroma_chunks_collection_name": null
