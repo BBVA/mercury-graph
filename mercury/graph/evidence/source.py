@@ -603,6 +603,8 @@ class SourceFile(SourceNode):
 		self._type	= 'file'
 		self._descr	= 'SourceFile: %s' % self._index
 
+		self._content = None
+
 		self.path = path
 
 
@@ -625,6 +627,55 @@ class SourceFile(SourceNode):
 
 		pass
 		# TODO: Implement the logic to return the child of the SourceFile with the given index.
+
+
+	def lines(self, span):
+		""" This is how every SourceEntity or Chunk gets access to the text.
+
+		The SourceNode objects in a SourceFile keep only ranges, never text and call this lines() or line_slice() to get the text.
+
+		Args:
+			span (slice): A slice object that defines the range of lines to return.
+
+		Returns:
+			(list of str): The lines of text in the given range, or None if the range is invalid.
+		"""
+
+		if self._content is None:	# TODO: Remove this check since it should never happen. Nothing calls this before _content is built.
+			return None
+
+		try:
+			ret = self._content[span]
+
+		except IndexError:
+			return None
+
+		return ret
+
+
+	def line_slice(self, line, span):
+		""" This is how every SourceEntity or Chunk gets access to the text.
+
+		The SourceNode objects in a SourceFile keep only ranges, never text and call this lines() or line_slice() to get the text.
+
+		Args:
+			line (int): The line number to return.
+			span (slice): A slice object that defines the range of characters to return from the line.
+
+		Returns:
+			(str): The characters in the given range from the specified line, or None if the range is invalid.
+		"""
+
+		if self._content is None:	# TODO: Remove this check since it should never happen. Nothing calls this before _content is built.
+			return None
+
+		try:
+			ret = self._content[line][span]
+
+		except IndexError:
+			return None
+
+		return ret
 
 
 class SourceEntity(SourceNode):
