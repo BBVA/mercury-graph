@@ -65,7 +65,7 @@ class SourceState(Enum):
 
 
 class SourceNode(ABC):
-	""" Everything in the Source is a tree of SourceNodes: A Maker, a File, an Entity, even a Chunk (a node with no children).
+	""" Everything in the Source is a tree of SourceNodes: A SourceMaker, SourceFile or SourceEntity.
 
 	## Overview
 
@@ -95,8 +95,7 @@ class SourceNode(ABC):
 	@property
 	def type(self):
 		""" Returns the type of this SourceNode. A type is more specific than the class name. E.g. A SourceMaker can have 'pdf_mirror',
-			'xml_stream', 'markdown_tree'. A SourceEntity can be a paragraph, a table, a figure, etc. A Chunk can be a text, a link or
-			a table cell.
+			'xml_stream', 'markdown_tree'. A SourceEntity can be anything in SourceEntityType.
 		"""
 
 		return self._type
@@ -119,8 +118,9 @@ class SourceNode(ABC):
 	@property
 	def description(self):
 		""" Returns the description of the SourceNode. It is a string that describes each SourceNode. If there is a title or
-			section title, it will the title with some numbering. The text in the descriptions can be searched independently of
-			the text in the chunks.
+			section title, it will the title with some numbering. The final SourceEntityType with no children does not have a description,
+			The description is mechanism to provide titles, sub-titles, table names, figure names, etc. to make them searchable
+			independently of the text.
 		"""
 
 		return self._descr
@@ -132,11 +132,11 @@ class SourceNode(ABC):
 
 		All SourceNodes are in a large tree of SourceNodes. Each node owns at least the node in the tree whose index is its own.
 		Since some nodes can have a large number of children, they can divide the index tree into clusters, returning themselves
-		as the SourceNode pointed to by the "chunk part" of the index.
+		as the SourceNode pointed to by the "cluster part" of the index (see example below).
 
 		## Example:
 
-		A SourceMaker with id 'corpus' can hold millions of files and chunk them into clusters, of say 100 files per cluster.
+		A SourceMaker with id 'corpus' can hold millions of files and divide them into clusters, of say 100 files per cluster.
 		So the final index to a file can be 'corpus|2:41|1:84|file_39.md'
 
 		Calling this method with index == 'corpus' will return [.., 'corpus|2:41', ..], calling it with index == 'corpus|2:41'
@@ -242,7 +242,7 @@ class SourceMaker(SourceNode):
 
 		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._index, self._type, self._dst)
 
-		# Note the ':' is %-encoded in file names by _safe_filename(), therefore it is used in chunk indices to make collisions with
+		# Note the ':' is %-encoded in file names by _safe_filename(), therefore it is used in cluster indices to make collisions with
 		self.rex_kwap = re.compile('(^ |[<>:"/\\\\|?*\\x00-\\x1f])')	# actual file names impossible.
 
 		self._ext = extensions
@@ -327,21 +327,21 @@ class SourceMaker(SourceNode):
 
 			old_keys = list(self._children.keys())
 
-			chunk_num = None
-			chunk_items = 0
+			clust_num = None
+			clust_items = 0
 			for o_key in old_keys:
-				if chunk_num is None or chunk_items >= self._cl_size:
-					chunk_num = 1 if chunk_num is None else chunk_num + 1
-					chunk_key = '%d:%d' % (depth, chunk_num)
+				if clust_num is None or clust_items >= self._cl_size:
+					clust_num = 1 if clust_num is None else clust_num + 1
+					clust_key = '%d:%d' % (depth, clust_num)
 
-					self._children[chunk_key] = {}
-					chunk_items = 0
+					self._children[clust_key] = {}
+					clust_items = 0
 
-				# Move the old key to the new chunk.
-				self._children[chunk_key][o_key] = self._children[o_key]
+				# Move the old key to the new cluster.
+				self._children[clust_key][o_key] = self._children[o_key]
 				del self._children[o_key]
 
-				chunk_items += 1
+				clust_items += 1
 
 		return True
 
@@ -630,7 +630,7 @@ class SourceFile(SourceNode):
 
 
 	def lines(self, span):
-		""" This is how every SourceEntity or Chunk gets access to the text.
+		""" This is how every SourceEntity gets access to the text.
 
 		The SourceNode objects in a SourceFile keep only ranges, never text and call this lines() or line_slice() to get the text.
 
@@ -654,7 +654,7 @@ class SourceFile(SourceNode):
 
 
 	def line_slice(self, line, span):
-		""" This is how every SourceEntity or Chunk gets access to the text.
+		""" This is how every SourceEntity gets access to the text.
 
 		The SourceNode objects in a SourceFile keep only ranges, never text and call this lines() or line_slice() to get the text.
 
@@ -679,28 +679,25 @@ class SourceFile(SourceNode):
 
 
 class SourceEntity(SourceNode):
-	""" The SourceEntity is a SourceNode that represents a single section, subsection, paragraph, table, figure, etc. in a markdown
-	file. It serves either smaller SourceEntity objects nested within it, or a single Chunk object (a node with no children).
+	""" The SourceEntity is a SourceNode that represents a single section, subsection, paragraph, chunk, table, cell, figure, etc. in a
+	file. It does not contain the text itself, just its span in the SourceFile. SourceEntity objects are created by the SourceFile and
+	live inside it
 
-	## Types of SourceEntity
-
-	  * **Header1 .. Header6**: A section starting with a markdown header, until the next header of the same or lower level. It includes
-		all the content in between, including nested headers of higher levels.
-	  * **Enum1 .. EnumN**: A section starting with a markdown enumeration, possibly nested, until the enumeration ends.
-	  * **Table**: A complete markdown table, including the header and all rows.
+	The class SourceEntityType is an Enum that defines all possible types of SourceEntity objects.
 
 	Args:
 		index (str): the index of this SourceEntity in the tree.
-		parent (SourceFile or SourceEntity): The parent SourceNode that contains this SourceEntity.
-		content (list of str): The lines of the original SourceFile that contain this SourceEntity. The content is always a subset of
-			complete lines of the SourceFile. This may change in the future to prevent giant objects stored in a single line. The
-			SourceMaker should take care of splitting, but when the SourceMaker's type is "markdown_tree" markdown is just accepted as is.
+		parent (SourceFile): The parent SourceFile that contains created this SourceEntity and has the content.
+		ent_type (SourceEntityType): The type of this SourceEntity.
+		line (slice or int): The line range to pass to it's parent's lines() if multiline or the only line (combined with span) for single
+			line entities..
+		span (slice): The range of characters in the only line (line must be an int when this is used) that this SourceEntity covers.
+
 	"""
 
-	def __init__(self, index, parent, content):
+	def __init__(self, index, parent, ent_type, line, span = None):
 		super().__init__(index, parent)
 
-		self.content  = content
 		self.children = None
 
 		self.get_children_idx()		# This identifies the type, index and description from the content. Runs just one time.
@@ -725,7 +722,7 @@ class SourceEntity(SourceNode):
 	def child(self, index):
 		""" Returns the child of this SourceEntity with the given index.
 
-		The child can be either a deeper SourceEntity or a Chunk.
+		The child can only be a deeper SourceEntity or None.
 
 		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
 		"""
@@ -734,60 +731,6 @@ class SourceEntity(SourceNode):
 			return None
 
 		return self.children.get(index, None)
-
-
-class Chunk(SourceNode):
-	""" The Chunk is a SourceNode that represents a single chunk of text or a link in a markdown file. It is a node with no children.
-
-	It is the text of a paragraph, delimited by end of paragraph, a link, or a cell in a table.
-
-	Args:
-		index (str): the index of this Chunk in the tree.
-		parent (SourceEntity): The SourceEntity that contains this Chunk.
-		content (str): The text of the chunk, table cell or link.
-		is_link (bool): True if the chunk is a link, False if it is a text or table cell.
-		label (str): The label of the table column if this is a table cell or the label of the link. None for text chunks.
-		row_name (str): The name of the table row if this is a table cell. The row number if the row has no name.
-	"""
-
-	def __init__(self, index, parent, content, is_link = False, label = None, row_name = None):
-		super().__init__(index, parent)
-
-		self.content = content
-
-		if is_link:
-			self._type	= 'link'
-			self._name	= label
-			self._descr	= content
-
-		else:
-			self._name = index.split('/')[-1]
-
-			if label is None:
-				self._type	= 'text'
-				self._descr	= 'Paragraph: %s' % self._name
-
-			else:
-				self._type	= 'table_cell'
-				self._descr	= 'row: "%s" column: "%s"' % (label, row_name)
-
-
-	def get_children_idx(self, index = None):
-		""" Following the SourceNode interface, returns an empty list as Chunks have no children.
-
-		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
-		"""
-
-		return []
-
-
-	def child(self, index):
-		""" Following the SourceNode interface, returns None as Chunks have no children.
-
-		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
-		"""
-
-		return None
 
 
 class Source(Agentic):
@@ -801,8 +744,8 @@ class Source(Agentic):
 	The Source provides:
 
 	- A "chunking" interface to break documents into smaller pieces for easier processing.
-	- A hierarchy that divides a corpus into: collection (a folder), document (a file), section (which is itself nested) and a chunk.
-	- An indexing system that provides unique identifiers for each chunk.
+	- A hierarchy that divides a corpus into: a collection (that manages many files), a document (a file) a section (which can be nested).
+	- An indexing system that provides unique identifiers for each component.
 	- A persistence backend that possibly includes vectorization and embedding of the chunks for later retrieval.
 	- An Agentic interface to everything above.
 
@@ -813,9 +756,8 @@ class Source(Agentic):
 	- [`SourceNode`][mercury.graph.evidence.SourceNode]: The base class to manage the index logic of all components.
 	- [`SourceMaker`][mercury.graph.evidence.SourceMaker]: The root SourceNode responsible for managing a tree of markdown files.
 	- [`SourceFile`][mercury.graph.evidence.SourceFile]: Each individual file as a SourceNode.
-	- [`SourceEntity`][mercury.graph.evidence.SourceEntity]: Each section, subsection, paragraph, table, figure, etc. in a markdown
-		file as a SourceNode.
-	- [`Chunk`][mercury.graph.evidence.Chunk]: Each chunk of text, table cell or link in a markdown file as a SourceNode.
+	- [`SourceEntity`][mercury.graph.evidence.SourceEntity]: Each section, subsection, paragraph, table, figure, text, table cell or link
+		in a markdown file as a SourceNode.
 
 	## Known Limitations
 
@@ -1084,13 +1026,13 @@ class Source(Agentic):
 				'type': 'function',
 				'function': {
 					'name': 'get_text_by_index_%s' % self.name,
-					'description': 'Get the text at a given chunk index.',
+					'description': 'Get the text at a given index.',
 					'parameters': {
 						'type': 'object',
 						'properties': {
 							'index': {
 								'type': 'string',
-								'description': 'Index of the text chunk.'
+								'description': 'Index of the text component.'
 							}
 						},
 						'required': ['index']

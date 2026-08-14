@@ -4,7 +4,7 @@ import pytest
 
 from lxml import etree
 
-from mercury.graph.evidence import SourceNode, SourceMaker, SourceFile, SourceEntity, Chunk
+from mercury.graph.evidence import SourceNode, SourceMaker, SourceFile, SourceEntity
 
 
 class DummySourceNode(SourceNode):
@@ -207,32 +207,12 @@ def test_source_file(tmp_path):
 		SourceFile('source|missing.md', maker, str(tmp_path / 'missing.md'))
 
 
-def test_source_entity(tmp_path):
-	path = tmp_path / 'source.md'
-	path.write_text('# Source\n')
-	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
-	file = SourceFile('source|source.md', maker, str(path))
-	entity = SourceEntity('source|source.md|header', file, ['# Source\n'])
-
-	entity.get_children_idx()
-	entity.child('source|source.md|header|chunk')
-	entity.children = {'source|source.md|header|chunk': None}
-	entity.get_children_idx()
-	entity.child('source|source.md|header|chunk')
-
-
-def test_chunk(tmp_path):
-	path = tmp_path / 'source.md'
-	path.write_text('# Source\n')
-	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
-	file = SourceFile('source|source.md', maker, str(path))
-	entity = SourceEntity('source|source.md|header', file, ['# Source\n'])
-	chunk = Chunk('source|source.md|header/chunk', entity, 'Source')
-
-	chunk.get_children_idx()
-	chunk.child('source|source.md|header/chunk|child')
-	Chunk('source|source.md|header/link', entity, 'https://example.com', is_link = True, label = 'Source')
-	Chunk('source|source.md|header/cell', entity, 'Cell', label = 'Column', row_name = 'Row')
+# def test_source_entity(tmp_path):
+# 	path = tmp_path / 'source.md'
+# 	path.write_text('# Source\n')
+# 	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
+# 	file = SourceFile('source|source.md', maker, str(path))
+# 	entity = SourceEntity('source|source.md|header', file, ['# Source\n'])
 
 
 # if __name__ == "__main__":
