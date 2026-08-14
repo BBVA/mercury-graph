@@ -703,6 +703,8 @@ class SourceEntity(SourceNode):
 
 		self._children = None
 
+		self.state = SourceState.READY.value
+
 
 	@property
 	def content(self):
@@ -737,8 +739,8 @@ class SourceEntity(SourceNode):
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
 		"""
 
-		if self.children is not None:
-			return list(self.children.keys())
+		if self._children is not None:
+			return list(self._children.keys())
 
 
 	def child(self, index):
@@ -749,10 +751,10 @@ class SourceEntity(SourceNode):
 		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
 		"""
 
-		if self.children is None:
+		if self._children is None:
 			return None
 
-		return self.children.get(index, None)
+		return self._children.get(index, None)
 
 
 	def add_child(self, child):
