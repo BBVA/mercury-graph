@@ -488,9 +488,6 @@ class SourceMaker(SourceNode):
 
 		# The file has 25,275,933 pages.
 
-		top_n = 25276	# For testing, write only the first 25276 pages.	(Roughly 1/1000 of the total pages.)
-		# TODO: Remove the top_n limit!
-
 		PAGE_TAG = '%shttp://www.mediawiki.org/xml/export-0.11/}page' % '{'
 		NS		 = {'mw': 'http://www.mediawiki.org/xml/export-0.11/'}
 
@@ -503,10 +500,6 @@ class SourceMaker(SourceNode):
 
 			while elem.getprevious() is not None:	# Also clear the previous siblings of the element to free memory.
 				del elem.getparent()[0]
-
-			top_n -= 1
-			if top_n == 0:
-				break
 
 		return True
 
@@ -612,11 +605,15 @@ class SourceFile(SourceNode):
 		""" Returns the children indices following the SourceNode interface.
 
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
-
 		"""
 
-		pass
-		# TODO: Implement the logic to return the children indices of the SourceFile.
+		if self.state != SourceState.READY.value:
+			self._load_and_parse()
+
+			if self.state != SourceState.READY.value:
+				return None
+
+		return list(self._children.keys())
 
 
 	def child(self, index):
@@ -625,8 +622,13 @@ class SourceFile(SourceNode):
 		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
 		"""
 
-		pass
-		# TODO: Implement the logic to return the child of the SourceFile with the given index.
+		if self.state != SourceState.READY.value:
+			self._load_and_parse()
+
+			if self.state != SourceState.READY.value:
+				return None
+
+		return self._children.get(index, None)
 
 
 	def lines(self, span):
@@ -640,9 +642,6 @@ class SourceFile(SourceNode):
 		Returns:
 			(list of str): The lines of text in the given range, or None if the range is invalid.
 		"""
-
-		if self._content is None:	# TODO: Remove this check since it should never happen. Nothing calls this before _content is built.
-			return None
 
 		try:
 			ret = self._content[span]
@@ -666,9 +665,6 @@ class SourceFile(SourceNode):
 			(str): The characters in the given range from the specified line, or None if the range is invalid.
 		"""
 
-		if self._content is None:	# TODO: Remove this check since it should never happen. Nothing calls this before _content is built.
-			return None
-
 		try:
 			ret = self._content[line][span]
 
@@ -676,6 +672,60 @@ class SourceFile(SourceNode):
 			return None
 
 		return ret
+
+
+	def _load_and_parse(self):
+		""" This method has all the internal logic of the class. It starts by loading the file into memory (self._content which is a
+		list of str). The coordinates in terms of lines and character ranges cannot be modified. Markdown parsing is very line oriented,
+		so even if pathological paragraphs are found, they will live in one line and be broken by characters. Every division is either
+		multiline with no character range or single line with a character range. This is enforced by this method.
+
+		This method uses numpy (as np) to build integer indices to define header levels, table rows, etc. The markdown interpretation
+		is done by the class MarkdownParser to keep this class simple.
+
+		## Hierarchy Example:
+
+		```text
+		HEADER_1 Title_1
+			└── HEADER_2 Subtitle_1_1
+    				└── PARAGRAPH
+							└── Chunk_1, Chunk_2, Chunk_3
+		```
+
+		Markdown has inherent hierarchy, like in the Example above. In that case, Header 1 Becomes and entity with a two children: Header 2
+		and the Title. The Title has content (the title itself) and no children. Header 2 has two children: the Subtitle and the Paragraph.
+		This becomes:
+
+
+		| entity       | content             | description                | children                  |
+		|--------------|---------------------|----------------------------|---------------------------|
+		| HEADER_1     |                     | "Title: The life of birds" | Title_1, HEADER_2         |
+	    | Title_1      | "The life of birds" |                            |                           |
+		| HEADER_2     |                     | "Section 1: Overview"      | Subtitle_1.1, PARAGRAPH   |
+		| Subtitle_1_1 | "Overview"          |                            |                           |
+		| PARAGRAPH    |                     | "Content of 1.1"           | Chunk_1, Chunk_2, Chunk_3 |
+		| Chunk_1      | "Bla, bla, bla"     |                            |                           |
+		| Chunk_2      | "Pio, pio, pio"     |                            |                           |
+		| Chunk_3      | "Trust me."         |                            |                           |
+
+		Note that range-wise HEADER_1 covers all the lines if the file from itself to the line before the next HEADER_1 (possibly the
+		whole file) but Tile_1 is only the slice of the line that contains the title. The same applies to HEADER_2 ...
+
+		Note that all the text content in the file becomes the content of some SourceEntity, so when the Source/EvidenceGraph/... use it
+		everything is there. The descriptions are as informative as possible using the titles of the sections to make a smaller database
+		of descriptions possible. The numbering if created automatically by the parser.
+
+		"""
+
+		self._children = {}
+
+		with open(self.path, 'r', encoding = 'utf-8') as f:
+			self._content = f.read().splitlines()
+
+
+		# TODO implement this!
+
+		self.state = SourceState.READY.value
 
 
 class SourceEntity(SourceNode):
