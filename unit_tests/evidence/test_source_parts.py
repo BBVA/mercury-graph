@@ -200,6 +200,16 @@ def test_source_file(tmp_path):
 	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
 	file = SourceFile('source|source.md', maker, str(path))
 
+	assert file.get_children_idx() == []
+	assert file.child('source|source.md|entity') is None
+	assert file.lines(slice(0, 1)) == ['# Source']
+	assert file.line_slice(0, slice(0, 1)) == '#'
+
+	not_ready = SourceFile('source|not_ready.md', maker, str(path))
+	not_ready._load_and_parse = lambda: None
+	assert not_ready.get_children_idx() is None
+	assert not_ready.child('source|not_ready.md|entity') is None
+
 	with pytest.raises(ValueError):
 		SourceFile('source|missing.md', maker, str(tmp_path / 'missing.md'))
 
@@ -220,19 +230,17 @@ def test_source_entity(tmp_path):
 	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
 	file = SourceFile('source|source.md', maker, str(path))
 
-	assert file.lines(slice(0, 1)) is None
-	assert file.line_slice(0, slice(0, 1)) is None
-	file._content = ['# Source\n', 'Body\n']
-	assert file.lines(slice(0, 1)) == ['# Source\n']
+	file.get_children_idx()
+	assert file.lines(slice(0, 1)) == ['# Source']
 	assert file.line_slice(0, slice(0, 1)) == '#'
 	assert file.line_slice(2, slice(0, 1)) is None
 	file._content = InvalidContent()
 	assert file.lines(slice(0, 1)) is None
-	file._content = ['# Source\n', 'Body\n']
+	file._content = ['# Source', 'Body']
 
 	entity = SourceEntity('source|source.md|header', file, 10, slice(0, 1), description = 'Source')
 	entity.parent = file
-	assert entity.content == ['# Source\n']
+	assert entity.content == ['# Source']
 	assert entity.description == 'Source'
 	assert entity.entity_type.value == 10
 	assert entity.get_children_idx() is None
