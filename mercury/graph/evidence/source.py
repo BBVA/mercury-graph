@@ -15,8 +15,6 @@ from .formats import WikiMarkdownWriter, PdfToMarkdown, MDbyPDFoxide
 class SourceEntityType(Enum):
 	""" The `SourceEntityType` enumeration defines the types of entities that can be represented in a SourceFile. """
 
-	UNKNOWN			=  0	# An entity whose type is unknown or could not be determined.
-
 	TEXT			=  1	# A text fragment within another entity.
 	PARAGRAPH		=  2	# A paragraph of text.
 	LINK			=  3	# A link.
@@ -692,31 +690,55 @@ class SourceEntity(SourceNode):
 		line (slice or int): The line range to pass to it's parent's lines() if multiline or the only line (combined with span) for single
 			line entities..
 		span (slice): The range of characters in the only line (line must be an int when this is used) that this SourceEntity covers.
-
+		description (str): An optional description of this SourceEntity. It is used for titles, sub-titles, given to it by the SourceFile.
 	"""
 
-	def __init__(self, index, parent, ent_type, line, span = None):
+	def __init__(self, index, parent, ent_type, line, span = None, description = None):
 		super().__init__(index, parent)
 
-		self.children = None
+		self._type	= ent_type
+		self._line	= line
+		self._span	= span
+		self._descr = description if description is not None else ''
 
-		self.get_children_idx()		# This identifies the type, index and description from the content. Runs just one time.
+		self._children = None
+
+
+	@property
+	def content(self):
+		""" Returns the content of this SourceEntity. Only SourceEntity without children have content. """
+
+		if self._children is not None:
+			return ''
+
+		if self._span is None:
+			return self.parent.lines(self._line)
+
+		return self.parent.line_slice(self._line, self._span)
+
+
+	@property
+	def description(self):
+		""" Returns the description of this SourceEntity. It is used for titles, sub-titles, given to it by the SourceFile. """
+
+		return self._descr
+
+
+	@property
+	def entity_type(self):
+		""" Returns the type of this SourceEntity. It is one of the values in the SourceEntityType enumeration. """
+
+		return SourceEntityType(self._type)
 
 
 	def get_children_idx(self, index = None):
-		""" This parses the content to identify the children of this SourceEntity.
-
-		While parsing, it also sets the type, index and description of this SourceEntity. E.g., the description of a title is the title
-		itself. It builds a dictionary with the children of the next level in the tree. The children are either deeper SourceEntity objects
-		or chunks containing text, a link or a cell in a table.
+		""" Returns the children indices of this SourceEntity. Only SourceEntity with children have children indices.
 
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
 		"""
 
 		if self.children is not None:
 			return list(self.children.keys())
-
-		# TODO: Implement the logic to return the children indices of the SourceEntity.
 
 
 	def child(self, index):
@@ -731,6 +753,21 @@ class SourceEntity(SourceNode):
 			return None
 
 		return self.children.get(index, None)
+
+
+	def add_child(self, child):
+		""" Adds a child SourceEntity to this SourceEntity.
+
+		This is called by the SourceFile when parsing the markdown file and creating the SourceEntity tree.
+
+		Args:
+			child (SourceEntity): The child SourceEntity to add.
+		"""
+
+		if self._children is None:
+			self._children = {}
+
+		self._children[child.index] = child
 
 
 class Source(Agentic):
