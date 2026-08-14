@@ -200,9 +200,6 @@ def test_source_file(tmp_path):
 	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
 	file = SourceFile('source|source.md', maker, str(path))
 
-	file.get_children_idx()
-	file.child('source|source.md|entity')
-
 	with pytest.raises(ValueError):
 		SourceFile('source|missing.md', maker, str(tmp_path / 'missing.md'))
 
@@ -235,7 +232,6 @@ def test_source_entity(tmp_path):
 
 	entity = SourceEntity('source|source.md|header', file, 10, slice(0, 1), description = 'Source')
 	entity.parent = file
-	entity.children = None
 	assert entity.content == ['# Source\n']
 	assert entity.description == 'Source'
 	assert entity.entity_type.value == 10
@@ -244,10 +240,8 @@ def test_source_entity(tmp_path):
 
 	text = SourceEntity('source|source.md|text', file, 1, 1, slice(0, 4))
 	text.parent = file
-	text.children = None
 	assert text.content == 'Body'
 	entity.add_child(text)
-	entity.children = entity._children
 	assert entity.content == ''
 	assert entity.get_children_idx() == ['source|source.md|text']
 	assert entity.child('source|source.md|text') is text
