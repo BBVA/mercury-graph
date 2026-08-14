@@ -675,46 +675,44 @@ class SourceFile(SourceNode):
 
 
 	def _load_and_parse(self):
-		""" This method has all the internal logic of the class. It starts by loading the file into memory (self._content which is a
-		list of str). The coordinates in terms of lines and character ranges cannot be modified. Markdown parsing is very line oriented,
+		""" This method has all the internal logic of the class. It starts by loading the file into memory (self._content, which is a
+		list of str). The coordinates in terms of lines and character ranges cannot be modified. Markdown parsing is very line-oriented,
 		so even if pathological paragraphs are found, they will live in one line and be broken by characters. Every division is either
-		multiline with no character range or single line with a character range. This is enforced by this method.
+		multiline with no character range or single-line with a character range. This is enforced by this method.
 
-		This method uses numpy (as np) to build integer indices to define header levels, table rows, etc. The markdown interpretation
+		This method uses numpy (as np) to build integer indices to define header levels, table rows, etc. The Markdown interpretation
 		is done by the class MarkdownParser to keep this class simple.
 
-		## Hierarchy Example:
+		## Hierarchy Example
 
 		```text
 		HEADER_1 Title_1
-			└── HEADER_2 Subtitle_1_1
-    				└── PARAGRAPH
-							└── Chunk_1, Chunk_2, Chunk_3
+		    └── HEADER_2 Subtitle_1_1
+		        └── PARAGRAPH
+		            └── Chunk_1, Chunk_2, Chunk_3
 		```
 
-		Markdown has inherent hierarchy, like in the Example above. In that case, Header 1 Becomes and entity with a two children: Header 2
-		and the Title. The Title has content (the title itself) and no children. Header 2 has two children: the Subtitle and the Paragraph.
-		This becomes:
-
+		Markdown has an inherent hierarchy, like in the example above. In that case, Header 1 becomes an entity with two children:
+		Header 2 and the Title. The Title has content (the title itself) and no children. Header 2 has two children: the Subtitle and
+		the Paragraph. This becomes:
 
 		| entity       | content             | description                | children                  |
-		|--------------|---------------------|----------------------------|---------------------------|
+		| ------------ | ------------------- | -------------------------- | ------------------------- |
 		| HEADER_1     |                     | "Title: The life of birds" | Title_1, HEADER_2         |
-	    | Title_1      | "The life of birds" |                            |                           |
-		| HEADER_2     |                     | "Section 1: Overview"      | Subtitle_1.1, PARAGRAPH   |
+		| Title_1      | "The life of birds" |                            |                           |
+		| HEADER_2     |                     | "Section 1: Overview"      | Subtitle_1_1, PARAGRAPH   |
 		| Subtitle_1_1 | "Overview"          |                            |                           |
 		| PARAGRAPH    |                     | "Content of 1.1"           | Chunk_1, Chunk_2, Chunk_3 |
 		| Chunk_1      | "Bla, bla, bla"     |                            |                           |
 		| Chunk_2      | "Pio, pio, pio"     |                            |                           |
 		| Chunk_3      | "Trust me."         |                            |                           |
 
-		Note that range-wise HEADER_1 covers all the lines if the file from itself to the line before the next HEADER_1 (possibly the
-		whole file) but Tile_1 is only the slice of the line that contains the title. The same applies to HEADER_2 ...
+		Note that, range-wise, HEADER_1 covers all the lines in the file from itself to the line before the next HEADER_1 (possibly the
+		whole file), but Title_1 is only the slice of the line that contains the title. The same applies to HEADER_2, etc.
 
-		Note that all the text content in the file becomes the content of some SourceEntity, so when the Source/EvidenceGraph/... use it
-		everything is there. The descriptions are as informative as possible using the titles of the sections to make a smaller database
-		of descriptions possible. The numbering if created automatically by the parser.
-
+		Note that all the text content in the file becomes the content of some SourceEntity, so when the Source/EvidenceGraph/etc. use it,
+		everything is there. The descriptions are as informative as possible, using the titles of the sections to make a smaller database
+		of descriptions possible. The numbering is created automatically by the parser.
 		"""
 
 		self._children = {}
