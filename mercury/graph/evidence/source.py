@@ -341,6 +341,8 @@ class SourceMaker(SourceNode):
 
 				clust_items += 1
 
+		self.state = SourceState.MAKER_READY_OK.value
+
 		return True
 
 
