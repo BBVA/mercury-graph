@@ -207,12 +207,51 @@ def test_source_file(tmp_path):
 		SourceFile('source|missing.md', maker, str(tmp_path / 'missing.md'))
 
 
-# def test_source_entity(tmp_path):
-# 	path = tmp_path / 'source.md'
-# 	path.write_text('# Source\n')
-# 	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
-# 	file = SourceFile('source|source.md', maker, str(path))
-# 	entity = SourceEntity('source|source.md|header', file, ['# Source\n'])
+def test_source_entity(tmp_path):
+	""" Exercise SourceEntity delegation, metadata, and child management. """
+
+	class InvalidContent:
+		""" Content container that reports an invalid slice. """
+
+		def __getitem__(self, span):
+			""" Raise IndexError for every requested slice. """
+
+			raise IndexError
+
+	path = tmp_path / 'source.md'
+	path.write_text('# Source\nBody\n')
+	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
+	file = SourceFile('source|source.md', maker, str(path))
+
+	assert file.lines(slice(0, 1)) is None
+	assert file.line_slice(0, slice(0, 1)) is None
+	file._content = ['# Source\n', 'Body\n']
+	assert file.lines(slice(0, 1)) == ['# Source\n']
+	assert file.line_slice(0, slice(0, 1)) == '#'
+	assert file.line_slice(2, slice(0, 1)) is None
+	file._content = InvalidContent()
+	assert file.lines(slice(0, 1)) is None
+	file._content = ['# Source\n', 'Body\n']
+
+	entity = SourceEntity('source|source.md|header', file, 10, slice(0, 1), description = 'Source')
+	entity.parent = file
+	entity.children = None
+	assert entity.content == ['# Source\n']
+	assert entity.description == 'Source'
+	assert entity.entity_type.value == 10
+	assert entity.get_children_idx() is None
+	assert entity.child('source|source.md|header|body') is None
+
+	text = SourceEntity('source|source.md|text', file, 1, 1, slice(0, 4))
+	text.parent = file
+	text.children = None
+	assert text.content == 'Body'
+	entity.add_child(text)
+	entity.children = entity._children
+	assert entity.content == ''
+	assert entity.get_children_idx() == ['source|source.md|text']
+	assert entity.child('source|source.md|text') is text
+	assert entity.child('source|source.md|header|missing') is None
 
 
 # if __name__ == "__main__":
