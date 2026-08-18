@@ -720,8 +720,19 @@ class SourceFile(SourceNode):
 		with open(self.path, 'r', encoding = 'utf-8') as f:
 			self._content = f.read().splitlines()
 
+		parser = MarkdownParser(self._content)
+		entities = {}
 
-		# TODO implement this!
+		for part in parser.parse():
+			parent = self if part['parent'] is None else entities[part['parent']]
+			entity = SourceEntity('%s|%s' % (self.index, part['index']), parent, part['ent_type'], part['line'], part['span'],
+				part['description'])
+			entities[part['index']] = entity
+
+			if parent is self:
+				self._children[entity.index] = entity
+			else:
+				parent.add_child(entity)
 
 		self.state = SourceState.READY.value
 
@@ -764,9 +775,9 @@ class SourceEntity(SourceNode):
 			return ''
 
 		if self._span is None:
-			return self.parent.lines(self._line)
+			return self._parent.lines(self._line)
 
-		return self.parent.line_slice(self._line, self._span)
+		return self._parent.line_slice(self._line, self._span)
 
 
 	@property
