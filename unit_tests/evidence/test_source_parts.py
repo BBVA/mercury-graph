@@ -207,7 +207,7 @@ def test_source_file(tmp_path):
 	assert header.description == 'Title: Source'
 	assert header.content == ''
 	title = header.child(header.get_children_idx()[0])
-	assert title.content == 'Source'
+	assert title.entity_type.value == 1
 	assert file.child('source|source.md|entity') is None
 	assert file.lines(slice(0, 1)) == ['# Source']
 	assert file.line_slice(0, slice(0, 1)) == '#'
