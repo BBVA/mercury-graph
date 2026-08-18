@@ -200,7 +200,14 @@ def test_source_file(tmp_path):
 	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
 	file = SourceFile('source|source.md', maker, str(path))
 
-	assert file.get_children_idx() == []
+	children = file.get_children_idx()
+	assert len(children) == 1
+	header = file.child(children[0])
+	assert header.entity_type.value == 10
+	assert header.description == 'Title: Source'
+	assert header.content == ''
+	title = header.child(header.get_children_idx()[0])
+	assert title.content == 'Source'
 	assert file.child('source|source.md|entity') is None
 	assert file.lines(slice(0, 1)) == ['# Source']
 	assert file.line_slice(0, slice(0, 1)) == '#'
