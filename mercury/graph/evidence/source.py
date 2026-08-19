@@ -29,10 +29,10 @@ class Source(Agentic):
 
 	The Source uses the following components to manage file conversion, chunking, indexing and to represent the parts of a document:
 
-	- [`SourceNode`][mercury.graph.evidence.SourceNode]: The base class to manage the index logic of all components.
-	- [`SourceMaker`][mercury.graph.evidence.SourceMaker]: The root SourceNode responsible for managing a tree of markdown files.
-	- [`SourceFile`][mercury.graph.evidence.SourceFile]: Each individual file as a SourceNode.
-	- [`SourceEntity`][mercury.graph.evidence.SourceEntity]: Each section, subsection, paragraph, table, figure, text, table cell or link
+	- [`SourceNode`][mercury.graph.evidence.source_parts.SourceNode]: The base class to manage the index logic of all components.
+	- [`SourceMaker`][mercury.graph.evidence.source_parts.SourceMaker]: The root SourceNode responsible for managing a tree of markdown files.
+	- [`SourceFile`][mercury.graph.evidence.source_parts.SourceFile]: Each individual file as a SourceNode.
+	- [`SourceEntity`][mercury.graph.evidence.source_parts.SourceEntity]: Each section, subsection, paragraph, table, figure, text, table cell or link
 		in a markdown file as a SourceNode.
 
 	## Known Limitations

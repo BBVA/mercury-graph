@@ -62,7 +62,7 @@ class SourceEntity(SourceNode):
 	def get_children_idx(self, index = None):
 		""" Returns the children indices of this SourceEntity. Only SourceEntity with children have children indices.
 
-		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
 		"""
 
 		if self._children is not None:
@@ -74,7 +74,7 @@ class SourceEntity(SourceNode):
 
 		The child can only be a deeper SourceEntity or None.
 
-		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
+		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
 		"""
 
 		if self._children is None:

@@ -183,7 +183,7 @@ class SourceMaker(SourceNode):
 	def get_children_idx(self, index = None):
 		""" Returns the children indices following the SourceNode interface.
 
-		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source.SourceNode.get_children_idx].)
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
 		"""
 
 		if index is None:	# The index is mandatory for the SourceMaker.
@@ -207,7 +207,7 @@ class SourceMaker(SourceNode):
 	def child(self, index):
 		""" Returns the corresponding SourceFile object following the SourceNode interface.
 
-		(See [`SourceNode.child()`][mercury.graph.evidence.source.SourceNode.child].)
+		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
 		"""
 
 		idx_stack = index.split('|')
