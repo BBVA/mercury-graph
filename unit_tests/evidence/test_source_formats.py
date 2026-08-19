@@ -31,6 +31,24 @@ def test_markdown_parser():
 	assert next(part for part in parts if part['index'] == 'link_1')['span'] == slice(5, 32)
 
 
+def test_markdown_parser_header_stack_and_block_transition():
+	""" Maintains header parents across siblings and ends paragraphs before list blocks. """
+
+	content = ['# First', 'Introduction', '- Item', '## Nested', 'Nested text', '## Sibling', 'Sibling text', '# Second']
+	parts = MarkdownParser(content).parse()
+
+	first = next(part for part in parts if part['index'] == 'header_1_1')
+	nested = next(part for part in parts if part['index'] == 'header_2_1')
+	sibling = next(part for part in parts if part['index'] == 'header_2_2')
+	second = next(part for part in parts if part['index'] == 'header_1_2')
+
+	assert first['line'] == slice(0, 7)
+	assert nested['parent'] == first['index']
+	assert sibling['parent'] == first['index']
+	assert second['line'] == slice(7, 8)
+	assert next(part for part in parts if part['index'] == 'paragraph_1')['line'] == slice(1, 2)
+
+
 def test_wiki_markdown_writer():
 	""" Renders basic blocks and tolerates the supported wikitext constructs. """
 
