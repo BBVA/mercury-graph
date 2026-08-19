@@ -50,7 +50,7 @@
 
 		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
 		// Provide a list of tool names
-		"tools": ["demo", "GLiNER2", "e_graph"]
+		"tools": ["wikipedia_2025", "GLiNER2", "e_graph"]
 	},
 
 	"gru": {
@@ -60,8 +60,15 @@
 			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
 			"description": "This Agentic does the supervision.",
 
+			// These two arguments are mandatory for litellm completion:
 			"api_base": "http://localhost:11434",
 			"model_name": "ollama_chat/qwen3:8b",
+
+			// These extra arguments will be at any call if given.
+			"extra_litellm" : {
+				"tool_choice": "auto",
+				"think": false
+			},
 
 			"capabilities": [
 				{
@@ -94,6 +101,6 @@
 
 		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
 		// Provide a list of tool names
-		"tools": ["demo", "GLiNER2", "e_graph"]
+		"tools": ["wikipedia_2025", "GLiNER2", "e_graph"]
 	}
 }

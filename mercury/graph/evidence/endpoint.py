@@ -22,7 +22,6 @@ class AgenticFailedToParseOutput(AgenticRunException):
 	pass
 
 
-
 class LockState(Enum):
 	""" The `LockState` is an enumeration that defines the possible states of the Endpoint lock. """
 
@@ -42,13 +41,13 @@ class EndPointState(Enum):
 	ERR_EXPOSING	= -3	# The Endpoint failed to building its API.
 	ERR_LINKING		= -2	# The Endpoint failed to link some of its objects.
 	ERR_LOADING_OBJ	= -1	# The Endpoint failed to load some of its objects.
-	INITIAL			=  0	# The initial state of the source.
+	INITIAL			=  0	# The initial state of the Endpoint.
 	LOADED_OBJ		=  1	# The Endpoint has loaded all the objects in its architecture. It is not ready to process queries yet.
 	LINKED_OBJ		=  2	# The Endpoint has satisfied all the inter-dependencies of its objects.
 	EXPOSED_API		=  3	# The Endpoint has exposed its Agentic API to the outside world.
 	PILOT_REQUIRED	=  4	# The Endpoint has loaded all its architecture but some of them are not ready to process queries yet.
 	TOOLS_ARE_READY	=  5	# The Endpoint has piloted all its Agentics to ready and can now research their capabilities.
-	ALL_READY		=  100	# The source is ready to be processed.
+	ALL_READY		=  100	# The Endpoint is ready to be called and all its Agentics are ready.
 
 
 class Endpoint(Agentic):
@@ -396,7 +395,7 @@ class Endpoint(Agentic):
 			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
 
-		return {'state' : 0}	# Anything else is created in the different stages of pilot()
+		return {'state' : 0}			# Anything else is created in the different stages of pilot()
 
 
 	def _dry_run(self, request):
@@ -423,7 +422,7 @@ class Endpoint(Agentic):
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
 
-		if self.meta['state'] < 0:					# Irrecoverable error.
+		if self.meta['state'] < 0:		# Irrecoverable error.
 			return
 
 		try:
@@ -440,7 +439,8 @@ class Endpoint(Agentic):
 					self.meta['state'] = self.states.ERR_LOADING_OBJ.value
 					break
 
-				continue
+				if just_once:
+					break
 
 			if self.meta['state'] == self.states.LOADED_OBJ.value:
 				if self._link_objects():
@@ -449,7 +449,8 @@ class Endpoint(Agentic):
 					self.meta['state'] = self.states.ERR_LINKING.value
 					break
 
-				continue
+				if just_once:
+					break
 
 			if self.meta['state'] == self.states.LINKED_OBJ.value:
 				if self._expose_api():
@@ -458,7 +459,8 @@ class Endpoint(Agentic):
 					self.meta['state'] = self.states.ERR_EXPOSING.value
 					break
 
-				continue
+				if just_once:
+					break
 
 			next_agentic = self._next_agentic_below(intent)
 			if next_agentic is not None:
@@ -473,13 +475,15 @@ class Endpoint(Agentic):
 				else:
 					self.meta['state'] = self.states.PILOT_REQUIRED.value
 
+				if just_once:
+					break
+
 			if self.meta['state'] == self.states.TOOLS_ARE_READY.value:
 				if self._research_capabilities():
 					self.meta['state'] = self.states.ALL_READY.value
 				else:
 					self.meta['state'] = self.states.ERR_TOOL_CAPS.value
 
-			if just_once:
 				break
 
 

@@ -82,6 +82,6 @@
 			"param1": "value1",
 			"param2": "value2"
 		},
-		"tools": ["demo", "GLiNER2", "reader"]
+		"tools": ["wikipedia_2025", "GLiNER2", "reader"]
 	}
 }

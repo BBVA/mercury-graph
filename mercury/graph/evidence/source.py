@@ -1,25 +1,12 @@
-from enum import Enum
+import os, pickle
+
+from collections import OrderedDict
+from pathlib import Path
+
+import chromadb as chroma
 
 from .agentic import Agentic
-
-
-class SourceState(Enum):
-	""" The `SourceState` is an enumeration that defines the possible states of the Source.
-	"""
-	CHUNKS_EMBED_ERR	= -6	# The chunks could not be embedded.
-	CHUNKS_STORE_ERR	= -5	# The chunks could not be stored.
-	CHUNKS_IDX_ERR		= -4	# The chunks could not be indexed.
-	SECTIONS_IDX_ERR	= -3	# The sections could not be indexed.
-	FILES_IDX_ERR		= -2	# The file names could not be indexed.
-	ERR_FS_404			= -1	# The file system path does not exist.
-	INITIAL				=  0	# The initial state of the source.
-	FS_FOUND			=  1	# The file system has been found.
-	FILES_IDX_OK		=  2	# The file names are indexed.
-	SECTIONS_IDX_OK		=  3	# The sections (chapter, section, subsection, paragraph, ...) are indexed.
-	CHUNKS_IDX_OK		=  4	# The chunks are indexed and ready to be processed.
-	CHUNKS_STORED_OK	=  5	# The chunks are stored and ready to be processed.
-	CHUNKS_EMBEDDED_OK	=  6	# The chunks are embedded and ready to be processed.
-	READY				=  100	# The source is ready to be processed.
+from .source_parts import SourceState, SourceMaker
 
 
 class Source(Agentic):
@@ -33,10 +20,26 @@ class Source(Agentic):
 	The Source provides:
 
 	- A "chunking" interface to break documents into smaller pieces for easier processing.
-	- A hierarchy that divides a corpus into: collection (a folder), document (a file), section (which is itself nested) and a chunk.
-	- An indexing system that provides unique identifiers for each chunk.
+	- A hierarchy that divides a corpus into: a collection (that manages many files), a document (a file) a section (which can be nested).
+	- An indexing system that provides unique identifiers for each component.
 	- A persistence backend that possibly includes vectorization and embedding of the chunks for later retrieval.
 	- An Agentic interface to everything above.
+
+	## Source Components
+
+	The Source uses the following components to manage file conversion, chunking, indexing and to represent the parts of a document:
+
+	- [`SourceNode`][mercury.graph.evidence.source_parts.SourceNode]: The base class to manage the index logic of all components.
+	- [`SourceMaker`][mercury.graph.evidence.source_parts.SourceMaker]: The root SourceNode responsible for managing a tree of markdown files.
+	- [`SourceFile`][mercury.graph.evidence.source_parts.SourceFile]: Each individual file as a SourceNode.
+	- [`SourceEntity`][mercury.graph.evidence.source_parts.SourceEntity]: Each section, subsection, paragraph, table, figure, text, table cell or link
+		in a markdown file as a SourceNode.
+
+	## Known Limitations
+
+	See:
+		- [Warning](evidence_formats.md#warning)
+		- [Limitations](evidence_source.md#known-limitations)
 
 	Args:
 		schema (str): a schema (a unique name) to use for the Source's ID.
@@ -52,22 +55,29 @@ class Source(Agentic):
 		self.states = SourceState
 
 		self.conf = extra_args
+		self.name = schema
 
-		self.pilot(0)	# Just to make .meta reflect the initial state.
+		self._maker	 = None
+		self._cache	 = None
+		self._chroma = None
+
+		self._meta_	 = self._meta()	# Just to make .meta reflect the initial state.
 
 
 	def _run(self, request):
 		""" Runs the Source with the given request.
 
-			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
+		(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
+
 		return {'status': 'ok'}
+		# TODO: Implement the logic to run the Source with the given request.
 
 
 	def _meta(self):
 		""" Returns the metadata of the Source.
 
-			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
+		(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
 		meta = {}
 		meta['state'] = 0
@@ -80,23 +90,171 @@ class Source(Agentic):
 	def _dry_run(self, request):
 		""" Simulates running the Source with the given request.
 
-			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+		(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
 		"""
+
 		return {'status': 'ok'}
+		# TODO: Implement the logic to simulate running the Source with the given request.
 
 
 	def pilot(self, intent, just_once = False):
 		""" Pilots the Source to a new state based on the given intent.
 
-			(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
+		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
-		state = self.meta['state']
 
-		if state < 0:
-			self.log_error('Source is in error state %d' % state)
+		if self.meta['state'] < 0:
+			self.log_error('Source is in error state %d' % self.meta['state'])
 			return
 
-		self.meta['state'] = self.states.READY.value
+		while self.meta['state'] < intent:
+			if self.meta['state'] == self.states.INITIAL.value:
+				try:
+					typ = self.conf['type']
+					src = self.conf['src_path']
+					dst = self.conf['dst_path']
+					siz = self.conf.get('cluster_size', 256)
+					ext = self.conf.get('extensions', None)
+					pdf = self.conf.get('pdf_to_markdown', None)
+					self._maker = SourceMaker(self.name, typ, src, dst, siz, ext, pdf)
+
+				except:
+					self.log_error('SourceMaker could not be created and initialized for Source "%s".' % self.name)
+					self.meta['state'] = self.states.ERR_MAKER_INIT.value
+					break
+
+				self.meta['state'] = self.states.MAKER_INIT_OK.value
+
+				if just_once:
+					break
+
+			if self.meta['state'] == self.states.MAKER_INIT_OK.value:
+				if self._maker.build_indices():
+					self.meta['state'] = self.states.MAKER_READY_OK.value
+				else:
+					self.log_error('SourceMaker could not build indices for Source "%s".' % self.name)
+					self.meta['state'] = self.states.ERR_MAKER_INDEX.value
+					break
+
+				if just_once:
+					break
+
+			if self.meta['state'] == self.states.MAKER_READY_OK.value:
+				self._setup_cache()		# No error condition. Worst case is no cache.
+				self.meta['state'] = self.states.CACHE_READY_OK.value
+
+				if just_once:
+					break
+
+			if self.meta['state'] == self.states.CACHE_READY_OK.value:
+				if self._setup_chroma_db():
+					self.meta['state'] = self.states.READY.value
+
+				else:
+					self.log_error('Source could not setup the vector database for Source "%s".' % self.name)
+					self.meta['state'] = self.states.ERR_DB_SETUP.value
+
+				break
+
+
+	def close(self, endpoint_locked):
+		""" Closes the Source and releases any resources it holds.
+
+		(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
+		"""
+
+		if endpoint_locked:
+			if self._cache is not None and self._cache_path is not None:
+				fn = os.path.abspath(self._cache_path)
+
+				pat = Path(fn).parent
+				pat.mkdir(parents = True, exist_ok = True)
+
+				with open(fn, 'wb') as f:
+					pickle.dump(self._cache, f)
+
+		self._cache	 = None
+		self._chroma = None		# There is no need to explicitly .close(), .flush() ... That persists changes.
+		self._maker	 = None
+
+
+	def _setup_cache(self):
+		""" Sets up the cache for the Source.
+
+		The cache keeps an LRU (Least Recently Used) dictionary of SourceNode objects by index. Optionally, it can be persisted to disk
+		as a pickle file. The cache size and path are configured in the Source's configuration.
+
+		Returns:
+			(bool): True if the cache was set up successfully, False if the Source does not have a cache.
+		"""
+
+		self._cache = None
+
+		self._cache_path = self.conf.get('cache_path', '')
+		if not self._cache_path.endswith('.pickle'):
+			self._cache_path = None
+
+		self._cache_size = self.conf.get('cache_size', 0)
+
+		if self._cache_size > 0:
+			if self._cache_path is not None and os.path.isfile(self._cache_path):
+				try:
+					with open(self._cache_path, 'rb') as f:
+						self._cache = pickle.load(f)
+
+				except:
+					self.log_error('Source could not load cache from "%s".' % (self._cache_path))
+					self._cache = OrderedDict()
+
+			else:
+				self._cache = OrderedDict()
+
+			while len(self._cache) > self._cache_size:
+				self._cache.popitem(last = False)
+
+		return self._cache is not None
+
+
+	def _setup_chroma_db(self):
+		""" Sets up the Chroma vector database for the Source.
+
+		The Chroma vector database is used to store embeddings of chunks for later retrieval. It is configured in the Source's
+		configuration.
+
+		Returns:
+			(bool): True if the Chroma vector database was set up successfully or is not used, False if setup failed.
+		"""
+
+		self._chroma = None
+
+		chroma_path = self.conf.get('chroma_path', None)
+
+		if chroma_path is None:
+			return True			# This is the neat way to disable ChromaDB.
+
+		try:
+			self._chroma = chroma.PersistentClient(path = chroma_path)
+
+		except:
+			self.log_error('Source failed to create Chroma client at path: "%s".' % (chroma_path))
+
+			return False
+
+		try:
+			name = self.conf['chroma_descriptions_collection_name']
+
+			self._chroma_descr = self._chroma.get_or_create_collection(name)
+
+			name = self.conf['chroma_chunks_collection_name']
+
+			self._chroma_chunks = self._chroma.get_or_create_collection(name)
+
+		except:
+			self.log_error('Source failed to create Chroma collections at path: "%s".' % (chroma_path))
+
+			return False
+
+		return True
 
 
 	def _capabilities(self):
@@ -105,57 +263,58 @@ class Source(Agentic):
 		Returns:
 			(list): A list of capabilities, each represented as a dictionary with the following keys:
 
-				- "type": The type of capability (e.g., "function").
-				- "function": A dictionary containing details about the function
+				- 'type': The type of capability (e.g., 'function').
+				- 'function': A dictionary containing details about the function
 
-				The value of "function" is:
+				The value of 'function' is:
 
-				* "name": The name of the function.
-				* "description": A brief description of what the function does.
-				* "parameters": A dictionary with "type", "properties", and "required"
-				* "returns": A dictionary with "type" and "items"
+				* 'name': The name of the function.
+				* 'description': A brief description of what the function does.
+				* 'parameters': A dictionary with 'type', 'properties', and 'required'
+				* 'returns': A dictionary with 'type' and 'items'
 		"""
+
 		return [
 			{
-				"type": "function",
-				"function": {
-					"name": "get_items_by_index",
-					"description": "Get indices of the children of an index. Indices are either folders, files, sections or chunks.",
-					"parameters": {
-						"type": "object",
-						"properties": {
-							"index": {
-								"type": "string",
-								"description": "Index whose children indices are required."
+				'type': 'function',
+				'function': {
+					'name': 'get_items_by_index_%s' % self.name,
+					'description': 'Get indices of the children of an index. Indices are either folders, files, sections or chunks.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'index': {
+								'type': 'string',
+								'description': 'Index whose children indices are required.'
 							}
 						},
-						"required": ["index"]
+						'required': ['index']
 					},
-					"returns": {
-						"type": "array",
-						"items": {
-							"type": "string"
+					'returns': {
+						'type': 'array',
+						'items': {
+							'type': 'string'
 						}
 					}
 				}
 			},
 			{
-				"type": "function",
-				"function": {
-					"name": "get_text_chunk_by_index",
-					"description": "Get the text at a given chunk index.",
-					"parameters": {
-						"type": "object",
-						"properties": {
-							"index": {
-								"type": "string",
-								"description": "Index of the text chunk."
+				'type': 'function',
+				'function': {
+					'name': 'get_text_by_index_%s' % self.name,
+					'description': 'Get the text at a given index.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'index': {
+								'type': 'string',
+								'description': 'Index of the text component.'
 							}
 						},
-						"required": ["index"]
+						'required': ['index']
 					},
-					"returns": {
-						"type": "string"
+					'returns': {
+						'type': 'string'
 					}
 				}
 			}

@@ -12,7 +12,7 @@ class EvidenceGraph(Agentic):
 
 	The graph structure enables capabilities that are difficult in standard RAG systems:
 
-	- Finding relevant answers to questions that are not similar to any single chunk.
+	- Finding relevant answers to questions that are not similar to any single chunk of text.
 	- Connecting entities and relations.
 	- Evidence weighting, making sense of contradictions and reinforcements.
 	- It does not replace RAG, it can be used in combination.

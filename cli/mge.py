@@ -13,7 +13,7 @@ class MgeFileLogger:
     """ A minimal append-only file logger for Agentic events.
 
     Args:
-		path (str): The path to the log file.
+        path (str): The path to the log file.
     """
 
     def __init__(self, path):
@@ -37,7 +37,7 @@ class MgeHttpServe:
     """ The MgeHttpServe class exposes an Endpoint Agentic API over HTTP.
 
     Args:
-		ep (Endpoint): The Endpoint to expose.
+        ep (Endpoint): The Endpoint to expose.
     """
 
     def __init__(self, ep):
@@ -126,7 +126,7 @@ class MgeHttpServe:
             request (dict): The JSON request body.
 
         Returns:
-			(dict): The validated request body.
+            (dict): The validated request body.
         """
 
         if type(request) != dict:
@@ -139,7 +139,7 @@ class MgeCli:
     """ The MgeCli class is a command line interface for managing Mercury-graph Evidence Endpoint objects.
 
     Args:
-		args (dict): The command line arguments as parsed by argparse.
+        args (dict): The command line arguments as parsed by argparse.
     """
 
     def __init__(self, args):
@@ -203,6 +203,20 @@ class MgeCli:
     def new(self):
         """ Executes the "new" command after the arguments have been checked to exist. """
 
+        ofn = os.path.abspath(self.name)
+        if os.path.exists(ofn):
+            print('Error: The target directory "%s" already exists. Please choose a different name or edit the existing Endpoint.' % ofn)
+            sys.exit(1)
+
+        full_name = self.name.split('/')
+        if len(full_name) > 1:
+            pat = os.path.abspath('/'.join(full_name[:-1]))
+            if not os.path.exists(pat):
+                print('Error: The parent directory "%s" does not exist. Please create it first.' % pat)
+                sys.exit(1)
+
+            self.name = full_name[-1]
+
         if mg.evidence.Agentic._normalize_name(self.name) != self.name:
             print('Error: The name "%s" is not valid. It must be a string of letters, numbers, and underscores.' % self.name)
             sys.exit(1)
@@ -210,11 +224,6 @@ class MgeCli:
         ifn = str(pathlib.Path(__file__).resolve().parent / 'new_endpoint_template')
         if not os.path.exists(ifn):
             print('Error: The source template directory "%s" does not exist. Try re-installing the package.' % ifn)
-            sys.exit(1)
-
-        ofn = os.path.abspath(self.name)
-        if os.path.exists(ofn):
-            print('Error: The target directory "%s" already exists. Please choose a different name or edit the existing Endpoint.' % ofn)
             sys.exit(1)
 
         self.__exec('cp -r %s %s' % (ifn, ofn))
@@ -233,7 +242,7 @@ class MgeCli:
             f.write(txt)
 
         try:
-            ep = mg.evidence.Endpoint(self.name)
+            ep = mg.evidence.Endpoint(ofn)
 
         except Exception:
             print('Error: The newly created Endpoint "%s" failed to load.' % self.name)
@@ -338,7 +347,7 @@ class MgeCli:
     def complete(self):
         """ Executes the "complete". The argument self.name is ignored. Should be "bash" because it is a mandatory argument. """
 
-        print('complete -W "new summary pilot serve unlock complete --just_once --log_file --help --version" -A directory mge')
+        print('complete -W "new summary pilot serve unlock complete ALL_READY --just_once --log_file --help --version" -A directory mge')
 
 
 # An argparse.ArgumentParser to manage the command line interface.
