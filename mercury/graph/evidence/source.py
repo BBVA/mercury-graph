@@ -6,7 +6,7 @@ from pathlib import Path
 import chromadb as chroma
 
 from .agentic import Agentic
-from .source_parts import SourceState, SourceMaker
+from .source_parts import SourceState, SourceMaker, SourceEntity
 
 
 class Source(Agentic):
@@ -155,6 +155,54 @@ class Source(Agentic):
 					self.meta['state'] = self.states.ERR_DB_SETUP.value
 
 				break
+
+
+	def get_children_idx(self, index = None):
+		""" Returns the children indices following the SourceNode interface.
+
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
+		"""
+
+		if (   self._maker is None
+			or self._maker.state != self.states.MAKER_READY_OK.value
+			or self.meta['state'] < self.states.READY.value):
+
+			self.log_error('Source is not ready for get_children_idx("%s").' % index)
+
+			return None
+
+		if index is None or index == '':
+			index = self._maker.index
+
+		return self._maker.get_children_idx(index)
+
+
+	def child(self, index):
+		""" Returns the corresponding SourceNode object following the SourceNode interface and serializes it to a dictionary.
+
+		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
+		"""
+
+		if (   self._maker is None
+			or self._maker.state != self.states.MAKER_READY_OK.value
+			or self.meta['state'] < self.states.READY.value):
+
+			self.log_error('Source is not ready for child("%s").' % index)
+
+			return None
+
+		child = self._maker.child(index)
+
+		if child is None:
+			return None
+
+		if type(child) is not SourceEntity:
+			return {'type': 'object', 'class': str(type(child)), 'description': child.description}
+
+		if child._children is None:
+			return {'type': str(child.entity_type), 'content': child.content}
+
+		return {'type': 'SourceEntity: %s' % child.entity_type, 'description': child.description}
 
 
 	def close(self, endpoint_locked):
