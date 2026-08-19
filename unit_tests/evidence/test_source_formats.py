@@ -3,6 +3,32 @@ import sys
 import pytest
 
 from mercury.graph.evidence.formats import PdfToMarkdown, MDbyPDFoxide, WikiMarkdownWriter
+from mercury.graph.evidence.source_parts import MarkdownParser, SourceEntityType
+
+
+def test_markdown_parser():
+	""" Builds line-based entity descriptions for the supported Markdown constructs. """
+
+	content = [
+		'# Title', '', 'Text [link](https://example.com) ![image](image.png).', '', '## Section', '- first', '- second', '',
+		'| Left | Right |', '| --- | --- |', '| one | two |', '', '> quoted', '', '```text', 'code', '```', '', '---', '[^one]: note'
+	]
+	parts = MarkdownParser(content).parse()
+	types = [part['ent_type'] for part in parts]
+
+	for ent_type in [
+		SourceEntityType.TEXT, SourceEntityType.PARAGRAPH, SourceEntityType.LINK, SourceEntityType.IMAGE, SourceEntityType.HEADER_1,
+		SourceEntityType.HEADER_2, SourceEntityType.LIST, SourceEntityType.LIST_ITEM, SourceEntityType.TABLE,
+		SourceEntityType.TABLE_HEADER, SourceEntityType.TABLE_ROW, SourceEntityType.TABLE_CELL, SourceEntityType.CODE_BLOCK,
+		SourceEntityType.BLOCKQUOTE, SourceEntityType.HORIZONTAL_RULE, SourceEntityType.FOOTNOTE
+	]:
+		assert ent_type.value in types
+
+	header = parts[0]
+	assert header['line'] == slice(0, len(content))
+	assert header['description'] == 'Title: Title'
+	assert next(part for part in parts if part['index'] == 'header_2_1')['description'] == 'Section 1.1: Section'
+	assert next(part for part in parts if part['index'] == 'link_1')['span'] == slice(5, 32)
 
 
 def test_wiki_markdown_writer():

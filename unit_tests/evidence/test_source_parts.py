@@ -4,7 +4,7 @@ import pytest
 
 from lxml import etree
 
-from mercury.graph.evidence import SourceNode, SourceMaker, SourceFile, SourceEntity
+from mercury.graph.evidence.source_parts import SourceNode, SourceMaker, SourceFile, SourceEntity
 
 
 class DummySourceNode(SourceNode):
