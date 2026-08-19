@@ -46,13 +46,6 @@ class SourceEntity(SourceNode):
 
 
 	@property
-	def description(self):
-		""" Returns the description of this SourceEntity. It is used for titles, sub-titles, given to it by the SourceFile. """
-
-		return self._descr
-
-
-	@property
 	def entity_type(self):
 		""" Returns the type of this SourceEntity. It is one of the values in the SourceEntityType enumeration. """
 
