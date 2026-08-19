@@ -16,8 +16,8 @@ components. This should be seen as a starting point that will evolve into a more
 
 
 ::: mercury.graph.evidence.Source
-::: mercury.graph.evidence.SourceNode
-::: mercury.graph.evidence.SourceMaker
-::: mercury.graph.evidence.SourceFile
-::: mercury.graph.evidence.SourceEntity
+::: mercury.graph.evidence.source_parts.SourceNode
+::: mercury.graph.evidence.source_parts.SourceMaker
+::: mercury.graph.evidence.source_parts.SourceFile
+::: mercury.graph.evidence.source_parts.SourceEntity
 
