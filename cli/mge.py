@@ -5,6 +5,7 @@ import argparse, datetime, os, pathlib, sys, subprocess
 import uvicorn
 
 from fastapi import Body, FastAPI, HTTPException
+from fastapi.responses import FileResponse, RedirectResponse
 
 import mercury.graph as mg
 
@@ -44,9 +45,24 @@ class MgeHttpServe:
         self.ep = ep
         self.app = FastAPI(title = 'Mercury-graph Evidence Endpoint', version = mg.__version__)
 
+        self.app.get('/')(self.root)
+        self.app.get('/favicon.ico', include_in_schema = False)(self.favicon)
+
         self.app.get('/meta')(self.meta)
         self.app.post('/run')(self.run)
         self.app.post('/dry_run')(self.dry_run)
+
+
+    def root(self):
+        """ Redirects the root URL to the Endpoint metadata. """
+
+        return RedirectResponse(url = '/meta')
+
+
+    def favicon(self):
+        """ Returns the Mercury-graph favicon. """
+
+        return FileResponse('%s/favicon.ico' % pathlib.Path(__file__).resolve().parent, media_type = 'image/x-icon')
 
 
     def meta(self):
