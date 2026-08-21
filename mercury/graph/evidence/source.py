@@ -5,8 +5,8 @@ from pathlib import Path
 
 import chromadb as chroma
 
-from .agentic import Agentic
-from .source_parts import SourceState, SourceMaker, SourceEntity
+from .agentic import Agentic, AgenticRunInvalidRequest
+from .source_parts import SourceState, SourceMaker, SourceFile, SourceEntity
 
 
 class Source(Agentic):
@@ -70,8 +70,21 @@ class Source(Agentic):
 		(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
 
-		return {'status': 'ok'}
-		# TODO: Implement the logic to run the Source with the given request.
+		call = self.call.get(request['name'], None)
+
+		if call is None:
+			self.log_error('Source does not have a function named "%s".' % request['function'])
+			raise AgenticRunInvalidRequest
+
+		index = request['arguments'].get('index', None)
+
+		if index is None:
+			self.log_error('Source function "%s" requires an "index" argument.' % request['function'])
+			raise AgenticRunInvalidRequest
+
+		ret = {'finish_reason': 'stop', 'message': call(index)}
+
+		return ret
 
 
 	def _meta(self):
