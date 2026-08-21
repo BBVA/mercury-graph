@@ -36,7 +36,7 @@
 	},
 
 	// The Endpoint's Agentic API is merged from exposed Agentics (at least one is mandatory).
-	"expose": ["gru", "wikipedia_2025", "bertrand_russell_works", "markdown_example"],
+	"expose": ["gru", "wikipedia_2025", "russell_works", "markdown_example"],
 
 	// An integer limit to keep it simple and have a target to refactor in the future.
 	"max_tool_calls_per_query": 10,

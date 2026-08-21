@@ -44,8 +44,8 @@
 		"tools": []
 	},
 
-	"bertrand_russell_works": {
-		"name": "bertrand_russell_works",
+	"russell_works": {
+		"name": "russell_works",
 
 		"extra_args": {
 			"description": "This is a collection of Bertrand Russell's works in pdf format.",
