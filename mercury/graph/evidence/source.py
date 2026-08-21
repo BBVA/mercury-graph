@@ -187,7 +187,22 @@ class Source(Agentic):
 		if index is None or index == '':
 			index = self._maker.index
 
-		return self._maker.get_children_idx(index)
+		ret = self._maker.get_children_idx(index)
+
+		if type(ret) is list:	# So far, the index belongs to the SourceMaker's tree.
+			return ret
+
+		file = self._maker.child(index)	# The sourceMaker will return a SourceFile if the index is valid even if it is longer.
+		if type(file) is not SourceFile:
+			self.log_error('SourceMaker could not find a SourceFile for index "%s".' % index)
+			return None
+
+		ret = file.get_children_idx(index)
+
+		if type(ret) is list:	# The File's index tree includes every SourceEntity in the file.
+			return ret
+
+		return None				# May not be an error. Just a chunk has not children. If it is an error, it will be logged inside.
 
 
 	def child(self, index):
