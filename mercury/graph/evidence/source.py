@@ -335,11 +335,16 @@ class Source(Agentic):
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
 
+		name_get_children_idx = 'children_by_idx_%s' % self.name
+		name_child			  = 'object_by_idx_%s' % self.name
+
+		self.call = {name_get_children_idx: self.get_children_idx, name_child: self.child}
+
 		return [
 			{
 				'type': 'function',
 				'function': {
-					'name': 'get_items_by_index_%s' % self.name,
+					'name': name_get_children_idx,
 					'description': 'Get indices of the children of an index. Indices are either folders, files, sections or chunks.',
 					'parameters': {
 						'type': 'object',
@@ -362,7 +367,7 @@ class Source(Agentic):
 			{
 				'type': 'function',
 				'function': {
-					'name': 'get_text_by_index_%s' % self.name,
+					'name': name_child,
 					'description': 'Get the text at a given index.',
 					'parameters': {
 						'type': 'object',
