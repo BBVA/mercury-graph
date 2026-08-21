@@ -186,7 +186,7 @@ class Endpoint(Agentic):
 
 		txt.append('   %-14s: %s %s(%s)%s' % ('state', state, italic, name, reset))
 
-		capabilities = self.meta.get('capabilities', None)
+		capabilities = self._meta_.get('capabilities', None)
 		if capabilities is not None:
 			txt.append('   %-14s: %s' % ('capabilities', '(%d total) %s' % (len(capabilities), list(self.agentic_by_capability.keys()))))
 
@@ -253,7 +253,7 @@ class Endpoint(Agentic):
 			obj = {}
 
 			for key in self.conf['auto_save']['save']:
-				obj[key] = self.meta[key]
+				obj[key] = self._meta_[key]
 
 			with open(path, 'wb') as f:
 				pickle.dump(obj, f)
@@ -338,7 +338,7 @@ class Endpoint(Agentic):
 				Agents. This is normal behavior, the First tool call is actually passing a message to a function.
 		"""
 
-		if self.meta['state'] < self.states.ALL_READY.value:
+		if self._meta_['state'] < self.states.ALL_READY.value:
 			raise AgenticRunInvalidState
 
 		is_pure_call = type(request) == dict and 'name' in request and 'arguments' in request
@@ -404,7 +404,7 @@ class Endpoint(Agentic):
 			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
 		"""
 
-		if self.meta['state'] < self.states.ALL_READY.value:
+		if self._meta_['state'] < self.states.ALL_READY.value:
 			return {'status': 1, 'description': 'Not ready.'}
 
 		issues = self._request_issues(request)
@@ -431,32 +431,32 @@ class Endpoint(Agentic):
 		except Exception:
 			intent = self.states[intent.upper()].value
 
-		while self.meta['state'] < intent:
-			if self.meta['state'] == self.states.INITIAL.value:
+		while self._meta_['state'] < intent:
+			if self._meta_['state'] == self.states.INITIAL.value:
 				if self._load_objects():
-					self.meta['state'] = self.states.LOADED_OBJ.value
+					self._meta_['state'] = self.states.LOADED_OBJ.value
 				else:
-					self.meta['state'] = self.states.ERR_LOADING_OBJ.value
+					self._meta_['state'] = self.states.ERR_LOADING_OBJ.value
 					break
 
 				if just_once:
 					break
 
-			if self.meta['state'] == self.states.LOADED_OBJ.value:
+			if self._meta_['state'] == self.states.LOADED_OBJ.value:
 				if self._link_objects():
-					self.meta['state'] = self.states.LINKED_OBJ.value
+					self._meta_['state'] = self.states.LINKED_OBJ.value
 				else:
-					self.meta['state'] = self.states.ERR_LINKING.value
+					self._meta_['state'] = self.states.ERR_LINKING.value
 					break
 
 				if just_once:
 					break
 
-			if self.meta['state'] == self.states.LINKED_OBJ.value:
+			if self._meta_['state'] == self.states.LINKED_OBJ.value:
 				if self._expose_api():
-					self.meta['state'] = self.states.EXPOSED_API.value
+					self._meta_['state'] = self.states.EXPOSED_API.value
 				else:
-					self.meta['state'] = self.states.ERR_EXPOSING.value
+					self._meta_['state'] = self.states.ERR_EXPOSING.value
 					break
 
 				if just_once:
@@ -465,24 +465,24 @@ class Endpoint(Agentic):
 			next_agentic = self._next_agentic_below(intent)
 			if next_agentic is not None:
 				if next_agentic.meta['state'] < 0:
-					self.meta['state'] = self.states.ERR_PILOTING.value
+					self._meta_['state'] = self.states.ERR_PILOTING.value
 					break
 
 				next_agentic.pilot(intent, just_once = just_once)
 
 				if self._next_agentic_below(intent) is None:
-					self.meta['state'] = self.states.TOOLS_ARE_READY.value
+					self._meta_['state'] = self.states.TOOLS_ARE_READY.value
 				else:
-					self.meta['state'] = self.states.PILOT_REQUIRED.value
+					self._meta_['state'] = self.states.PILOT_REQUIRED.value
 
 				if just_once:
 					break
 
-			if self.meta['state'] == self.states.TOOLS_ARE_READY.value:
+			if self._meta_['state'] == self.states.TOOLS_ARE_READY.value:
 				if self._research_capabilities():
-					self.meta['state'] = self.states.ALL_READY.value
+					self._meta_['state'] = self.states.ALL_READY.value
 				else:
-					self.meta['state'] = self.states.ERR_TOOL_CAPS.value
+					self._meta_['state'] = self.states.ERR_TOOL_CAPS.value
 
 				break
 
@@ -804,10 +804,10 @@ class Endpoint(Agentic):
 				agentic_by_capability[capability_name] = agentic
 				capabilities_by_name[capability_name]  = capability
 
-		self.meta['capabilities']  = capabilities
-		self.agentic_by_capability = agentic_by_capability
-		self.capabilities_by_name  = capabilities_by_name
-		self.num_capabilities	   = len(capabilities)
+		self._meta_['capabilities']	= capabilities
+		self.agentic_by_capability	= agentic_by_capability
+		self.capabilities_by_name	= capabilities_by_name
+		self.num_capabilities		= len(capabilities)
 
 		return self.num_capabilities > 0
 
