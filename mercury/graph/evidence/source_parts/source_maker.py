@@ -201,7 +201,10 @@ class SourceMaker(SourceNode):
 
 			keys = keys[ky]
 
-		return list(keys.keys())
+			if type(keys) is not dict:
+				return SourceState.FILE_NEEDS_UPDATE.value
+
+		return ['%s|%s' % (index, k) for k in keys.keys()]
 
 
 	def child(self, index):
