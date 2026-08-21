@@ -117,11 +117,11 @@ class Source(Agentic):
 		"""
 
 		if self.meta['state'] < 0:
-			self.log_error('Source is in error state %d' % self.meta['state'])
+			self.log_error('Source is in error state %d' % self._meta_['state'])
 			return
 
-		while self.meta['state'] < intent:
-			if self.meta['state'] == self.states.INITIAL.value:
+		while self._meta_['state'] < intent:
+			if self._meta_['state'] == self.states.INITIAL.value:
 				try:
 					typ = self.conf['type']
 					src = self.conf['src_path']
@@ -133,39 +133,39 @@ class Source(Agentic):
 
 				except:
 					self.log_error('SourceMaker could not be created and initialized for Source "%s".' % self.name)
-					self.meta['state'] = self.states.ERR_MAKER_INIT.value
+					self._meta_['state'] = self.states.ERR_MAKER_INIT.value
 					break
 
-				self.meta['state'] = self.states.MAKER_INIT_OK.value
+				self._meta_['state'] = self.states.MAKER_INIT_OK.value
 
 				if just_once:
 					break
 
-			if self.meta['state'] == self.states.MAKER_INIT_OK.value:
+			if self._meta_['state'] == self.states.MAKER_INIT_OK.value:
 				if self._maker.build_indices():
-					self.meta['state'] = self.states.MAKER_READY_OK.value
+					self._meta_['state'] = self.states.MAKER_READY_OK.value
 				else:
 					self.log_error('SourceMaker could not build indices for Source "%s".' % self.name)
-					self.meta['state'] = self.states.ERR_MAKER_INDEX.value
+					self._meta_['state'] = self.states.ERR_MAKER_INDEX.value
 					break
 
 				if just_once:
 					break
 
-			if self.meta['state'] == self.states.MAKER_READY_OK.value:
+			if self._meta_['state'] == self.states.MAKER_READY_OK.value:
 				self._setup_cache()		# No error condition. Worst case is no cache.
-				self.meta['state'] = self.states.CACHE_READY_OK.value
+				self._meta_['state'] = self.states.CACHE_READY_OK.value
 
 				if just_once:
 					break
 
-			if self.meta['state'] == self.states.CACHE_READY_OK.value:
+			if self._meta_['state'] == self.states.CACHE_READY_OK.value:
 				if self._setup_chroma_db():
-					self.meta['state'] = self.states.READY.value
+					self._meta_['state'] = self.states.READY.value
 
 				else:
 					self.log_error('Source could not setup the vector database for Source "%s".' % self.name)
-					self.meta['state'] = self.states.ERR_DB_SETUP.value
+					self._meta_['state'] = self.states.ERR_DB_SETUP.value
 
 				break
 
@@ -178,7 +178,7 @@ class Source(Agentic):
 
 		if (   self._maker is None
 			or self._maker.state != self.states.MAKER_READY_OK.value
-			or self.meta['state'] < self.states.READY.value):
+			or self._meta_['state'] < self.states.READY.value):
 
 			self.log_error('Source is not ready for get_children_idx("%s").' % index)
 
@@ -198,7 +198,7 @@ class Source(Agentic):
 
 		if (   self._maker is None
 			or self._maker.state != self.states.MAKER_READY_OK.value
-			or self.meta['state'] < self.states.READY.value):
+			or self._meta_['state'] < self.states.READY.value):
 
 			self.log_error('Source is not ready for child("%s").' % index)
 
