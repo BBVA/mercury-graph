@@ -22,10 +22,10 @@ doc = ['mkdocs', 'mkdocstrings[python]', 'mkdocs-material', 'mkdocs-minify-plugi
 
 [tool.setuptools]
 include-package-data = true
-script-files = ['test.sh', 'cli/mge.py']
+script-files = ['cli/mge']
 
 [tool.setuptools.package-data]
-cli = ['mge', 'favicon.ico', 'new_endpoint_template/*', 'new_endpoint_template/**/*']
+cli = ['mge', 'mge.py', 'favicon.ico', 'new_endpoint_template/*', 'new_endpoint_template/**/*']
 
 [tool.setuptools.packages.find]
 include 		= ['mercury*', 'tutorials*', 'cli*']
