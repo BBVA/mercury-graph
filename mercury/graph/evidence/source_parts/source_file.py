@@ -192,8 +192,9 @@ class SourceFile(SourceNode):
 
 		for part in parser.parse():
 			parent = self if part['parent'] is None else entities[part['parent']]
-			entity = SourceEntity('%s|%s' % (self.index, part['index']), parent, part['ent_type'], part['line'], part['span'],
-				part['description'])
+			idx	   = '%s|%s' % (parent.index, part['index'])
+			entity = SourceEntity(idx, self, part['ent_type'], part['line'], part['span'], part['description'])
+
 			entities[part['index']] = entity
 
 			if parent is self:
