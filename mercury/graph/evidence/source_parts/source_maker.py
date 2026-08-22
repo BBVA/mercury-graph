@@ -194,17 +194,21 @@ class SourceMaker(SourceNode):
 		if idx_stack.pop(0) != self._index:
 			return None
 
-		keys = self._children
-		for ky in idx_stack:
-			if ky not in keys:
+		ret = self._children
+		while len(idx_stack) > 0:
+			ky = idx_stack.pop(0)
+			if ky not in ret:
 				return None
 
-			keys = keys[ky]
+			ret = ret[ky]
 
-			if type(keys) is not dict:
-				return SourceState.FILE_NEEDS_UPDATE.value
+			if type(ret) is not dict:
+				if len(idx_stack) > 0:		# The index is longer than the tree depth, we return the part that exists in this SourceNode.
+					return '|'.join(index.split('|')[0:-len(idx_stack)])
+				else:
+					return index
 
-		return ['%s|%s' % (index, k) for k in keys.keys()]
+		return ['%s|%s' % (index, k) for k in ret.keys()]
 
 
 	def child(self, index):
@@ -219,15 +223,23 @@ class SourceMaker(SourceNode):
 			return None
 
 		ret = self._children
-		for ky in idx_stack:
+		while len(idx_stack) > 0:
+			ky = idx_stack.pop(0)
+
 			if ky not in ret:
 				return None
 
 			dic = ret
 			ret = ret[ky]
 
+			if type(ret) is not dict:
+				break
+
 		if type(ret) is dict:
 			return self				# Index returns the SourceMaker itself, calling get_children_idx() will explore further down the tree.
+
+		if len(idx_stack) > 0:		# The index is longer than the tree depth, we return the part that exists in this SourceNode.
+			return '|'.join(index.split('|')[0:-len(idx_stack)])
 
 		if type(ret) is SourceFile:
 			return ret
