@@ -98,13 +98,14 @@ def test_source_maker(tmp_path, monkeypatch):
 	src_path = tmp_path / 'pdf_source'
 	dst_path = tmp_path / 'pdf_destination'
 	src_path.mkdir()
-	(src_path / 'source.md').write_text('# Source\n')
+	(src_path / 'source.pdf').write_text('PDF source\n')
 	pdf = SourceMaker('pdf', 'pdf_mirror', str(src_path), str(dst_path), 10, None, None)
+	pdf._pdf_to_md = ReadyConverter
 	pdf.build_indices()
-	pdf.child('pdf|source.md')
-	(dst_path / 'source.md').write_text('# Source\n')
-	pdf.child('pdf|source.md')
-	pdf.child('pdf|source.md')
+	pdf.child('pdf|source.pdf')
+	(dst_path / 'source.pdf').write_text('# Source\n')
+	pdf.child('pdf|source.pdf')
+	pdf.child('pdf|source.pdf')
 
 	missing = SourceMaker('missing', 'pdf_mirror', str(tmp_path / 'missing'), str(tmp_path / 'destination'), 10, None, None)
 	missing.build_indices()
@@ -200,7 +201,7 @@ def test_source_file(tmp_path):
 	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
 	file = SourceFile('source|source.md', maker, str(path))
 
-	children = file.get_children_idx()
+	children = file.get_children_idx(file.index)
 	assert len(children) == 1
 	header = file.child(children[0])
 	assert header.entity_type.value == 10
@@ -237,7 +238,7 @@ def test_source_entity(tmp_path):
 	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
 	file = SourceFile('source|source.md', maker, str(path))
 
-	file.get_children_idx()
+	file.get_children_idx(file.index)
 	assert file.lines(slice(0, 1)) == ['# Source']
 	assert file.line_slice(0, slice(0, 1)) == '#'
 	assert file.line_slice(2, slice(0, 1)) is None
