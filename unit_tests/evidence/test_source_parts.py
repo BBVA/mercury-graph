@@ -23,6 +23,7 @@ class ReadyConverter:
 	def __init__(self, source, destination, extra):
 		self.destination = destination
 
+	@property
 	def ready(self):
 		return True
 
@@ -37,6 +38,7 @@ class NotReadyConverter:
 	def __init__(self, source, destination, extra):
 		pass
 
+	@property
 	def ready(self):
 		return False
 
@@ -72,6 +74,9 @@ def test_source_maker(tmp_path, monkeypatch):
 	maker.child('other')
 	maker.child('source|missing')
 	maker.child('source')
+	assert maker.get_children_idx('source|source.md') == 'source|source.md'
+	assert maker.get_children_idx('source|source.md|nested') == 'source|source.md'
+	assert maker.child('source|source.md|nested') == 'source|source.md'
 	maker._safe_filename(str(tmp_path), ' invalid ')
 	maker._recurse_tree(str(tmp_path / 'missing'))
 
@@ -106,6 +111,20 @@ def test_source_maker(tmp_path, monkeypatch):
 	(dst_path / 'source.pdf').write_text('# Source\n')
 	pdf.child('pdf|source.pdf')
 	pdf.child('pdf|source.pdf')
+	assert pdf._build_child_at('pdf|missing.pdf') == 404
+	(src_path / 'unavailable.pdf').write_text('PDF source\n')
+	pdf._pdf_to_md = NotReadyConverter
+	assert pdf._build_child_at('pdf|unavailable.pdf') == 404
+
+	stale_source = tmp_path / 'stale_source'
+	stale_destination = tmp_path / 'stale_destination'
+	stale_source.mkdir()
+	stale_destination.mkdir()
+	(stale_source / 'source.pdf').write_text('PDF source\n')
+	(stale_destination / 'source.pdf').write_text('# Source\n')
+	os.utime(stale_source / 'source.pdf', (1, 1))
+	stale = SourceMaker('stale', 'pdf_mirror', str(stale_source), str(stale_destination), 10, None, None)
+	assert type(stale._build_child_at('stale|source.pdf')) is SourceFile
 
 	missing = SourceMaker('missing', 'pdf_mirror', str(tmp_path / 'missing'), str(tmp_path / 'destination'), 10, None, None)
 	missing.build_indices()
@@ -175,6 +194,13 @@ def test_source_maker(tmp_path, monkeypatch):
 	conversion._pdf_to_md = NotReadyConverter
 	conversion._build_child_at('conversion|unavailable.md')
 	conversion._build_child_at('conversion|missing.md')
+	(conversion_destination / 'existing.md').write_text('Existing\n')
+	assert type(conversion._build_child_at('conversion|existing.md')) is SourceFile
+
+	failed_access = SourceMaker('failed_access', 'markdown_tree', None, str(tmp_path), 10, None, None)
+	failed_access._children = {'missing.md': 404}
+	assert failed_access.child('failed_access|missing.md') == 404
+	assert failed_access.state == -3
 
 	with pytest.raises(ValueError):
 		SourceMaker('invalid', 'invalid', None, str(tmp_path), 10, None, None)
@@ -209,7 +235,12 @@ def test_source_file(tmp_path):
 	assert header.content == ''
 	title = header.child(header.get_children_idx()[0])
 	assert title.entity_type.value == 1
+	assert file.get_children_idx(header.index) == [title.index]
+	assert file.get_children_idx(title.index) is None
+	assert file.get_children_idx('%s|missing' % file.index) is None
+	assert file.get_children_idx('other|source.md') is None
 	assert file.child('source|source.md|entity') is None
+	assert file.child('other|source.md') is None
 	assert file.lines(slice(0, 1)) == ['# Source']
 	assert file.line_slice(0, slice(0, 1)) == '#'
 
