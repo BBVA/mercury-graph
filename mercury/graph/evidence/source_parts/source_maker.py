@@ -398,7 +398,7 @@ class SourceMaker(SourceNode):
 
 		fn_dst = '%s/%s' % (self._dst, index.split('|')[-1])
 
-		if self._type == 'pdf_mirror':	# The file must exist in self._dst
+		if self._type != 'pdf_mirror':	# The file must exist in self._dst
 			if os.path.isfile(fn_dst):
 				return SourceFile(index, self, fn_dst)
 
@@ -417,7 +417,7 @@ class SourceMaker(SourceNode):
 
 		cnv = self._pdf_to_md(fn_src, fn_dst, self._pdf_extra)
 
-		if cnv.ready():
+		if cnv.ready:
 			cnv.run()
 
 			if os.path.isfile(fn_dst):
