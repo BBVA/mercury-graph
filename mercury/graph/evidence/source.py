@@ -40,6 +40,12 @@ class Source(Agentic):
 	See:
 		- [Warning](evidence_formats.md#warning)
 		- [Limitations](evidence_source.md#known-limitations)
+		- The SourceNode tree (all the SourceEntity objects inside each SourceFile, all the SourceFiles inside the SourceMaker
+			created on demand) can become very large and the Source has yet not mechanisms to limit the size of the tree.
+			We postpone until a later release exploring how to do that to make Sources production ready. For now, Sources typically load
+			very fast since everything is stored in files and can be re-loaded when they grow too much.
+		- The vector database is configured, created by the Source, and not used. This requires exposing new capabilities by the Source.
+			It is postponed until a later release, since it is not part of the MVP.
 
 	Args:
 		schema (str): a schema (a unique name) to use for the Source's ID.
