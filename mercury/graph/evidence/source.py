@@ -109,10 +109,15 @@ class Source(Agentic):
 		""" Simulates running the Source with the given request.
 
 		(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+
+		## NOTE:
+
+		The Endpoint takes care of validating the request according to the capabilities exposed by the Source. It is not necessary to
+		validate again here and the Endpoint does not forward the dry_run() request to the Source. This method is provided as a
+		requirement of the Agentic interface, but it is only used when you use Sources directly outside of an Endpoint.
 		"""
 
-		return {'status': 'ok'}
-		# TODO: Implement the logic to simulate running the Source with the given request.
+		return {'status': 0, 'description': 'Valid request.'}
 
 
 	def pilot(self, intent, just_once = False):
