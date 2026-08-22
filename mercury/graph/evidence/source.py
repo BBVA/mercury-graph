@@ -5,8 +5,8 @@ from pathlib import Path
 
 import chromadb as chroma
 
-from .agentic import Agentic
-from .source_parts import SourceState, SourceMaker
+from .agentic import Agentic, AgenticRunInvalidRequest
+from .source_parts import SourceState, SourceMaker, SourceFile, SourceEntity
 
 
 class Source(Agentic):
@@ -40,6 +40,12 @@ class Source(Agentic):
 	See:
 		- [Warning](evidence_formats.md#warning)
 		- [Limitations](evidence_source.md#known-limitations)
+		- The SourceNode tree (all the SourceEntity objects inside each SourceFile, all the SourceFiles inside the SourceMaker
+			created on demand) can become very large and the Source has yet not mechanisms to limit the size of the tree.
+			We postpone until a later release exploring how to do that to make Sources production ready. For now, Sources typically load
+			very fast since everything is stored in files and can be re-loaded when they grow too much.
+		- The vector database is configured, created by the Source, and not used. This requires exposing new capabilities by the Source.
+			It is postponed until a later release, since it is not part of the MVP.
 
 	Args:
 		schema (str): a schema (a unique name) to use for the Source's ID.
@@ -58,7 +64,6 @@ class Source(Agentic):
 		self.name = schema
 
 		self._maker	 = None
-		self._cache	 = None
 		self._chroma = None
 
 		self._meta_	 = self._meta()	# Just to make .meta reflect the initial state.
@@ -70,8 +75,21 @@ class Source(Agentic):
 		(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
 
-		return {'status': 'ok'}
-		# TODO: Implement the logic to run the Source with the given request.
+		call = self.call.get(request['name'], None)
+
+		if call is None:
+			self.log_error('Source does not have a function named "%s".' % request['function'])
+			raise AgenticRunInvalidRequest
+
+		index = request['arguments'].get('index', None)
+
+		if index is None:
+			self.log_error('Source function "%s" requires an "index" argument.' % request['function'])
+			raise AgenticRunInvalidRequest
+
+		ret = {'finish_reason': 'stop', 'message': call(index)}
+
+		return ret
 
 
 	def _meta(self):
@@ -91,10 +109,15 @@ class Source(Agentic):
 		""" Simulates running the Source with the given request.
 
 		(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+
+		## NOTE:
+
+		The Endpoint takes care of validating the request according to the capabilities exposed by the Source. It is not necessary to
+		validate again here and the Endpoint does not forward the dry_run() request to the Source. This method is provided as a
+		requirement of the Agentic interface, but it is only used when you use Sources directly outside of an Endpoint.
 		"""
 
-		return {'status': 'ok'}
-		# TODO: Implement the logic to simulate running the Source with the given request.
+		return {'status': 0, 'description': 'Valid request.'}
 
 
 	def pilot(self, intent, just_once = False):
@@ -104,11 +127,11 @@ class Source(Agentic):
 		"""
 
 		if self.meta['state'] < 0:
-			self.log_error('Source is in error state %d' % self.meta['state'])
+			self.log_error('Source is in error state %d' % self._meta_['state'])
 			return
 
-		while self.meta['state'] < intent:
-			if self.meta['state'] == self.states.INITIAL.value:
+		while self._meta_['state'] < intent:
+			if self._meta_['state'] == self.states.INITIAL.value:
 				try:
 					typ = self.conf['type']
 					src = self.conf['src_path']
@@ -120,41 +143,101 @@ class Source(Agentic):
 
 				except:
 					self.log_error('SourceMaker could not be created and initialized for Source "%s".' % self.name)
-					self.meta['state'] = self.states.ERR_MAKER_INIT.value
+					self._meta_['state'] = self.states.ERR_MAKER_INIT.value
 					break
 
-				self.meta['state'] = self.states.MAKER_INIT_OK.value
+				self._meta_['state'] = self.states.MAKER_INIT_OK.value
 
 				if just_once:
 					break
 
-			if self.meta['state'] == self.states.MAKER_INIT_OK.value:
+			if self._meta_['state'] == self.states.MAKER_INIT_OK.value:
 				if self._maker.build_indices():
-					self.meta['state'] = self.states.MAKER_READY_OK.value
+					self._meta_['state'] = self.states.MAKER_READY_OK.value
 				else:
 					self.log_error('SourceMaker could not build indices for Source "%s".' % self.name)
-					self.meta['state'] = self.states.ERR_MAKER_INDEX.value
+					self._meta_['state'] = self.states.ERR_MAKER_INDEX.value
 					break
 
 				if just_once:
 					break
 
-			if self.meta['state'] == self.states.MAKER_READY_OK.value:
-				self._setup_cache()		# No error condition. Worst case is no cache.
-				self.meta['state'] = self.states.CACHE_READY_OK.value
-
-				if just_once:
-					break
-
-			if self.meta['state'] == self.states.CACHE_READY_OK.value:
+			if self._meta_['state'] == self.states.MAKER_READY_OK.value:
 				if self._setup_chroma_db():
-					self.meta['state'] = self.states.READY.value
+					self._meta_['state'] = self.states.READY.value
 
 				else:
 					self.log_error('Source could not setup the vector database for Source "%s".' % self.name)
-					self.meta['state'] = self.states.ERR_DB_SETUP.value
+					self._meta_['state'] = self.states.ERR_DB_SETUP.value
 
 				break
+
+
+	def get_children_idx(self, index = None):
+		""" Returns the children indices following the SourceNode interface.
+
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
+		"""
+
+		if (   self._maker is None
+			or self._maker.state != self.states.MAKER_READY_OK.value
+			or self._meta_['state'] < self.states.READY.value):
+
+			self.log_error('Source is not ready for get_children_idx("%s").' % index)
+
+			return None
+
+		if index is None or index == '':
+			index = self._maker.index
+
+		ret = self._maker.get_children_idx(index)
+
+		if type(ret) is list or ret is None:		# The SourceMaker provided the children indices or an error.
+			return ret
+
+		# Now, ret is a string that is the index of the SourceFile.
+
+		file = self._maker.child(ret)
+		if type(file) is not SourceFile:
+			self.log_error('SourceMaker could not find a SourceFile for index "%s".' % index)
+			return None
+
+		return file.get_children_idx(index)
+
+
+	def child(self, index):
+		""" Returns the corresponding SourceNode object following the SourceNode interface and serializes it to a dictionary.
+
+		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
+		"""
+
+		if (   self._maker is None
+			or self._maker.state != self.states.MAKER_READY_OK.value
+			or self._meta_['state'] < self.states.READY.value):
+
+			self.log_error('Source is not ready for child("%s").' % index)
+
+			return None
+
+		child = self._maker.child(index)
+
+		if child is None:
+			return None
+
+		if type(child) is str:					# The SourceMaker returned the index of a SourceFile that understands the index.
+			child = self._maker.child(child)
+			child = child.child(index)
+
+			if child is None:
+				return None
+
+		if type(child) is not SourceEntity:
+			return {'type': 'object', 'class': str(type(child)), 'description': child.description}
+
+		if child._children is None:
+			return {'type': str(child.entity_type), 'content': child.content}
+
+		return {'type': 'SourceEntity: %s' % child.entity_type, 'description': child.description}
 
 
 	def close(self, endpoint_locked):
@@ -163,56 +246,8 @@ class Source(Agentic):
 		(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
 		"""
 
-		if endpoint_locked:
-			if self._cache is not None and self._cache_path is not None:
-				fn = os.path.abspath(self._cache_path)
-
-				pat = Path(fn).parent
-				pat.mkdir(parents = True, exist_ok = True)
-
-				with open(fn, 'wb') as f:
-					pickle.dump(self._cache, f)
-
-		self._cache	 = None
 		self._chroma = None		# There is no need to explicitly .close(), .flush() ... That persists changes.
 		self._maker	 = None
-
-
-	def _setup_cache(self):
-		""" Sets up the cache for the Source.
-
-		The cache keeps an LRU (Least Recently Used) dictionary of SourceNode objects by index. Optionally, it can be persisted to disk
-		as a pickle file. The cache size and path are configured in the Source's configuration.
-
-		Returns:
-			(bool): True if the cache was set up successfully, False if the Source does not have a cache.
-		"""
-
-		self._cache = None
-
-		self._cache_path = self.conf.get('cache_path', '')
-		if not self._cache_path.endswith('.pickle'):
-			self._cache_path = None
-
-		self._cache_size = self.conf.get('cache_size', 0)
-
-		if self._cache_size > 0:
-			if self._cache_path is not None and os.path.isfile(self._cache_path):
-				try:
-					with open(self._cache_path, 'rb') as f:
-						self._cache = pickle.load(f)
-
-				except:
-					self.log_error('Source could not load cache from "%s".' % (self._cache_path))
-					self._cache = OrderedDict()
-
-			else:
-				self._cache = OrderedDict()
-
-			while len(self._cache) > self._cache_size:
-				self._cache.popitem(last = False)
-
-		return self._cache is not None
 
 
 	def _setup_chroma_db(self):
@@ -274,11 +309,16 @@ class Source(Agentic):
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
 
+		name_get_children_idx = 'children_by_idx_%s' % self.name
+		name_child			  = 'object_by_idx_%s' % self.name
+
+		self.call = {name_get_children_idx: self.get_children_idx, name_child: self.child}
+
 		return [
 			{
 				'type': 'function',
 				'function': {
-					'name': 'get_items_by_index_%s' % self.name,
+					'name': name_get_children_idx,
 					'description': 'Get indices of the children of an index. Indices are either folders, files, sections or chunks.',
 					'parameters': {
 						'type': 'object',
@@ -301,7 +341,7 @@ class Source(Agentic):
 			{
 				'type': 'function',
 				'function': {
-					'name': 'get_text_by_index_%s' % self.name,
+					'name': name_child,
 					'description': 'Get the text at a given index.',
 					'parameters': {
 						'type': 'object',

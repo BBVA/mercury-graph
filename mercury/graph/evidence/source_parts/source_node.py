@@ -15,8 +15,6 @@ class SourceState(Enum):
 	MAKER_INIT_OK		=  1	# The SourceMaker could be created and initialized.
 	MAKER_READY_OK		=  2	# The SourceMaker either created every output file or is ready to create any on demand.
 
-	CACHE_READY_OK		=  10	# The Source has initialized (possibly loaded, possibly created) a cache for SourceNode objects.
-
 	READY				=  100	# The source is ready to be processed.
 
 	FILE_NEEDS_UPDATE	=  404	# The file needs to be updated because the source file is more recent than the output file.
@@ -114,7 +112,8 @@ class SourceNode(ABC):
 			index (str): An optional index to clarify which part of the SourceNode tree should be returned. (See the example above.)
 
 		Returns:
-			(list): A list of children indices.
+			(list, str, None): A list of children indices when the entire index belongs to the SourceNode. None for an invalid index. The
+				index of the deepest SourceNode that exists in this SourceNode when the given index goes beyond the tree depth.
 		"""
 
 		pass
@@ -128,7 +127,8 @@ class SourceNode(ABC):
 			index (str): the index of the child to return.
 
 		Returns:
-			(SourceNode): The child SourceNode with the given index.
+			(SourceNode, str, None): The child SourceNode with the given index. None for an invalid index. The index of the deepest
+				SourceNode that exists in this SourceNode when the given index goes beyond the tree depth.
 		"""
 
 		pass

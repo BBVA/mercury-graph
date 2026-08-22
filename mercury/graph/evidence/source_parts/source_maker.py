@@ -194,14 +194,21 @@ class SourceMaker(SourceNode):
 		if idx_stack.pop(0) != self._index:
 			return None
 
-		keys = self._children
-		for ky in idx_stack:
-			if ky not in keys:
+		ret = self._children
+		while len(idx_stack) > 0:
+			ky = idx_stack.pop(0)
+			if ky not in ret:
 				return None
 
-			keys = keys[ky]
+			ret = ret[ky]
 
-		return list(keys.keys())
+			if type(ret) is not dict:
+				if len(idx_stack) > 0:		# The index is longer than the tree depth, we return the part that exists in this SourceNode.
+					return '|'.join(index.split('|')[0:-len(idx_stack)])
+				else:
+					return index
+
+		return ['%s|%s' % (index, k) for k in ret.keys()]
 
 
 	def child(self, index):
@@ -216,15 +223,23 @@ class SourceMaker(SourceNode):
 			return None
 
 		ret = self._children
-		for ky in idx_stack:
+		while len(idx_stack) > 0:
+			ky = idx_stack.pop(0)
+
 			if ky not in ret:
 				return None
 
 			dic = ret
 			ret = ret[ky]
 
+			if type(ret) is not dict:
+				break
+
 		if type(ret) is dict:
 			return self				# Index returns the SourceMaker itself, calling get_children_idx() will explore further down the tree.
+
+		if len(idx_stack) > 0:		# The index is longer than the tree depth, we return the part that exists in this SourceNode.
+			return '|'.join(index.split('|')[0:-len(idx_stack)])
 
 		if type(ret) is SourceFile:
 			return ret
@@ -383,7 +398,7 @@ class SourceMaker(SourceNode):
 
 		fn_dst = '%s/%s' % (self._dst, index.split('|')[-1])
 
-		if self._type == 'pdf_mirror':	# The file must exist in self._dst
+		if self._type != 'pdf_mirror':	# The file must exist in self._dst
 			if os.path.isfile(fn_dst):
 				return SourceFile(index, self, fn_dst)
 
@@ -402,7 +417,7 @@ class SourceMaker(SourceNode):
 
 		cnv = self._pdf_to_md(fn_src, fn_dst, self._pdf_extra)
 
-		if cnv.ready():
+		if cnv.ready:
 			cnv.run()
 
 			if os.path.isfile(fn_dst):

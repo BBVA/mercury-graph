@@ -21,8 +21,6 @@
 
 			"capabilities": [
 				{
-					"name": "chat_with_reader",
-					"description": "Chat with READER agent.",
 					"type": "function",
 					"function": {
 						"name": "chat_with_reader",
@@ -72,8 +70,6 @@
 
 			"capabilities": [
 				{
-					"name": "chat_with_gru",
-					"description": "Chat with GRU agent.",
 					"type": "function",
 					"function": {
 						"name": "chat_with_gru",

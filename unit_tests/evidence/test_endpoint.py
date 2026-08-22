@@ -90,10 +90,13 @@ def test_dummy_runs(tmp_path):
 
 	endpoint = Endpoint(str(path))
 
-	with pytest.raises(AgenticRunInvalidState):
+	with pytest.raises(TypeError):
 		endpoint.run({'query': 'dummy'})
 
-	endpoint.dry_run({'query': 'dummy'})
+	with pytest.raises(TypeError):
+		endpoint.dry_run({'query': 'dummy'})
+
+	assert endpoint._meta_ is None
 	assert type(endpoint.meta) == dict
 
 
@@ -569,6 +572,7 @@ def test_endpoint_expose_api(tmp_path):
 
 	agentic.meta = {'capabilities': [{'function': {'name': 'first'}}, {'function': {'name': 'second'}}]}
 	endpoint.conf['expose'] = ['agentic']
+	assert type(endpoint.meta) == dict
 	assert endpoint._expose_api() is True
 	assert list(endpoint.agentic_by_capability) == ['first', 'second']
 
