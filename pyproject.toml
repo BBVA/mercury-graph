@@ -14,7 +14,7 @@ classifiers		= ['Programming Language :: Python :: 3',
 keywords		= ['graph', 'embedding', 'graph embedding', 'graph exploration', 'graph metrics', 'graph visualization']
 authors			= [{name = 'Mercury Team', email = 'mercury.group@bbva.com'}]
 readme			= 'README.md'
-dependencies 	= ['numpy', 'pandas', 'scipy', 'networkx', 'scikit-learn', 'anywidget', 'traitlets']
+dependencies 	= ['numpy', 'pandas', 'scipy', 'networkx', 'scikit-learn', 'anywidget', 'traitlets', 'chromadb', 'lxml', 'regex', 'fastapi', 'uvicorn']
 
 [project.optional-dependencies]
 dev = ['pytest', 'coverage', 'flake8', 'graphframes-latest', 'pyspark', 'matplotlib', 'seaborn', 'pyyaml', 'setuptools>=61.0', 'ipywidgets', 'pyvis']
@@ -22,7 +22,11 @@ doc = ['mkdocs', 'mkdocstrings[python]', 'mkdocs-material', 'mkdocs-minify-plugi
 
 [tool.setuptools]
 include-package-data = true
+script-files = ['test.sh', 'cli/mge.py']
+
+[tool.setuptools.package-data]
+cli = ['mge', 'favicon.ico', 'new_endpoint_template/*', 'new_endpoint_template/**/*']
 
 [tool.setuptools.packages.find]
-include 		= ['mercury*', 'tutorials*']
+include 		= ['mercury*', 'tutorials*', 'cli*']
 exclude 		= ['docker', 'unit_tests']
