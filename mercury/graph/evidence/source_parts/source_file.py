@@ -41,7 +41,28 @@ class SourceFile(SourceNode):
 			if self.state != SourceState.READY.value:
 				return None
 
-		return list(self._children.keys())
+		idx_stack = index.split('|')
+		ky 		  = idx_stack.pop(0)
+		while len(idx_stack) > 0:
+			if ky == self._index:
+				break
+
+			if not self._index.startswith(ky):
+				return None
+
+			ky = '%s|%s' % (ky, idx_stack.pop(0))
+
+		ret = self._children
+		while len(idx_stack) > 0:
+			ky = '%s|%s' % (ky, idx_stack.pop(0))
+			if ky not in ret:
+				return None
+
+			ret = ret[ky]._children
+			if type(ret) is not dict:
+				return None
+
+		return list(ret.keys())
 
 
 	def child(self, index):
@@ -56,7 +77,25 @@ class SourceFile(SourceNode):
 			if self.state != SourceState.READY.value:
 				return None
 
-		return self._children.get(index, None)
+		idx_stack = index.split('|')
+		ky 		  = idx_stack.pop(0)
+		while len(idx_stack) > 0:
+			if ky == self._index:
+				break
+
+			if not self._index.startswith(ky):
+				return None
+
+			ky = '%s|%s' % (ky, idx_stack.pop(0))
+
+		obj = self
+		while len(idx_stack) > 0:
+			ky	= '%s|%s' % (ky, idx_stack.pop(0))
+			obj = obj._children.get(ky, None)
+			if obj is None:
+				return None
+
+		return obj
 
 
 	def lines(self, span):
