@@ -114,8 +114,8 @@ class SourceNode(ABC):
 			index (str): An optional index to clarify which part of the SourceNode tree should be returned. (See the example above.)
 
 		Returns:
-			(list): A list of children indices, None for an invalid index, or a SourceState.FILE_NEEDS_UPDATE if the index is valid but
-				continues beyond the object's own index tree and the Source needs to query the next object in the tree.
+			(list, str, None): A list of children indices when the entire index belongs to the SourceNode. None for an invalid index. The
+				index of the deepest SourceNode that exists in this SourceNode when the given index goes beyond the tree depth.
 		"""
 
 		pass
@@ -129,7 +129,8 @@ class SourceNode(ABC):
 			index (str): the index of the child to return.
 
 		Returns:
-			(SourceNode): The child SourceNode with the given index.
+			(SourceNode, str, None): The child SourceNode with the given index. None for an invalid index. The index of the deepest
+				SourceNode that exists in this SourceNode when the given index goes beyond the tree depth.
 		"""
 
 		pass
