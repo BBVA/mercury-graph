@@ -15,8 +15,6 @@ class SourceState(Enum):
 	MAKER_INIT_OK		=  1	# The SourceMaker could be created and initialized.
 	MAKER_READY_OK		=  2	# The SourceMaker either created every output file or is ready to create any on demand.
 
-	CACHE_READY_OK		=  10	# The Source has initialized (possibly loaded, possibly created) a cache for SourceNode objects.
-
 	READY				=  100	# The source is ready to be processed.
 
 	FILE_NEEDS_UPDATE	=  404	# The file needs to be updated because the source file is more recent than the output file.

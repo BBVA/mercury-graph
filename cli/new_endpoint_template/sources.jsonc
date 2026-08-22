@@ -29,10 +29,6 @@
 			// No need to filter by extensions, since "xml_stream" creates only markdown files.
 			"extensions": [],
 
-			// Cache options: cache_size (in objects) = 0, prevents caching, cache_save = extension must be .pickle or no saving.
-			"cache_size": 1024,
-			"cache_save": "/storage/temp/cache/wikipedia_2025.pickle",
-
 			// ChromaDB options: chroma_path must be a directory that will be passed as the argument persist_directory to
 			//		chromadb.Settings. If not accepted, vector DB will be disabled.
 			"chroma_path": "/storage/temp/chroma/wikipedia_2025",
@@ -55,9 +51,6 @@
 			"dst_path": "/storage/temp/markdown/bertrand_russell/",
 
 			"extensions": [".pdf"],
-
-			"cache_size": 0,
-			"cache_save": null,
 
 			// PDF conversion to markdown: This is how you tell the SourceMaker to use a custom PdfToMarkdown descendant. See the
 			// "md_by_docling.py" file in the endpoint's sources directory.
@@ -88,9 +81,6 @@
 			"dst_path": "/storage/temp/markdown_examples/",
 
 			"extensions": [".md"],
-
-			"cache_size": 0,
-			"cache_save": null,
 
 			"chroma_path": null,
 			"chroma_descriptions_collection_name": null,
