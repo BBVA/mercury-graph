@@ -97,6 +97,7 @@ class Source(Agentic):
 
 		(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
+
 		meta = {}
 		meta['state'] = SourceState.INITIAL.value
 		meta['conf'] = self.conf
