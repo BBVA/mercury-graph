@@ -1,4 +1,18 @@
+from enum import Enum
+
 from .agentic import Agentic, AgenticRunInvalidState, AlwaysReadyState
+from mercury.graph.core import Graph
+
+
+class GraphState(Enum):
+	""" The `GraphState` is an enumeration that defines all possible states of an AgenticGraph. """
+
+	ERR_GRAPH_INIT		= -1	# Something failed loading the graph.
+
+	INITIAL				=  0	# The initial state of the graph.
+	GRAPH_LOADED_OK		=  1	# The graph was loaded successfully.
+
+	READY				=  100	# The graph is ready to be queried.
 
 
 class AgenticGraph(Agentic):
