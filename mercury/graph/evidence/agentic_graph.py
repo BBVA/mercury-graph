@@ -1,6 +1,6 @@
 from enum import Enum
 
-from .agentic import Agentic, AgenticRunInvalidState, AlwaysReadyState
+from .agentic import Agentic, AgenticRunInvalidRequest
 from mercury.graph.core import Graph
 
 
@@ -72,7 +72,22 @@ class AgenticGraph(Agentic):
 
 			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
-		raise AgenticRunInvalidState
+
+		call = self.call.get(request['name'], None)
+
+		if call is None:
+			self.log_error('AgenticGraph does not have a function named "%s".' % request['function'])
+			raise AgenticRunInvalidRequest
+
+		index = request['arguments'].get('index', None)
+
+		if index is None:
+			self.log_error('AgenticGraph function "%s" requires an "index" argument.' % request['function'])
+			raise AgenticRunInvalidRequest
+
+		ret = {'finish_reason': 'stop', 'message': call(index)}
+
+		return ret
 
 
 	def _meta(self):
@@ -80,6 +95,7 @@ class AgenticGraph(Agentic):
 
 			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
+
 		meta = {}
 		meta['state'] = GraphState.INITIAL.value
 		meta['conf'] = self.conf
@@ -101,3 +117,146 @@ class AgenticGraph(Agentic):
 		"""
 
 		return {'status': 0, 'description': 'Valid request.'}
+
+
+	def pilot(self, intent, just_once = False):
+		""" Pilots the AgenticGraph to a new state based on the given intent.
+
+		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
+		"""
+
+		if self.meta['state'] < 0:
+			self.log_error('AgenticGraph is in error state %d' % self._meta_['state'])
+
+			return
+
+		while self._meta_['state'] < intent:
+			if self._meta_['state'] == self.states.INITIAL.value:
+				try:
+					typ = self.conf['type']
+					# TODO: Create the graph loading it as required.
+
+				except:
+					self.log_error('Graph could not be created and initialized for AgenticGraph "%s".' % self.name)
+					self._meta_['state'] = self.states.ERR_GRAPH_INIT.value
+					break
+
+				self._meta_['state'] = self.states.GRAPH_LOADED_OK.value
+
+				if just_once:
+					break
+
+			if self._meta_['state'] == self.states.GRAPH_LOADED_OK.value:
+				self._build_indices()
+				self._meta_['state'] = self.states.READY.value
+
+				break
+
+
+	def get_children_idx(self, index = None):
+		""" Returns the children indices following the SourceNode interface.
+
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
+		"""
+
+		return None
+		# TODO: Implement this method.
+
+
+	def child(self, index):
+		""" Returns the corresponding SourceNode object following the SourceNode interface and serializes it to a dictionary.
+
+		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
+		"""
+
+		return None
+		# TODO: Implement this method.
+
+
+	def close(self, endpoint_locked):
+		""" Closes the AgenticGraph, persists it to disk and releases any resources it holds.
+
+		(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
+		"""
+
+		if endpoint_locked:
+			pass
+			# TODO: Persist the Graph.
+
+		self._graph = None
+
+
+	def _build_indices(self):
+		""" Builds the indices for the AgenticGraph for the first time after it is loaded. """
+
+		self._children = {}
+		# TODO: Implement this method.
+
+
+	def _capabilities(self):
+		""" Returns the capabilities of the AgenticGraph.
+
+		Returns:
+			(list): A list of capabilities, each represented as a dictionary with the following keys:
+
+				- 'type': The type of capability (e.g., 'function').
+				- 'function': A dictionary containing details about the function
+
+				The value of 'function' is:
+
+				* 'name': The name of the function.
+				* 'description': A brief description of what the function does.
+				* 'parameters': A dictionary with 'type', 'properties', and 'required'
+				* 'returns': A dictionary with 'type' and 'items'
+		"""
+
+		name_children_idx = 'children_by_idx_%s' % self.name
+		name_node_by_idx  = 'node_by_idx_%s' % self.name
+
+		self.call = {name_children_idx: self.get_children_idx, name_node_by_idx: self.child}
+
+		return [
+			{
+				'type': 'function',
+				'function': {
+					'name': name_children_idx,
+					'description': 'Get indices of the children of an index.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'index': {
+								'type': 'string',
+								'description': 'Index whose children indices are required.'
+							}
+						},
+						'required': ['index']
+					},
+					'returns': {
+						'type': 'array',
+						'items': {
+							'type': 'string'
+						}
+					}
+				}
+			},
+			{
+				'type': 'function',
+				'function': {
+					'name': name_node_by_idx,
+					'description': 'Get the properties of a node by its index.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'index': {
+								'type': 'string',
+								'description': 'Index of the node.'
+							}
+						},
+						'required': ['index']
+					},
+					'returns': {
+						'type': 'string'
+					}
+				}
+			}
+		]
