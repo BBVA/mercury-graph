@@ -80,7 +80,12 @@ class AgenticGraph(Agentic):
 
 			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
-		return {'state' : AlwaysReadyState.INITIAL.value}
+		meta = {}
+		meta['state'] = GraphState.INITIAL.value
+		meta['conf'] = self.conf
+		meta['capabilities'] = self._capabilities()
+
+		return meta
 
 
 	def _dry_run(self, request):
