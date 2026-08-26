@@ -1,4 +1,8 @@
+import os, pickle
+
 from enum import Enum
+
+import pandas as pd
 
 from .agentic import Agentic, AgenticRunInvalidRequest
 from mercury.graph.core import Graph
@@ -125,6 +129,34 @@ class AgenticGraph(Agentic):
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
 
+		def new_graph():
+			""" Creates a new graph when there is no persisted graph to load, but possibly initial_nodes and/or initial_edges. """
+
+			keys = self.conf.get('file_format', None)
+			if keys is None:
+				keys = {'src': 'src', 'dst': 'dst', 'id': 'id', 'weight': 'weight', 'directed': True, 'sep': '\t'}
+
+			nodes = None
+			fn_nodes = self.conf.get('initial_nodes', None)
+			if fn_nodes is not None:
+				if fn_nodes['type'] == 'csv':
+					sep = ',' if keys is None or 'sep' not in keys else keys['sep']
+					nodes = pd.read_csv(fn_nodes['path'], sep = sep)
+				elif fn_nodes['type'] == 'pickle':
+					nodes = pd.read_pickle(fn_nodes['path'])
+
+			edges = None
+			fn_edges = self.conf.get('initial_edges', None)
+			if fn_edges is not None:
+				if fn_edges['type'] == 'csv':
+					sep = ',' if keys is None or 'sep' not in keys else keys['sep']
+					edges = pd.read_csv(fn_edges['path'], sep = sep)
+				elif fn_edges['type'] == 'pickle':
+					edges = pd.read_pickle(fn_edges['path'])
+
+			return Graph(data = edges, keys = keys, nodes = nodes)
+
+
 		if self.meta['state'] < 0:
 			self.log_error('AgenticGraph is in error state %d' % self._meta_['state'])
 
@@ -133,8 +165,26 @@ class AgenticGraph(Agentic):
 		while self._meta_['state'] < intent:
 			if self._meta_['state'] == self.states.INITIAL.value:
 				try:
-					typ = self.conf['type']
-					# TODO: Create the graph loading it as required.
+					dsc = self.conf.get('description', None)
+					if dsc is not None:
+						self._meta_['description'] = dsc
+
+					self._fname = self.conf.get('persistence', None)
+					if self._fname is None:
+						self._graph = new_graph()
+					else:
+						self._fname = self._fname['path']
+						parent_dir	= os.path.dirname(self._fname)
+
+						if parent_dir:
+							os.makedirs(parent_dir, exist_ok = True)
+
+						if os.path.isfile(self._fname):
+							with open(self._fname, 'rb') as f:
+								ntx = pickle.load(f)			# A NetworkX graph object saved by this class.
+							self._graph = Graph(data = ntx)
+						else:
+							self._graph = new_graph()
 
 				except:
 					self.log_error('Graph could not be created and initialized for AgenticGraph "%s".' % self.name)
@@ -179,9 +229,10 @@ class AgenticGraph(Agentic):
 		(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
 		"""
 
-		if endpoint_locked:
-			pass
-			# TODO: Persist the Graph.
+		if endpoint_locked and self._graph is not None and self._fname is not None:
+			ntx = self._graph.networkx
+			with open(self._fname, 'wb') as f:
+				pickle.dump(ntx, f)
 
 		self._graph = None
 
