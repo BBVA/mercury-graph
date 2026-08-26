@@ -16,20 +16,39 @@ class GraphState(Enum):
 
 
 class AgenticGraph(Agentic):
-	""" AgenticGraph is a class that exposed a `mercury.graph.Graph` in the Agentic tree.
+	""" AgenticGraph is the class that exposes a `mercury.graph.Graph` using the Agentic interface.
 
 	## Overview
 
-	All the underlying technologies are supported, but typically the graph will be stored in RAM.
+	A graph is a persisted storage of anything: the storage of nodes is a key/value store with any properties. On top of that, nodes
+	can be connected by edges that also have properties. AgenticGraph objects are persisted. They can read from .csv files that
+	contain ontologies, for initialization, but do not write to .csv files to keep project management simple. Once the graph is
+	initialized, it stores itself as a pickle file. When initializing the object, if the pickle file exists, it will be loaded rather
+	than initializing the graph from .csv files.
 
-	The class also provides functionality to manage entire graphs as an Agentic `schema` providing persistence and concurrency.
+	## How AgenticGraphs are used to build EvidenceGraphs
 
-	Ontologies, dictionaries and storages that in general will expect key/value stores are just a special case of graphs (without edges).
-	Therefore, this is also the storage for all these things.
+	There a three components: the Ontology (which is just a graph with a structure the Formalizer understands) keeps the concepts for
+	both the entities and the relationships and also the indices of each node or relation in an EvidenceGraph. The Formalizer takes
+	the concepts from the Ontology (E.g., person, product, country, etc.) and the relationships (E.g., is_owned_by, is_located_in, etc.)
+	and finds instances of those concepts in natural language text. The EvidenceGraph creates an aggregated graph of all that information
+	handling contradictions, reinforcements and confidence.
+
+	## What the AgenticGraph exposes via the Agentic interface
+
+	All the internals of a graph are basically understood by the Formalizer and the EvidenceGraph. The AgenticGraph is an understandable
+	storage for concepts, entity indices and relationships and, via the Agentic interface that is what is accessible: A mechanism
+	similar to that of a source to retrieve, via unique indices, concepts, entities and relationships.
+
+	## Known Limitations
+
+	There is no "graph language" exposed via the Agentic interface that allows for arbitrary graph oriented queries. That may be added
+	in the future to leverage on the functionality the underlying graph class already has.
 
 	Args:
 		schema (str): a schema (a unique name) to use for the AgenticGraph's ID.
-		extra_args (dict): the configuration for the AgenticGraph.
+		extra_args (dict): the configuration for the AgenticGraph. See the configuration for the examples in ontologies.jsonc for
+			reference on how to configure the AgenticGraph's persistence.
 		endpoint (Agentic): an optional Endpoint. It becomes part of the AgenticGraph's ID and is available via `self.endpoint`. If not
 			provided, the AgenticGraph becomes its own Endpoint.
 		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
