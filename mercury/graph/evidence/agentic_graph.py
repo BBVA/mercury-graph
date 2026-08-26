@@ -57,7 +57,14 @@ class AgenticGraph(Agentic):
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'agentic_graph', schema = schema, endpoint = endpoint, logger = logger)
 
+		self.states = GraphState
+
 		self.conf = extra_args
+		self.name = schema
+
+		self._graph	= None
+
+		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
 
 	def _run(self, request):
