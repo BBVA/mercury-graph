@@ -31,10 +31,10 @@
 			// This optional dataframe (default is an empty graph) is only loaded when the file in "persistence" does not exist.
 			// It can be either a csv or a pickle of a pandas dataframe.
 			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
-			"initial_nodes" : {"type" : "csv", "$path" : "graphs/entities_concepts.csv"},
+			"initial_nodes" : {"type" : "csv", "path" : "/storage/temp/graphs/entities_concepts.csv"},
 			// This optional requires the entities to be defined in "initial_nodes". Both are only loaded when the file in "persistence"
 			// does not exist. It can be either a csv or a pickle of a pandas dataframe.
-			"initial_edges" : {"type" : "csv", "$path" : "graphs/entities_relations.csv"},
+			"initial_edges" : {"type" : "csv", "path" : "/storage/temp/graphs/entities_relations.csv"},
 			// This is where the AgenticGraph will persists itself. The "initial_nodes" and "initial_edges" are only used when the graph
 			// is first created for the first time. It is a pickle of a NetworkX graph.
 			"persistence" : {"type" : "pickle", "$path" : "graphs/entities.pickle"}
@@ -51,18 +51,9 @@
 				"This ontology holds the relationships between entities. E.g., works_for, located_in, ...",
 				"It uses the node ids as keys and an attribute 'description' to explain the relationship."
 			],
-			"initial_nodes" : {"type" : "csv", "$path" : "graphs/relationships_concepts.csv"},
-			"initial_edges" : {"type" : "csv", "$path" : "graphs/relationships_relations.csv"},
+			"initial_nodes" : {"type" : "csv", "path" : "/storage/temp/graphs/relationships_concepts.csv"},
+			"initial_edges" : {"type" : "csv", "path" : "/storage/temp/graphs/relationships_relations.csv"},
 			"persistence" : {"type" : "pickle", "$path" : "graphs/relationships.pickle"}
-		},
-		"tools": []
-	},
-
-	"service_logic": {
-		"name": "service_logic",
-		"extra_args": {
-			"description": "This ontology holds the pipelines the root agent (gru) should enforce.",
-			"persistence" : {"type" : "pickle", "$path" : "graphs/service_logic.pickle"}
 		},
 		"tools": []
 	}
