@@ -100,7 +100,11 @@ class Source(Agentic):
 
 		meta = {}
 		meta['state'] = SourceState.INITIAL.value
-		meta['conf'] = self.conf
+
+		meta['description'] = self.conf.get('description', '')
+		if type(meta['description']) is list:
+			meta['description'] = '\n'.join(meta['description'])
+
 		meta['capabilities'] = self._capabilities()
 
 		return meta

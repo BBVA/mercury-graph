@@ -115,7 +115,11 @@ class AgenticGraph(Agentic):
 
 		meta = {}
 		meta['state'] = GraphState.INITIAL.value
-		meta['conf'] = self.conf
+
+		meta['description'] = self.conf.get('description', '')
+		if type(meta['description']) is list:
+			meta['description'] = '\n'.join(meta['description'])
+
 		meta['capabilities'] = self._capabilities()
 
 		return meta
@@ -178,10 +182,6 @@ class AgenticGraph(Agentic):
 		while self._meta_['state'] < intent:
 			if self._meta_['state'] == self.states.INITIAL.value:
 				try:
-					dsc = self.conf.get('description', None)
-					if dsc is not None:
-						self._meta_['description'] = dsc
-
 					self._fname = self.conf.get('persistence', None)
 					if self._fname is None:
 						self._graph = new_graph()
