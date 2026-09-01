@@ -22,21 +22,32 @@ class GraphState(Enum):
 class AgenticGraph(Agentic):
 	""" AgenticGraph is the class that exposes a `mercury.graph.Graph` using the Agentic interface.
 
-	## Overview
+	## AgenticGraphs are typically persisted
 
 	A graph is a persisted storage of anything: the storage of nodes is a key/value store with any properties. On top of that, nodes
-	can be connected by edges that also have properties. AgenticGraph objects are persisted. They can read from .csv files that
+	can be connected by edges that also have properties. AgenticGraph objects are typically persisted (that is part of their configuration
+	to store such things as hierarchical ontologies for both entities and relationships). They can read from .csv files that
 	contain ontologies, for initialization, but do not write to .csv files to keep project management simple. Once the graph is
 	initialized, it stores itself as a pickle file. When initializing the object, if the pickle file exists, it will be loaded rather
 	than initializing the graph from .csv files.
 
+	## IDs and hierarchical structure
+
+	The ontology is not only the place where concepts and relationships are defined to be used by the formalizer, but also the
+	place where the IDs of every node and edge in the EvidenceGraph live. Despite the number of entities being potentially very large and
+	AgenticGraphs typically living in RAM, the importance of creating concepts and maintaining the hierarchical structure dynamically from
+	text by Agentic decisions makes this "all in one place" design recommendable. Also, the mechanism used to structure text entities using
+	[`SourceNode`][mercury.graph.evidence.source_parts.SourceNode] is exactly the mechanism used in the hierarchy of the IDs.
+
 	## How AgenticGraphs are used to build EvidenceGraphs
 
-	There a three components: the Ontology (which is just a graph with a structure the Formalizer understands) keeps the concepts for
-	both the entities and the relationships and also the indices of each node or relation in an EvidenceGraph. The Formalizer takes
-	the concepts from the Ontology (E.g., person, product, country, etc.) and the relationships (E.g., is_owned_by, is_located_in, etc.)
-	and finds instances of those concepts in natural language text. The EvidenceGraph creates an aggregated graph of all that information
-	handling contradictions, reinforcements and confidence.
+	There a three components:
+
+	* The Ontologies are just graphs with IDs and definitions for concepts. Typically entities and
+	relationships live in different graphs (relationships may not be used, all that is configurable).
+	* The Formalizer takes concepts defined in the Ontology (E.g., person, product, country, etc.) also possibly relationships
+	(E.g., is_owned_by, is_located_in, etc.) and finds instances of those concepts in natural language text.
+	* The EvidenceGraph creates an aggregated graph of all that information handling contradictions, reinforcements and confidence.
 
 	## What the AgenticGraph exposes via the Agentic interface
 
@@ -46,8 +57,10 @@ class AgenticGraph(Agentic):
 
 	## Known Limitations
 
-	There is no "graph language" exposed via the Agentic interface that allows for arbitrary graph oriented queries. That may be added
-	in the future to leverage on the functionality the underlying graph class already has.
+	There is no "graph language" exposed via the Agentic interface that allows for arbitrary graph oriented queries. Note that Agentic
+	objects have a mechanism to access the objects directly and will typically bypass the Agentic interface for intense computations such
+	as crawling entire corpora. In the future, Agents, besides discovering the hierarchy tree may also have to modify it by creating or
+	updating concepts and relationships.
 
 	Args:
 		schema (str): a schema (a unique name) to use for the AgenticGraph's ID.
