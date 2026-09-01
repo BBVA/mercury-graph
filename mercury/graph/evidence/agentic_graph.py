@@ -162,7 +162,6 @@ class AgenticGraph(Agentic):
 				elif fn_nodes['type'] == 'pickle':
 					nodes = pd.read_pickle(fn_nodes['path'])
 
-			edges = None
 			fn_edges = self.conf.get('initial_edges', None)
 			if fn_edges is not None:
 				if fn_edges['type'] == 'csv':
@@ -170,6 +169,8 @@ class AgenticGraph(Agentic):
 					edges = pd.read_csv(fn_edges['path'], sep = sep)
 				elif fn_edges['type'] == 'pickle':
 					edges = pd.read_pickle(fn_edges['path'])
+			else:
+				edges = pd.DataFrame({keys['src']: pd.Series(dtype='str'), keys['dst']: pd.Series(dtype='str')})
 
 			return Graph(data = edges, keys = keys, nodes = nodes)
 
