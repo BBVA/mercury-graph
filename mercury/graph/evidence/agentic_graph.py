@@ -252,10 +252,44 @@ class AgenticGraph(Agentic):
 
 
 	def _build_indices(self):
-		""" Builds the indices for the AgenticGraph for the first time after it is loaded. """
+		""" Builds the indices for the AgenticGraph for the first time after it is loaded.
+
+		This iterates though the id attributes of the nodes and edges in self._graph. and parses
+		the ID breaking then by their | character. The result is stored in a tree of dictionaries
+		where the root is self._children.
+		"""
 
 		self._children = {}
-		# TODO: Implement this method.
+
+		for id, _ in self._graph.networkx.nodes.data('id'):
+			d  = self._children
+			ii = id.split('|')
+
+			last = len(ii) - 1
+
+			for i, ix in enumerate(ii):
+				if i == last:
+					d[ix] = None
+				else:
+					if ix not in d or d[ix] is None:
+						d[ix] = {}
+
+					d = d[ix]
+
+		for _, _, id in self._graph.networkx.edges.data('id'):
+			d  = self._children
+			ii = id.split('|')
+
+			last = len(ii) - 1
+
+			for i, ix in enumerate(ii):
+				if i == last:
+					d[ix] = None
+				else:
+					if ix not in d or d[ix] is None:
+						d[ix] = {}
+
+					d = d[ix]
 
 
 	def _capabilities(self):
