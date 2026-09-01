@@ -15,7 +15,10 @@
 		// "extra_args" is given to the source's constructor.
 		"extra_args": {
 			// The description will be exposed in the Sources's Agentic API. It can be a string or a list of strings.
-			"description": "This is the wikipedia dump enwiki-20260101-pages-articles-multistream.xml in markdown format.",
+			"description": ["This is the wikipedia dump enwiki-20260101-pages-articles-multistream.xml in markdown format.",
+							"The xml is processed only when more recent than the existing markdown files. In the current setup,",
+							"only 25,386 files are processed (approx 1/1000 of the total). Touch the xml file to force reprocessing.",
+							"That requires hundreds of hours and hundreds of gigabytes of storage."],
 
 			// The arguments passed to the SourceMaker
 			"type": "xml_stream",
