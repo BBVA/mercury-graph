@@ -9,7 +9,6 @@
 // You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
 //
 
-
 	"entities": {
 		// An ontology is just a persisted AgenticGraph. It is typically as a key/value to hold anything in nodes or a graph.
 
@@ -19,9 +18,9 @@
 		"extra_args": {
 			// The description will be exposed in the AgenticGraph's Agentic API. It can be a string or a list of strings.
 			"description": [
-				"This ontology holds all the entities that can be used in the Evidence Graphs. E.g., person, organization, location ...",
-				"It uses the node ids as keys and an attribute 'description' to explain the entity. A 'is_a' relation (e.g. capital",
-				"is_a city) can be defined as an edge with the attribute 'relation' set to 'is_a'."
+				"This ontology holds all the entities that can be used in the Evidence Graph. E.g., person, organization, location ...",
+				"It uses the node ids as keys and an attribute 'definition' to explain the entity.",
+				"The hierarchy is defined by the | separator in the IDs. E.g., location, location|country, location|country|city"
 			],
 
 			// This optional dictionary defines the names of the columns in csv files, if the graph is directed and the separator.
@@ -30,13 +29,11 @@
 
 			// This optional dataframe (default is an empty graph) is only loaded when the file in "persistence" does not exist.
 			// It can be either a csv or a pickle of a pandas dataframe.
-			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
 			"initial_nodes" : {"type" : "csv", "path" : "/storage/temp/graphs/entities_concepts.csv"},
-			// This optional requires the entities to be defined in "initial_nodes". Both are only loaded when the file in "persistence"
-			// does not exist. It can be either a csv or a pickle of a pandas dataframe.
-			"initial_edges" : {"type" : "csv", "path" : "/storage/temp/graphs/entities_relations.csv"},
-			// This is where the AgenticGraph will persists itself. The "initial_nodes" and "initial_edges" are only used when the graph
+
+			// This is where the AgenticGraph will persist itself. The "initial_nodes" and "initial_edges" are only used when the graph
 			// is first created for the first time. It is a pickle of a NetworkX graph.
+			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
 			"persistence" : {"type" : "pickle", "$path" : "graphs/entities.pickle"}
 		},
 
@@ -49,11 +46,30 @@
 		"extra_args": {
 			"description": [
 				"This ontology holds the relationships between entities. E.g., works_for, located_in, ...",
-				"It uses the node ids as keys and an attribute 'description' to explain the relationship."
+				"It defined a relationship id as a key, src and dest define the type of entity the relationship connects as defined",
+				"in 'entities'. An attribute 'definition' explains the relationship. Hierarchy is defined by the | separator in the IDs."
 			],
 			"initial_nodes" : {"type" : "csv", "path" : "/storage/temp/graphs/relationships_concepts.csv"},
-			"initial_edges" : {"type" : "csv", "path" : "/storage/temp/graphs/relationships_relations.csv"},
 			"persistence" : {"type" : "pickle", "$path" : "graphs/relationships.pickle"}
+		},
+		"tools": []
+	},
+
+	"known_ids": {
+		"name": "known_ids",
+
+		"extra_args": {
+			"description": [
+				"This AgenticGraph holds the keys to every entity and relation that has been identified. E.g., if location|country|city",
+				"is defined in 'entities', this can hold ids such as: location|country|city|Helsinki or location|country|city|Anchorage.",
+				"Also, if is_ceo(person, company) is defined in 'relationships', this holds ids for specific instances.",
+				"This does not contain any other information (that belongs in the EvidenceGraph)."
+			],
+			"initial_nodes" : {"type" : "csv", "path" : "/storage/temp/graphs/known_ids_nodes.csv"},
+			// This optional requires the entities to be defined in "initial_nodes". Both are only loaded when the file in "persistence"
+			// does not exist. It can be either a csv or a pickle of a pandas dataframe.
+			"initial_edges" : {"type" : "csv", "path" : "/storage/temp/graphs/known_ids_edges.csv"},
+			"persistence" : {"type" : "pickle", "$path" : "graphs/known_ids.pickle"}
 		},
 		"tools": []
 	}
