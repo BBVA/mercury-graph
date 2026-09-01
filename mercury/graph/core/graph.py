@@ -137,8 +137,8 @@ class Graph:
     - [On scikit conventions](https://scikit-learn.org/stable/glossary.html)
 
     Args:
-        data (pd.DataFrame, nx.Graph or pyspark.sql.DataFrame): The data to create the graph from. 
-            It can be a pandas DataFrame, a networkx Graph, a pyspark DataFrame, or a Graphframe. 
+        data (pd.DataFrame, nx.Graph or pyspark.sql.DataFrame): The data to create the graph from.
+            It can be a pandas DataFrame, a networkx Graph, a pyspark DataFrame, or a Graphframe.
             In case it already contains a graph (networkx or graphframes), the keys and nodes arguments are ignored.
         keys (dict): A dictionary with keys to specify the columns in the data DataFrame. The keys are:
 
@@ -406,7 +406,7 @@ class Graph:
         """
         Returns True if the graph is directed, False otherwise.
 
-        Note: 
+        Note:
             Graphs created using graphframes are always directed. The way around it is to add the reverse edges to the graph.
             This can be done by creating the Graph with pyspark DataFrame() and defining a key 'directed' set as False in the `dict`
             argument. Otherwise, the graph will be considered directed even if these reversed edges have been created by other means
@@ -774,7 +774,9 @@ class Graph:
 
         if self._as_networkx is not None:
             l = ['src', 'dst']
-            l.extend(list(self._as_networkx.edges[list(self._as_networkx.edges.keys())[0]].keys()))
+            k = self._as_networkx.edges.keys()
+            if len(k) > 0:
+                l.extend(list(self._as_networkx.edges[list(self._as_networkx.edges.keys())[0]].keys()))
             return l
 
         return self.graphframe.edges.columns
