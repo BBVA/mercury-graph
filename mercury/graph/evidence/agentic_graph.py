@@ -3,6 +3,7 @@ import os, pickle
 from enum import Enum
 
 import pandas as pd
+import networkx as nx
 
 from .agentic import Agentic, AgenticRunInvalidRequest
 from mercury.graph.core import Graph
@@ -17,6 +18,40 @@ class GraphState(Enum):
 	GRAPH_LOADED_OK		=  1	# The graph was loaded successfully.
 
 	READY				=  100	# The graph is ready to be queried.
+
+
+class MultiGraph(Graph):
+
+	def __init__(self, data = None, keys = None, nodes = None):
+		super().__init__(data = data, keys = keys, nodes = nodes)
+
+
+	def _from_pandas(self, edges, nodes, keys):
+		""" This internal method is overridden to construct a NetworkX MultiDiGraph (directed, not weighted) instead of the DiGraph() or
+        Graph() of the original Graph class.
+		"""
+
+		src = keys.get('src', 'src')
+		dst = keys.get('dst', 'dst')
+		id  = keys.get('id', 'id')
+
+		directed = keys.get('directed', True)
+
+		if directed:
+			g = nx.MultiDiGraph()
+		else:
+			raise NotImplementedError('Only directed graphs are currently supported.')
+
+		for _, row in edges.iterrows():
+			attr = row.drop([src, dst]).to_dict()
+			g.add_edge(row[src], row[dst], key = row[id], **attr)
+
+		if nodes is not None:
+			for _, row in nodes.iterrows():
+				attr = row.drop([id]).to_dict()
+				g.add_node(row[id], **attr)
+
+		self._from_networkx(g)
 
 
 class AgenticGraph(Agentic):
@@ -151,7 +186,7 @@ class AgenticGraph(Agentic):
 
 			keys = self.conf.get('file_format', None)
 			if keys is None:
-				keys = {'src': 'src', 'dst': 'dst', 'id': 'id', 'weight': 'weight', 'directed': True, 'sep': '\t'}
+				keys = {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}
 
 			nodes = None
 			fn_nodes = self.conf.get('initial_nodes', None)
@@ -172,7 +207,7 @@ class AgenticGraph(Agentic):
 			else:
 				edges = pd.DataFrame({keys['src']: pd.Series(dtype='str'), keys['dst']: pd.Series(dtype='str')})
 
-			return Graph(data = edges, keys = keys, nodes = nodes)
+			return MultiGraph(data = edges, keys = keys, nodes = nodes)
 
 
 		if self.meta['state'] < 0:
@@ -196,7 +231,7 @@ class AgenticGraph(Agentic):
 						if os.path.isfile(self._fname):
 							with open(self._fname, 'rb') as f:
 								ntx = pickle.load(f)			# A NetworkX graph object saved by this class.
-							self._graph = Graph(data = ntx)
+							self._graph = MultiGraph(data = ntx)
 						else:
 							self._graph = new_graph()
 
