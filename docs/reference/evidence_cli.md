@@ -5,6 +5,7 @@ The **`mge`** command-line interface is the recommended way to create, inspect, 
 Although every component of the `mercury.graph.evidence` module can be used directly from Python, most users will interact with Endpoints
 through the `mge` command. It automates the complete Endpoint lifecycle, from creating a new project to exposing it as a REST service.
 
+
 ## Typical workflow
 
 The most common workflow consists of the following steps:
@@ -27,6 +28,7 @@ where:
 * **`pilot`** loads the Endpoint and drives it to the desired operational state.
 * **`summary`** displays the current Endpoint configuration and state.
 * **`serve`** exposes the Endpoint through its REST API.
+
 
 ## Command reference
 
