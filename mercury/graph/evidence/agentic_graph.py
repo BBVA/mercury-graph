@@ -21,6 +21,12 @@ class GraphState(Enum):
 
 
 class MultiGraph(Graph):
+	""" MultiGraph is a subclass of Graph, implemented only for AgenticGraph.
+
+	It demonstrates how to extend the original Graph class to support MultiDiGraph structures, but only supports NetworkX MultiDiGraph
+	instead of all the technologies supported by the original Graph class. Its interactions with graph-specific functions and attributes
+	in the original class are not guaranteed to work correctly.
+	"""
 
 	def __init__(self, data = None, keys = None, nodes = None):
 		super().__init__(data = data, keys = keys, nodes = nodes)
@@ -28,7 +34,7 @@ class MultiGraph(Graph):
 
 	def _from_pandas(self, edges, nodes, keys):
 		""" This internal method is overridden to construct a NetworkX MultiDiGraph (directed, not weighted) instead of the DiGraph() or
-        Graph() of the original Graph class.
+		Graph() of the original Graph class.
 		"""
 
 		src = keys.get('src', 'src')
@@ -43,7 +49,7 @@ class MultiGraph(Graph):
 			raise NotImplementedError('Only directed graphs are currently supported.')
 
 		for _, row in edges.iterrows():
-			attr = row.drop([src, dst]).to_dict()
+			attr = row.drop([src, dst, id]).to_dict()
 			g.add_edge(row[src], row[dst], key = row[id], **attr)
 
 		if nodes is not None:
@@ -52,6 +58,17 @@ class MultiGraph(Graph):
 				g.add_node(row[id], **attr)
 
 		self._from_networkx(g)
+
+
+	def _calculate_edges_colnames(self):
+		""" This internal method is overridden to add the key column for MultiDiGraph edges. """
+
+		l = ['src', 'dst', 'key']
+		k = self._as_networkx.edges.keys()
+		if len(k) > 0:
+			l.extend(list(self._as_networkx.edges[list(self._as_networkx.edges.keys())[0]].keys()))
+
+		return l
 
 
 class AgenticGraph(Agentic):
