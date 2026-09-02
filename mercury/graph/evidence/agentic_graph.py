@@ -324,22 +324,26 @@ class AgenticGraph(Agentic):
 
 			d = d[i]
 
-		nx = self._graph.networkx
+		ntx = self._graph.networkx
 
 		if idx_stack[0] != '_edge_':
 			ix = '|'.join(idx_stack)
 
 			try:
-				ret = dict(nx.nodes(data = True))[ix]
+				ret = dict(ntx.nodes(data = True))[ix]
+
 				return ret
 
 			except:
 				return None
+
 		else:
-			ix = '|'.join(idx_stack[1:])
+			idx_stack.pop(0)
 
 			try:
-				ret = dict(nx.edges(data = True))[ix]
+				src, dst, key = '|'.join(idx_stack).split('||')
+				ret = dict(ntx.edges[src, dst, key])
+
 				return ret
 
 			except:
@@ -396,8 +400,8 @@ class AgenticGraph(Agentic):
 		for id, _ in self._graph.networkx.nodes.data('id'):
 			self._add_index_to_tree(id)
 
-		for _, _, id in self._graph.networkx.edges.data('id'):
-			self._add_index_to_tree('_edge_|%s' % id)
+		for src, dst, key in self._graph.networkx.edges.data(keys = True, data = False):
+			self._add_index_to_tree('_edge_|%s||%s||%s' % (src, dst, key))
 
 
 	def _capabilities(self):
