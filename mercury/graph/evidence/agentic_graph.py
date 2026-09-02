@@ -251,45 +251,42 @@ class AgenticGraph(Agentic):
 		self._graph = None
 
 
+	def _add_index_to_tree(self, tree, index):
+		""" Adds an index to the hierarchical tree structure.
+
+		Args:
+			tree (dict): The hierarchical tree to which the index will be added. (self._node_ix or self._edge_ix)
+			index (str): The index to add, represented as a string with components separated by '|'.
+		"""
+
+		ii = index.split('|')
+		last = len(ii) - 1
+
+		for i, ix in enumerate(ii):
+			if i == last:
+				tree[ix] = None
+
+			else:
+				if ix not in tree or tree[ix] is None:
+					tree[ix] = {}
+
+				tree = tree[ix]
+
+
 	def _build_indices(self):
 		""" Builds the indices for the AgenticGraph for the first time after it is loaded.
 
-		This iterates though the id attributes of the nodes and edges in self._graph. and parses
-		the ID breaking then by their | character. The result is stored in a tree of dictionaries
-		where the root is self._children.
+		This builds a hierarchical tree structure of dictionaries, one for the nodes (self._node_ix) and one for the edges (self._edge_ix).
 		"""
 
-		self._children = {}
+		self._node_ix = {}
+		self._edge_ix = {}
 
 		for id, _ in self._graph.networkx.nodes.data('id'):
-			d  = self._children
-			ii = id.split('|')
-
-			last = len(ii) - 1
-
-			for i, ix in enumerate(ii):
-				if i == last:
-					d[ix] = None
-				else:
-					if ix not in d or d[ix] is None:
-						d[ix] = {}
-
-					d = d[ix]
+			self._add_index_to_tree(self._node_ix, id)
 
 		for _, _, id in self._graph.networkx.edges.data('id'):
-			d  = self._children
-			ii = id.split('|')
-
-			last = len(ii) - 1
-
-			for i, ix in enumerate(ii):
-				if i == last:
-					d[ix] = None
-				else:
-					if ix not in d or d[ix] is None:
-						d[ix] = {}
-
-					d = d[ix]
+			self._add_index_to_tree(self._edge_ix, id)
 
 
 	def _capabilities(self):
