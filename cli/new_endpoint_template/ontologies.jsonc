@@ -24,8 +24,8 @@
 			],
 
 			// This optional dictionary defines the names of the columns in csv files, if the graph is directed and the separator.
-			// Default is: {'src': 'src', 'dst': 'dst', 'id': 'id', 'weight': 'weight', 'directed': true, 'sep': '\t'}
-			"file_format": {"src": "src", "dst": "dst", "id": "id", "weight": "weight", "directed": true, "sep" : "\t"},
+			// Default is: {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': true, 'sep': '\t'}
+			"file_format": {"src": "src", "dst": "dst", "id": "id", "directed": true, "sep" : "\t"},
 
 			// This optional dataframe (default is an empty graph) is only loaded when the file in "persistence" does not exist.
 			// It can be either a csv or a pickle of a pandas dataframe.
