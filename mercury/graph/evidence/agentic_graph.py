@@ -236,19 +236,13 @@ class AgenticGraph(Agentic):
 		if idx_stack.pop(0) != self.name:
 			return None
 
-		def find_in(d):
-			for i in idx_stack:
-				if i not in d:
-					return None
-				d = d[i]
+		d = self._indices
+		for i in idx_stack:
+			if i not in d:
+				return None
 
-			return d
+			d = d[i]
 
-		d = find_in(self._node_ix)
-		if type(d) is dict:
-			return ['%s|%s' % (index, k) for k in d.keys()]
-
-		d = find_in(self._edge_ix)
 		if type(d) is dict:
 			return ['%s|%s' % (index, k) for k in d.keys()]
 
@@ -271,37 +265,33 @@ class AgenticGraph(Agentic):
 		if idx_stack.pop(0) != self.name:
 			return None
 
-		def find_in(d):
-			for i in idx_stack:
-				if i not in d:
-					return False
-				d = d[i]
+		d = self._indices
+		for i in idx_stack:
+			if i not in d:
+				return None
 
-			return True
+			d = d[i]
 
-		if find_in(self._node_ix):
+		nx = self._graph.networkx
+
+		if idx_stack[0] != '_edge_':
 			ix = '|'.join(idx_stack)
-			nx = self._graph.networkx
 
 			try:
 				ret = dict(nx.nodes(data = True))[ix]
 				return ret
 
-			except KeyError:
+			except:
 				return None
-
-		if find_in(self._edge_ix):
-			ix = '|'.join(idx_stack)
-			nx = self._graph.networkx
+		else:
+			ix = '|'.join(idx_stack[1:])
 
 			try:
 				ret = dict(nx.edges(data = True))[ix]
 				return ret
 
-			except KeyError:
+			except:
 				return None
-
-		return None
 
 
 	def close(self, endpoint_locked):
@@ -318,16 +308,19 @@ class AgenticGraph(Agentic):
 		self._graph = None
 
 
-	def _add_index_to_tree(self, tree, index):
-		""" Adds an index to the hierarchical tree structure.
+	def _add_index_to_tree(self, index):
+		""" Adds an index to the hierarchical tree structure. It traverses the tree rooted at self._indices and adds dictionaries
+		as required. The same tree contains node and edge indices, but the latter have their index prefixed by `_edge_` which
+		places them in a dictionary under the `_edge_` key.
 
 		Args:
-			tree (dict): The hierarchical tree to which the index will be added. (self._node_ix or self._edge_ix)
 			index (str): The index to add, represented as a string with components separated by '|'.
 		"""
 
 		ii = index.split('|')
 		last = len(ii) - 1
+
+		tree = self._indices
 
 		for i, ix in enumerate(ii):
 			if i == last:
@@ -343,17 +336,16 @@ class AgenticGraph(Agentic):
 	def _build_indices(self):
 		""" Builds the indices for the AgenticGraph for the first time after it is loaded.
 
-		This builds a hierarchical tree structure of dictionaries, one for the nodes (self._node_ix) and one for the edges (self._edge_ix).
+		This builds a hierarchical tree structure of dictionaries, rooted at self._indices.
 		"""
 
-		self._node_ix = {}
-		self._edge_ix = {}
+		self._indices = {}
 
 		for id, _ in self._graph.networkx.nodes.data('id'):
-			self._add_index_to_tree(self._node_ix, id)
+			self._add_index_to_tree(id)
 
 		for _, _, id in self._graph.networkx.edges.data('id'):
-			self._add_index_to_tree(self._edge_ix, id)
+			self._add_index_to_tree('_edge_|%s' % id)
 
 
 	def _capabilities(self):
