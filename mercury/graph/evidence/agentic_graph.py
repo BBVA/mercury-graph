@@ -223,8 +223,36 @@ class AgenticGraph(Agentic):
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
 		"""
 
+		if self._meta_['state'] != self.states.READY.value:
+			self.log_error('AgenticGraph is not ready for get_children_idx.')
+
+			return None
+
+		if index is None or index == '':
+			index = self.name
+
+		idx_stack = index.split('|')
+
+		if idx_stack.pop(0) != self.name:
+			return None
+
+		def find_in(d):
+			for i in idx_stack:
+				if i not in d:
+					return None
+				d = d[i]
+
+			return d
+
+		d = find_in(self._node_ix)
+		if type(d) is dict:
+			return ['%s|%s' % (index, k) for k in d.keys()]
+
+		d = find_in(self._edge_ix)
+		if type(d) is dict:
+			return ['%s|%s' % (index, k) for k in d.keys()]
+
 		return None
-		# TODO: Implement this method.
 
 
 	def child(self, index):
@@ -233,8 +261,47 @@ class AgenticGraph(Agentic):
 		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
 		"""
 
+		if self._meta_['state'] != self.states.READY.value:
+			self.log_error('AgenticGraph is not ready for child.')
+
+			return None
+
+		idx_stack = index.split('|')
+
+		if idx_stack.pop(0) != self.name:
+			return None
+
+		def find_in(d):
+			for i in idx_stack:
+				if i not in d:
+					return False
+				d = d[i]
+
+			return True
+
+		if find_in(self._node_ix):
+			ix = '|'.join(idx_stack)
+			nx = self._graph.networkx
+
+			try:
+				ret = dict(nx.nodes(data = True))[ix]
+				return ret
+
+			except KeyError:
+				return None
+
+		if find_in(self._edge_ix):
+			ix = '|'.join(idx_stack)
+			nx = self._graph.networkx
+
+			try:
+				ret = dict(nx.edges(data = True))[ix]
+				return ret
+
+			except KeyError:
+				return None
+
 		return None
-		# TODO: Implement this method.
 
 
 	def close(self, endpoint_locked):
