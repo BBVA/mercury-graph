@@ -9,6 +9,9 @@
 // You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
 //
 
+	// You can have more than one Formalizer in an Endpoint, but an EvidenceGraph only uses one. Multiple formalizers could be used
+	// by Agents or more than one EvidenceGraph. You can also share one Formalizer in different Agents or EvidenceGraphs but make sure
+	// the ontologies remain consistent. The Formalizer itself has no state other than this configuration.
 	"GLiNER2": {
 		"name": "GLiNER2",
 
@@ -17,12 +20,33 @@
 			// The description will be exposed in the Formalizer's Agentic API. It can be a string or a list of strings.
 			"description": "This Agentic Formalizer extracts entities and relationships from text.",
 
-			// The model_name is the name of the GLiNER2. In the future, we may support other models.
-			"model_name": "microsoft/GLiNER2"
+			"model": {
+				// This is mandatory to support other technologies in the future.
+				"library": "gliner2",
+
+				// Since August 2026, 2.5 is the current architecture (boundary architecture), use "small" (instead of "base") if you have
+				// limited resources or "multi" for multilingual support.
+				"model": "fastino/gliner2.5-base-v1",
+
+				// Use these options with care! If not null, they will be passed to AutoExtractor.from_pretrained() as arguments.
+				// "map_location": "cuda" may actually slow down and interfere with the Agent's use of the GPU.
+				"map_location": null,
+
+				// This may only work on the GPU, set it to true if you know what you are doing.
+				"quantize": null,
+
+				// This may only work on the GPU, set it to true if you know what you are doing.
+				"compile": null
+			},
+
+			// This dictionary allows using different names or disabling (making null) relations or known_ids. If you disable a key,
+			// the Formalizer will expose limited capabilities.
+			// The names (values) must match the "tools" the Formalizer expects the Endpoint to provide.
+			"ontologies": {"entities": "entities", "relationships": "relationships", "known_ids": "known_ids"}
 		},
 
-		// "tools" declares what tools does the formalizer expect. The endpoint will find them an provide them via `add_tool()`.
-		// Provide a list of tool names
-		"tools": ["entities", "relationships"]
+		// "tools" is an argument for the Endpoint to serve these tools to the Formalizer. This must include the same names in the
+		// values of the "ontologies" dictionary (which is this case are identical to the keys).
+		"tools": ["entities", "relationships", "known_ids"]
 	}
 }
