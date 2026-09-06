@@ -63,6 +63,15 @@ def test_agentic_graph_metadata_and_requests():
 	assert logger[-1]['error'] == 'AgenticGraph function "children_by_idx_ontology" requires an "index" argument.'
 
 
+def test_agentic_graph_allows_schema_discovery_without_configuration():
+	""" Verifies construction for callers that only need the AgenticGraph class identity. """
+	graph = AgenticGraph(schema = None, extra_args = None)
+
+	assert type(graph) is AgenticGraph
+	assert graph.id == 'agentic_graph'
+	assert graph.states.__name__ == 'AlwaysReadyState'
+
+
 def test_agentic_graph_creates_and_queries_default_graph():
 	""" Verifies default graph creation, one-step piloting, and index query results. """
 	graph = AgenticGraph(schema = 'empty', extra_args = {'description': 'Empty graph.'})
