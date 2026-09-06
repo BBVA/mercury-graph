@@ -63,6 +63,11 @@ class Formalizer(Agentic):
 
 	## Capabilities exposed by the Formalizer
 
+	The Formalizer exposes three capabilities:
+
+	1. Entity Extraction
+	2. Relationship Extraction
+	3. Classification
 
 	Args:
 		schema (str): a schema (a unique name) to use for the Formalizer's ID.
@@ -98,5 +103,130 @@ class Formalizer(Agentic):
 		""" Simulates running the Formalizer with the given request.
 
 			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+
+		## NOTE:
+
+		The Endpoint takes care of validating the request according to the capabilities exposed by the Formalizer. It is not necessary to
+		validate again here and the Endpoint does not forward the dry_run() request to the Formalizer. This method is provided as a
+		requirement of the Agentic interface, but it is only used when you use Formalizers directly outside of an Endpoint.
 		"""
-		return {'status': 1, 'description': 'Not ready.'}
+
+		return {'status': 0, 'description': 'Valid request.'}
+
+	def _capabilities(self):
+		""" Returns the capabilities of the Formalizer.
+
+		Returns:
+			(list): A list of capabilities, each represented as a dictionary with the following keys:
+
+				- 'type': The type of capability (e.g., 'function').
+				- 'function': A dictionary containing details about the function
+
+				The value of 'function' is:
+
+				* 'name': The name of the function.
+				* 'description': A brief description of what the function does.
+				* 'parameters': A dictionary with 'type', 'properties', and 'required'
+				* 'returns': A dictionary with 'type' and 'items'
+		"""
+
+		name_hint_nodes = 'hint_nodes_%s' % self.name
+		name_hint_edges = 'hint_edges_%s' % self.name
+		name_is_a		= 'is_a_%s' % self.name
+
+		self.call = {name_hint_nodes: self.hint_nodes, name_hint_edges: self.hint_edges, name_is_a: self.is_a}
+
+		return [
+			{
+				'type': 'function',
+				'function': {
+					'name': name_hint_nodes,
+					'description': 'Identify nodes in a text from the ontology or some concepts in it.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'text': {
+								'type': 'string',
+								'description': 'Text from which to identify nodes.'
+							},
+							'concepts': {
+								'type': 'array',
+								'items': {
+									'type': 'string'
+								},
+								'description': 'List of concepts to identify in the text. If empty, all concepts will be considered.'
+							}
+						},
+						'required': ['text']
+					},
+					'returns': {
+						'type': 'dict',
+						'items': {
+							'key': 'description'
+						}
+					}
+				}
+			},
+			{
+				'type': 'function',
+				'function': {
+					'name': name_hint_edges,
+					'description': 'Identify edges in a text from the ontology or some concepts in it.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'text': {
+								'type': 'string',
+								'description': 'Text from which to identify edges.'
+							},
+							'concepts': {
+								'type': 'array',
+								'items': {
+									'type': 'string'
+								},
+								'description': 'List of concepts to identify in the text. If empty, all concepts will be considered.'
+							}
+						},
+						'required': ['text']
+					},
+					'returns': {
+						'type': 'dict',
+						'items': {
+							'key': 'description'
+						}
+					}
+				}
+			},
+			{
+				'type': 'function',
+				'function': {
+					'name': name_is_a,
+					'description': 'Determine if a given concept is a type of another concept in the ontology.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'text': {
+								'type': 'string',
+								'description': 'Text from which to determine the relationship between concepts.'
+							},
+							'concept': {
+								'type': 'string',
+								'description': 'The concept to check.'
+							},
+							'parent_concept': {
+								'type': 'string',
+								'description': 'The parent concept to check against.'
+							}
+						},
+						'required': ['text', 'concept', 'parent_concept']
+					},
+					'returns': {
+						'type': 'number',
+						'description': 'A numerical score (0..1) indicating the confidence.',
+						'score': {
+							'type': 'number'
+						}
+					}
+				}
+			}
+		]
