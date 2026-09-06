@@ -153,6 +153,20 @@ class Formalizer(Agentic):
 
 		return {'status': 0, 'description': 'Valid request.'}
 
+
+	def close(self, endpoint_locked):
+		""" Closes the Formalizer, persists it to disk and releases any resources it holds.
+
+		(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
+		"""
+
+		# There is no state to persist, just freeing resources.
+		self._entities = None
+		self._relation = None
+		self._known_id = None
+		self._model	   = None
+
+
 	def _capabilities(self):
 		""" Returns the capabilities of the Formalizer.
 
