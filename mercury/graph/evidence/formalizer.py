@@ -349,8 +349,37 @@ class Formalizer(Agentic):
 
 			return None
 
-		# TODO: Implement hint_edges.
-		return {}
+		text = arguments.get('text', None)
+
+		if text is None:
+			self.log_error('Formalizer.hint_edges() %s called without "text" argument.' % self.id)
+
+			return None
+
+		ntx = self._relation._graph.networkx
+
+		format = {}
+		concepts = arguments.get('concepts', None)
+		if concepts is None:
+			for id, _ in ntx.nodes.data('id'):
+				node = dict(ntx.nodes(data = True))[id]
+				src = node.get('src', None)
+				dst = node.get('dest', None)
+				key = node.get('definition', None)
+				format[key] = [src, dst]
+
+		else:
+			for id, _ in ntx.nodes.data('id'):
+				if id in concepts:
+					node = dict(ntx.nodes(data = True))[id]
+					src = node.get('src', None)
+					dst = node.get('dest', None)
+					key = node.get('definition', None)
+					format[key] = [src, dst]
+
+		result = self._model.extract_json(text, format)
+
+		return result
 
 
 	def is_a(self, arguments):
