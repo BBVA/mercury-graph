@@ -126,6 +126,9 @@ class AgenticGraph(Agentic):
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'agentic_graph', schema = schema, endpoint = endpoint, logger = logger)
 
+		if schema is None:			# This allows finding out the class name (to link tools) without actually instantiating a full object.
+			return
+
 		self.states = GraphState
 
 		self.conf = extra_args
@@ -225,7 +228,6 @@ class AgenticGraph(Agentic):
 				edges = pd.DataFrame({keys['src']: pd.Series(dtype='str'), keys['dst']: pd.Series(dtype='str')})
 
 			return MultiGraph(data = edges, keys = keys, nodes = nodes)
-
 
 		if self.meta['state'] < 0:
 			self.log_error('AgenticGraph is in error state %d' % self._meta_['state'])
