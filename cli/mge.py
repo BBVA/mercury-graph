@@ -349,7 +349,7 @@ class MgeCli:
         """ Executes the "unlock" command after the arguments have been checked to exist. """
 
         try:
-            ep = mg.evidence.Endpoint(self.name)
+            ep = mg.evidence.Endpoint(self.name, auto_pilot = False)
 
         except Exception:
             print('Error: Could not load the Endpoint object from "%s". Please check the path and try again.' % self.name)
