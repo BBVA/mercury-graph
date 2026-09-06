@@ -111,7 +111,15 @@ class Formalizer(Agentic):
 
 			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
-		raise AgenticRunInvalidState
+		call = self.call.get(request['name'], None)
+
+		if call is None:
+			self.log_error('Formalizer does not have a function named "%s".' % request['function'])
+			raise AgenticRunInvalidRequest
+
+		ret = {'finish_reason': 'stop', 'message': call(request['arguments'])}
+
+		return ret
 
 
 	def _meta(self):
@@ -119,7 +127,16 @@ class Formalizer(Agentic):
 
 			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
-		return {'state' : AlwaysReadyState.INITIAL.value}
+		meta = {}
+		meta['state'] = FormalizerState.INITIAL.value
+
+		meta['description'] = self.conf.get('description', '')
+		if type(meta['description']) is list:
+			meta['description'] = '\n'.join(meta['description'])
+
+		meta['capabilities'] = self._capabilities()
+
+		return meta
 
 
 	def _dry_run(self, request):
