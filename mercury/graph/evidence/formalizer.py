@@ -1,4 +1,4 @@
-import os
+import os, warnings
 
 from enum import Enum
 
@@ -12,6 +12,7 @@ except ImportError:
 	AutoExtractor = None
 
 from .agentic import Agentic, AgenticRunInvalidRequest
+from .agentic_graph import AgenticGraph
 
 
 class FormalizerState(Enum):
@@ -167,10 +168,57 @@ class Formalizer(Agentic):
 
 		while self._meta_['state'] < intent:
 			if self._meta_['state'] == self.states.INITIAL.value:
+				model_config = self.conf.get('model', None)
+				if model_config is None:
+					self.log_error('Model configuration is missing while piloting Formalizer %s.' % self.id)
 
-				# TODO: Implement model loading logic here.
+					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
 
-				self._meta_['state'] = self.states.MODEL_LOADED_OK.value
+					break
+
+				library = model_config.get('library', None)
+				if library != 'gliner2' or AutoExtractor is None:
+					self.log_error('Missing gliner2.AutoExtractor or unsupported model library while piloting Formalizer %s.' % self.id)
+
+					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
+
+					break
+
+				model = model_config.get('model', None)
+				if model is None:
+					self.log_error('Model specification is missing while piloting Formalizer %s.' % self.id)
+
+					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
+
+					break
+
+				map_location = model_config.get('map_location', None)
+				quantize = model_config.get('quantize', None)
+				compile = model_config.get('compile', None)
+
+				args = {}
+				if map_location is not None:
+					args['map_location'] = map_location
+
+				if quantize is not None:
+					args['quantize'] = quantize
+
+				if compile is not None:
+					args['compile'] = compile
+
+				try:
+					with warnings.catch_warnings():
+						warnings.simplefilter('ignore')
+						self._model = AutoExtractor.from_pretrained(model, **args)
+
+					self._meta_['state'] = self.states.MODEL_LOADED_OK.value
+
+				except Exception as e:
+					self.log_error('Failed to load model while piloting Formalizer %s: %s' % (self.id, str(e)))
+
+					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
+
+					break
 
 				if just_once:
 					break
