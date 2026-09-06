@@ -11,7 +11,20 @@ try:
 except ImportError:
 	AutoExtractor = None
 
-from .agentic import Agentic, AgenticRunInvalidState, AlwaysReadyState
+from .agentic import Agentic, AgenticRunInvalidRequest
+
+
+class FormalizerState(Enum):
+	""" The `FormalizerState` is an enumeration that defines all possible states of a Formalizer. """
+
+	ERR_ONTOLOGY_INIT	= -2	# Something failed loading the ontology.
+	ERR_MODEL_INIT		= -1	# Something failed loading the model.
+
+	INITIAL				=  0	# The initial state of the formalizer.
+	MODEL_LOADED_OK		=  1	# The model was loaded successfully.
+	ONTOLOGY_LOADED_OK	=  2	# The ontology was loaded successfully.
+
+	READY				=  100	# The formalizer is ready to be queried.
 
 
 class Formalizer(Agentic):
@@ -80,7 +93,17 @@ class Formalizer(Agentic):
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'formalizer', schema = schema, endpoint = endpoint, logger = logger)
 
+		self.states = FormalizerState
+
 		self.conf = extra_args
+		self.name = schema
+
+		self._entities = None
+		self._relation = None
+		self._known_id = None
+		self._model	   = None
+
+		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
 
 	def _run(self, request):
