@@ -188,7 +188,11 @@ class Endpoint(Agentic):
 
 		capabilities = self._meta_.get('capabilities', None)
 		if capabilities is not None:
-			txt.append('   %-14s: %s' % ('capabilities', '(%d total) %s' % (len(capabilities), list(self.agentic_by_capability.keys()))))
+			capability_names = list(self.agentic_by_capability.keys())
+			if len(capability_names) > 4:
+				capability_names = capability_names[:3] + ['...'] + capability_names[-1:]
+
+			txt.append('   %-14s: %s' % ('capabilities', '(%d total) %s' % (len(capabilities), capability_names)))
 
 		for section_name in sections:
 			items = self.conf.get(section_name, {})
