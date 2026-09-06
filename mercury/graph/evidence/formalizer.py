@@ -154,6 +154,109 @@ class Formalizer(Agentic):
 		return {'status': 0, 'description': 'Valid request.'}
 
 
+	def pilot(self, intent, just_once = False):
+		""" Pilots the Formalizer to a new state based on the given intent.
+
+		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
+		"""
+
+		if self.meta['state'] < 0:
+			self.log_error('Formalizer is in error state %d' % self._meta_['state'])
+
+			return
+
+		while self._meta_['state'] < intent:
+			if self._meta_['state'] == self.states.INITIAL.value:
+
+				# TODO: Implement model loading logic here.
+
+				self._meta_['state'] = self.states.MODEL_LOADED_OK.value
+
+				if just_once:
+					break
+
+			if self._meta_['state'] == self.states.MODEL_LOADED_OK.value:
+
+				# TODO: Implement ontology loading logic here.
+
+				self._meta_['state'] = self.states.ONTOLOGY_LOADED_OK.value
+
+				if just_once:
+					break
+
+			if self._meta_['state'] == self.states.ONTOLOGY_LOADED_OK.value:
+
+				# TODO: Finalize any remaining setup before the Formalizer is ready.
+
+				self._meta_['state'] = self.states.READY.value
+
+				if just_once:
+					break
+
+
+	def hint_nodes(self, arguments):
+		""" Identifies nodes in a text from the ontology or some concepts in it.
+
+		Args:
+			arguments (dict): A dictionary containing the following keys:
+				- 'text' (str): The text from which to identify nodes.
+				- 'concepts' (list): A list of concepts to identify in the text. If empty, all concepts will be considered.
+
+		Returns:
+			(dict): A dictionary where keys are identified nodes and values are their descriptions.
+		"""
+
+		if self._meta_['state'] != self.states.READY.value:
+			self.log_error('Formalizer is not ready for hint_nodes.')
+
+			return None
+
+		# TODO: Implement hint_nodes.
+		return {}
+
+
+	def hint_edges(self, arguments):
+		""" Identifies edges in a text from the ontology or some concepts in it.
+
+		Args:
+			arguments (dict): A dictionary containing the following keys:
+				- 'text' (str): The text from which to identify edges.
+				- 'concepts' (list): A list of concepts to identify in the text. If empty, all concepts will be considered.
+
+		Returns:
+			(dict): A dictionary where keys are identified edges and values are their descriptions.
+		"""
+
+		if self._meta_['state'] != self.states.READY.value:
+			self.log_error('Formalizer is not ready for hint_edges.')
+
+			return None
+
+		# TODO: Implement hint_edges.
+		return {}
+
+
+	def is_a(self, arguments):
+		""" Checks if a given concept is a subclass of another concept in the ontology.
+
+		Args:
+			arguments (dict): A dictionary containing the following keys:
+				- 'child' (str): The child concept to check.
+				- 'parent' (str): The parent concept to check against.
+
+		Returns:
+			(float): Returns a [0..1] score indicating the likelihood that the child is a subclass of the parent.
+		"""
+
+		if self._meta_['state'] != self.states.READY.value:
+			self.log_error('Formalizer is not ready for is_a.')
+
+			return None
+
+		# TODO: Implement is_a.
+		return 0
+
+
 	def close(self, endpoint_locked):
 		""" Closes the Formalizer, persists it to disk and releases any resources it holds.
 
