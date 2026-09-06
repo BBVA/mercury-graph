@@ -5,3 +5,8 @@ networkx
 scikit-learn
 anywidget
 traitlets
+chromadb
+lxml
+regex
+fastapi
+uvicorn

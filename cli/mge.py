@@ -349,7 +349,7 @@ class MgeCli:
         """ Executes the "unlock" command after the arguments have been checked to exist. """
 
         try:
-            ep = mg.evidence.Endpoint(self.name)
+            ep = mg.evidence.Endpoint(self.name, auto_pilot = False)
 
         except Exception:
             print('Error: Could not load the Endpoint object from "%s". Please check the path and try again.' % self.name)
@@ -368,9 +368,9 @@ class MgeCli:
 
 # An argparse.ArgumentParser to manage the command line interface.
 #   RawTextHelpFormatter is used to allow multi-line help messages.
-parser = argparse.ArgumentParser(prog			 = '\033[1mMercury-graph Evidence\033[0m: Endpoint management cli %s' % mg.__version__,
-                                 description	 = 'Creates, displays, serves and pilots persisted Endpoint objects.',
-                                 allow_abbrev	 = False,
+parser = argparse.ArgumentParser(prog            = '\033[1mMercury-graph Evidence\033[0m: Endpoint management cli %s' % mg.__version__,
+                                 description     = 'Creates, displays, serves and pilots persisted Endpoint objects.',
+                                 allow_abbrev    = False,
                                  formatter_class = argparse.RawTextHelpFormatter)
 
 # The help message is a multi-line string.
@@ -398,7 +398,7 @@ parser.add_argument('--version', action = 'version', version = mg.__version__)
 if __name__ == '__main__':
     args = parser.parse_args()
 
-    cli = MgeCli(vars(args))		# Just create the object and print errors for bad requests making args.command = None on error.
+    cli = MgeCli(vars(args))        # Just create the object and print errors for bad requests making args.command = None on error.
 
     if args.command == 'new':
         cli.new()

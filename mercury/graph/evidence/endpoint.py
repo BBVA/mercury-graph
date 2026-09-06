@@ -105,9 +105,11 @@ class Endpoint(Agentic):
 		path (str): the path to the Endpoint's home directory. The final name (the folder inside whatever path) must be identical to its
 			._normalize_name() value, that is, a name with only letters, numbers or underscores.
 		logger (list): an optional logger. If not provided, no logging will be done.
+		auto_pilot (bool): an optional flag that completely disables auto-piloting for such things as forceful unlocking. By default,
+			auto_pilot is set via configuration.
 	"""
 
-	def __init__(self, path = None, logger = None):
+	def __init__(self, path = None, logger = None, auto_pilot = True):
 		if not os.path.isdir(path):
 			raise ValueError('The path "%s" is not a valid directory.' % path)
 
@@ -129,6 +131,9 @@ class Endpoint(Agentic):
 
 		self.states = EndPointState
 		self.ids = {'sources': {}, 'ontologies': {}, 'formalizers': {}, 'evidence_graphs': {}, 'agents': {}, 'custom_agentics': {}}
+
+		if not auto_pilot:
+			return
 
 		auto_pilot = self.conf.get('auto_pilot', None)
 		if auto_pilot is not None:
@@ -188,7 +193,11 @@ class Endpoint(Agentic):
 
 		capabilities = self._meta_.get('capabilities', None)
 		if capabilities is not None:
-			txt.append('   %-14s: %s' % ('capabilities', '(%d total) %s' % (len(capabilities), list(self.agentic_by_capability.keys()))))
+			capability_names = list(self.agentic_by_capability.keys())
+			if len(capability_names) > 4:
+				capability_names = capability_names[:3] + ['...'] + capability_names[-1:]
+
+			txt.append('   %-14s: %s' % ('capabilities', '(%d total) %s' % (len(capabilities), capability_names)))
 
 		for section_name in sections:
 			items = self.conf.get(section_name, {})

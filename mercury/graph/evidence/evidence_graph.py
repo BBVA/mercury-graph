@@ -1,7 +1,9 @@
 from .agentic import Agentic, AgenticRunInvalidState, AlwaysReadyState
+from .agentic_graph import GraphState
 
 
 class EvidenceGraph(Agentic):
+	# TODO: Make this an AgenticGraph
 	""" The EvidenceGraph is the class that holds the knowledge about one or many sources in the form of a graph.
 
 	## Overview
@@ -48,9 +50,14 @@ class EvidenceGraph(Agentic):
 	"""
 
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
+		# TODO: Make this an AgenticGraph (Check what AgenticGraph has that Agentic does not and avoid duplicating functionality)
+
 		super().__init__(my_class = 'evidence_graph', schema = schema, endpoint = endpoint, logger = logger)
 
 		self.conf = extra_args
+		self.name = schema
+
+		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
 
 	def _run(self, request):
@@ -62,16 +69,81 @@ class EvidenceGraph(Agentic):
 
 
 	def _meta(self):
+		# TODO: Make this an AgenticGraph (It DOES override the _capabilities, but this method can be inherited)
+
 		""" Returns the metadata of the EvidenceGraph.
 
 			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
-		return {'state' : AlwaysReadyState.INITIAL.value}
+		meta = {}
+		meta['state'] = GraphState.INITIAL.value
+
+		meta['description'] = self.conf.get('description', '')
+		if type(meta['description']) is list:
+			meta['description'] = '\n'.join(meta['description'])
+
+		meta['capabilities'] = self._capabilities()
+
+		return meta
 
 
 	def _dry_run(self, request):
+		# TODO: Make this an AgenticGraph (This method must disappear but not without testing)
 		""" Simulates running the EvidenceGraph with the given request.
 
 			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
 		"""
 		return {'status': 1, 'description': 'Not ready.'}
+
+
+	def crawl(self, index):
+		# TODO: Implement the crawl functionality for the EvidenceGraph.
+		raise NotImplementedError("Crawl functionality is not yet implemented.")
+
+
+	def _capabilities(self):
+		""" Returns the capabilities of the EvidenceGraph.
+
+		Returns:
+			(list): A list of capabilities, each represented as a dictionary with the following keys:
+
+				- 'type': The type of capability (e.g., 'function').
+				- 'function': A dictionary containing details about the function
+
+				The value of 'function' is:
+
+				* 'name': The name of the function.
+				* 'description': A brief description of what the function does.
+				* 'parameters': A dictionary with 'type', 'properties', and 'required'
+				* 'returns': A dictionary with 'type' and 'items'
+		"""
+
+		name_crawl = 'crawl_%s' % self.name
+
+		self.call = {name_crawl: self.crawl}
+
+		return [
+			{
+				'type': 'function',
+				'function': {
+					'name': name_crawl,
+					'description': 'Crawl the text starting from a given source index.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'index': {
+								'type': 'string',
+								'description': 'Source index from which to start crawling the text.'
+							}
+						},
+						'required': ['index']
+					},
+					'returns': {
+						'type': 'dict',
+						'items': {
+							'key': 'description'
+						}
+					}
+				}
+			}
+		]

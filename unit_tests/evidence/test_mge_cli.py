@@ -34,6 +34,8 @@ def test_file_logger_and_http_server(monkeypatch, tmp_path):
 	endpoint.run.return_value = {'result': 'run'}
 	endpoint.dry_run.return_value = {'result': 'dry'}
 	server = mge.MgeHttpServe(endpoint)
+	assert server.root().headers['location'] == '/meta'
+	assert server.favicon().media_type == 'image/x-icon'
 	assert server.meta() == {'state': 1}
 	assert server.run({'request': 1}) == {'result': 'run'}
 	assert server.dry_run({'request': 1}) == {'result': 'dry'}

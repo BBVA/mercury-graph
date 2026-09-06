@@ -1,5 +1,6 @@
 # EvidenceGraph in Production
 
+
 ## Intention
 
 In some ways, `mercury.graph.EvidenceGraph` is a PoC implementation. You can very easily test the concept and build systems that provide
@@ -12,6 +13,26 @@ that run on commodity GPUs. The architecture is easy to extend, but to achieve p
 Hopefully, `mercury.graph.EvidenceGraph` is being released early enough to become the core of a community effort and enough people see the
 value of evidence graphs to contribute to the project. You are all more than welcome [CONTRIBUTING](https://github.com/BBVA/mercury-graph#contributing).
 
+
+## Some details on how the entity/relationship identification works
+
+----
+
+From *Gliner2: An efficient multi-task information extraction system with schema-driven interface* (Zaratiana et al., 2025):
+
+  * Can a small, CPU-friendly model replace the patchwork of NER, classification, and structured-extraction tools in an evidence pipeline?
+  * A schema can be the interface: describe what matters, then extract it without writing task-specific prompts or models.
+  * Local, private inference for sensitive documents is especially relevant when evidence cannot leave the organization.
+  * It approaches GPT-4o on zero-shot NER while running on standard CPU hardware, but it does not claim to beat LLMs everywhere.
+
+```bibtex
+@article{zaratiana2025gliner2,
+  title={Gliner2: An efficient multi-task information extraction system with schema-driven interface},
+  author={Zaratiana, Urchade and Pasternak, Gil and Boyd, Oliver and Hurn-Maloney, George and Lewis, Ash},
+  journal={arXiv preprint arXiv:2507.18546},
+  year={2025}
+}
+```
 
 ## Some lessons on maintaining systems that explicitly handle evidence from literature
 

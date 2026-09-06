@@ -97,9 +97,14 @@ class Source(Agentic):
 
 		(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
+
 		meta = {}
-		meta['state'] = 0
-		meta['conf'] = self.conf
+		meta['state'] = SourceState.INITIAL.value
+
+		meta['description'] = self.conf.get('description', '')
+		if type(meta['description']) is list:
+			meta['description'] = '\n'.join(meta['description'])
+
 		meta['capabilities'] = self._capabilities()
 
 		return meta
@@ -319,7 +324,7 @@ class Source(Agentic):
 				'type': 'function',
 				'function': {
 					'name': name_get_children_idx,
-					'description': 'Get indices of the children of an index. Indices are either folders, files, sections or chunks.',
+					'description': 'Get indices of the children of an index. Indices are either sources, files, sections or chunks.',
 					'parameters': {
 						'type': 'object',
 						'properties': {
@@ -354,7 +359,7 @@ class Source(Agentic):
 						'required': ['index']
 					},
 					'returns': {
-						'type': 'string'
+						'type': 'dict'
 					}
 				}
 			}

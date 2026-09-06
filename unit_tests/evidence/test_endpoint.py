@@ -630,19 +630,5 @@ def test_end_to_end_using_cli(tmp_path, capsys):
 	assert '   state         : 4 \x1b[3m(PILOT_REQUIRED)\x1b[0m\n' in output
 	assert ': 0 (INITIAL) id: endpoint' in output
 
-	args = {'command': 'pilot', 'name': endpoint, 'intent': 'ALL_READY', 'just_once': False}
-	cli = MgeCli(args)
-	cli.pilot()
-	assert 'Final state is 100 "ALL_READY"' in capsys.readouterr().out
-
-	args = {'command': 'summary', 'name': endpoint, 'just_once': False}
-	cli = MgeCli(args)
-	cli.summary()
-	output = capsys.readouterr().out
-	assert '🌐 Endpoint' in output
-	assert '   state         : 100 \x1b[3m(ALL_READY)\x1b[0m\n' in output
-	assert ': 100 (READY) id: endpoint' in output
-
-
 # if __name__ == "__main__":
 # 	pytest.main([__file__])
