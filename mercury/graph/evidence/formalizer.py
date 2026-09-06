@@ -225,16 +225,56 @@ class Formalizer(Agentic):
 
 			if self._meta_['state'] == self.states.MODEL_LOADED_OK.value:
 
-				# TODO: Implement ontology loading logic here.
+				graph = AgenticGraph(schema = None, extra_args = None)
+
+				ontologies	  = self.conf.get('ontologies', None)
+				endpoint_name = self.id.split('/')[0]
+				graph_class	  = graph.id
+
+				def find_tool(name):
+					if ontologies is not None:
+						if name not in ontologies:
+							self.log_error('Ontologies is malformed in the configuration of %s (missing %s)' % (self.id, name))
+							self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
+
+							return None
+
+						name = ontologies[name]
+
+					if name is None:
+						return None		# The option is just disabled via configuration
+
+					key = '%s/%s_%s' % (endpoint_name, graph_class, name)
+
+					if key not in self.tools:
+						self.log_error('Tool with key "%s" not found while piloting Formalizer %s.' % (key, self.id))
+						self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
+
+						return None
+
+					return self.tools[key]
 
 				self._meta_['state'] = self.states.ONTOLOGY_LOADED_OK.value
+
+				self._entities = find_tool('entities')
+				self._relation = find_tool('relationships')
+				self._known_id = find_tool('known_ids')
+
+				if self._meta_['state'] < 0:
+					break
+
+				if self._entities is None:
+					self.log_error('Configuration error: "entities" is mandatory while piloting Formalizer %s.' % self.id)
+					self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
+
+					break
 
 				if just_once:
 					break
 
 			if self._meta_['state'] == self.states.ONTOLOGY_LOADED_OK.value:
 
-				# TODO: Finalize any remaining setup before the Formalizer is ready.
+				# TODO: Remove capabilities that require disabled tools.
 
 				self._meta_['state'] = self.states.READY.value
 
