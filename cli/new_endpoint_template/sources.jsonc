@@ -43,8 +43,8 @@
 		"tools": []
 	},
 
-	"russell_works": {
-		"name": "russell_works",
+	"russell": {
+		"name": "russell",
 
 		"extra_args": {
 			"description": "This is a collection of Bertrand Russell's works in pdf format.",
@@ -73,8 +73,8 @@
 		"tools": []
 	},
 
-	"markdown_example": {
-		"name": "markdown_example",
+	"md_any": {
+		"name": "md_any",
 
 		"extra_args": {
 			"description": "This is a collection of markdown files.",
