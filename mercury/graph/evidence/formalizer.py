@@ -83,6 +83,20 @@ class Formalizer(Agentic):
 	2. Relationship Extraction
 	3. Classification
 
+	## Known Limitations
+
+	The functionality is still very exploratory and minimalistic. Specifically, the following limitations exist:
+
+	- Confidence scoring is not implemented.
+	- There is not mechanism to specify "threshold"
+	- The key 'definition' is hardcoded, it should be included in the config to make it easier to find and modify.
+	- hint_edges() requires a different logic since it is forcing to return all possible edges, not just those
+	- is_a() is not implemented. It is still unclear how to merge entities and if text classification should play a role in it.
+
+	In general, the whole system is very early-stage, released for developer use and experimentation. The best way of formalizing
+	entities and relationships from text is still to be determined. It requires a functioning architecture to experiment, and that
+	is what we are to-some-extent providing with this early-stage implementation.
+
 	Args:
 		schema (str): a schema (a unique name) to use for the Formalizer's ID.
 		extra_args (dict): the configuration for the Formalizer.
@@ -399,7 +413,7 @@ class Formalizer(Agentic):
 
 			return None
 
-		# TODO: Implement is_a.
+		# TODO: Implement is_a().
 		return 0
 
 
