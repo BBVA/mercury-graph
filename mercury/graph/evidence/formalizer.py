@@ -274,7 +274,14 @@ class Formalizer(Agentic):
 
 			if self._meta_['state'] == self.states.ONTOLOGY_LOADED_OK.value:
 
-				# TODO: Remove capabilities that require disabled tools.
+				def remove_capability(name):
+					self._meta_['capabilities'] = [c for c in self._meta_['capabilities'] if c['function']['name'] != name]
+
+				if self._relation is None:
+					remove_capability('hint_edges_%s' % self.name)
+
+				if self._known_id is None:
+					remove_capability('is_a_%s' % self.name)
 
 				self._meta_['state'] = self.states.READY.value
 
