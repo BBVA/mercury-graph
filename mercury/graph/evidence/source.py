@@ -359,7 +359,7 @@ class Source(Agentic):
 						'required': ['index']
 					},
 					'returns': {
-						'type': 'string'
+						'type': 'dict'
 					}
 				}
 			}

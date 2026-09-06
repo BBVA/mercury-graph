@@ -466,7 +466,7 @@ class AgenticGraph(Agentic):
 						'required': ['index']
 					},
 					'returns': {
-						'type': 'string'
+						'type': 'dict'
 					}
 				}
 			}
