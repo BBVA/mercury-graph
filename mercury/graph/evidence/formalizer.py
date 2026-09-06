@@ -306,8 +306,30 @@ class Formalizer(Agentic):
 
 			return None
 
-		# TODO: Implement hint_nodes.
-		return {}
+		text = arguments.get('text', None)
+
+		if text is None:
+			self.log_error('Formalizer.hint_nodes() %s called without "text" argument.' % self.id)
+
+			return None
+
+		ntx = self._entities._graph.networkx
+		schema = {}
+		concepts = arguments.get('concepts', None)
+		if concepts is None:
+			for id, _ in ntx.nodes.data('id'):
+				node = dict(ntx.nodes(data = True))[id]
+				schema[id] = node.get('definition', '')
+		else:
+			for id in concepts:
+				node = dict(ntx.nodes(data = True)).get(id, {})
+				schema[id] = node.get('definition', '')
+
+		schema = self._model.create_schema().entities(schema)
+
+		result = self._model.extract(text, schema)
+
+		return result.get('entities', {})
 
 
 	def hint_edges(self, arguments):
