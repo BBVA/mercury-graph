@@ -1,5 +1,11 @@
+import os
+
+from enum import Enum
 
 try:
+	os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+	os.environ.setdefault('USE_TF', '0')
+
 	from gliner2 import AutoExtractor
 
 except ImportError:
