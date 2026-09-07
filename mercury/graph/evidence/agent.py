@@ -86,13 +86,14 @@ class Agent(Agentic):
 			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
 
-		meta = {'state' : AlwaysReadyState.CONSTRUCTION_FAILED.value}
+		meta = {}
+		meta['state'] = AgentState.INITIAL.value
 
-		if self.conf is None or 'api_base' not in self.conf or 'capabilities' not in self.conf or 'model_name' not in self.conf:
-			return meta
+		meta['description'] = self.conf.get('description', '')
+		if type(meta['description']) is list:
+			meta['description'] = '\n'.join(meta['description'])
 
-		meta['capabilities'] = self.conf['capabilities']
-		meta['state'] = AlwaysReadyState.READY.value
+		meta['capabilities'] = []
 
 		return meta
 
