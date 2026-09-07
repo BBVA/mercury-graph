@@ -259,3 +259,34 @@ class Agent(Agentic):
 					break
 
 
+	def _capability(self, name, description):
+		""" Defines a capability for the agent with the given name and description.
+
+		Args:
+			name (str): The name of the capability.
+			description (str): A brief description of what the capability does.
+
+		Returns:
+			(dict): A dictionary representing the capability in the required format.
+		"""
+
+		return {
+			'type': 'function',
+			'function': {
+				'name': name,
+				'description': description,
+				'parameters': {
+					'type': 'object',
+					'properties': {
+						'content': {
+							'type': 'string',
+							'description': 'The content to the user prompt.'
+						}
+					},
+					'required': ['content']
+				},
+				'returns': {
+					'type': 'dict'
+				}
+			}
+		}
