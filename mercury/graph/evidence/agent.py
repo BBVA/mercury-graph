@@ -137,7 +137,7 @@ class Agent(Agentic):
 			self._meta_['state'] = AgentState.ERR_COMPLETION.value
 			raise AgenticRunFailed
 
-		return ret
+		return ret.choices[0]
 
 
 	def _meta(self):
