@@ -6,10 +6,15 @@ from .agentic import Agentic, AgenticRunInvalidState, AlwaysReadyState
 class AgentState(Enum):
 	""" The `AgentState` is an enumeration that defines the possible states of the Agent. """
 
-	INITIAL			=  0	# The initial state of the Agent.
-	TOOLS_NO_TOOLS	=  1	# The Agent has no tools available.
-	TOOLS_VALID		=  2	# The Agent has valid tools available.
-	READY			=  100	# The Agent is ready to be called.
+	ERR_BUILDING_TOOLS	= -3	# The Agent encountered an error finding the capabilities of the tools.
+	ERR_COMPLETION		= -2	# The Agent encountered an error finding or calling completion.
+	ERR_SETUP			= -1	# The Agent encountered an error during setup.
+
+	INITIAL				=  0	# The initial state of the Agent.
+	SETUP_OK			=  1	# The Agent was setup from its configuration.
+	COMPLETION_OK		=  2	# The Agent can call completion.
+
+	READY				=  100	# The Agent is ready to be called.
 
 
 class Agent(Agentic):
