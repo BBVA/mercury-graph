@@ -65,9 +65,11 @@ class Agent(Agentic):
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'agent', schema = schema, endpoint = endpoint, logger = logger)
 
+		self.states = AgentState
+
 		self.conf = extra_args
 
-		self.pilot(AlwaysReadyState.READY.value)	# This forces a call to _meta() to check the configuration.
+		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
 
 	def _run(self, request):
