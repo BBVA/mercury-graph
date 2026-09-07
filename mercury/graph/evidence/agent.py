@@ -28,12 +28,12 @@ class Agent(Agentic):
 
 	## Overview
 
-	This connects the LLM model is two ways: Upstream and Downstream.
+	This connects the LLM model in two ways:
 
-	1. Upstream: It exposes the Agent's capabilities (defined in the Agents configuration) via an Agentic interface to any Agentic in
+	1. **Upstream**: It exposes the Agent's capabilities (defined in the Agents configuration) via an Agentic interface to any Agentic in
 	its Endpoint that can use it as a tool.
 
-	2. Downstream: Making the Agent aware of what tools it has access to, and how they work so it can create proper arguments.
+	2. **Downstream**: Making the Agent aware of what tools it has access to, and how they work so it can create proper arguments.
 
 	## Focus and Scope
 
@@ -43,22 +43,35 @@ class Agent(Agentic):
 
 	Agents do not validate, prepare, plan their own tasks. The Endpoint is responsible for the "higher-level" orchestration.
 
-	These agents do not, in general, communicate through natural language. They use instructions and metadata in natural language but
+	These agents do not always communicate through natural language. They use instructions and metadata in natural language but
 	produce structured output that may or may not include natural language.
 
 	## Interfacing with Agents
 
-	Agents have a fixed list of capabilities. Any accounting of resources for answering a query belongs to the Endpoint. Agents do not
-	directly call a tool. Instead, they produce a litellm (OpenAI-style) answer with `finish_reason='tool_calls'` and
+	Unlike other Agentic, each Agent has only one capability, but you can create as many Agents as needed.
+
+	Agents do not directly call a tool. Instead, they produce a litellm (OpenAI-style) answer with `finish_reason='tool_calls'` and
 	`tool_calls=[ChatCompletionMessageToolCall(function=Function(arguments='{"input": 16}', name='my_tool_for_sqrt')`. The Endpoint
 	calls the tools if the "accounting" of resources is valid and calls the Agent back with result properly appended to the Agent's
-	conversation.
+	conversation. Any accounting of resources for answering a query belongs to the Endpoint.
 
 	## Defining an Agent
 
-	Agents are defined entirely by their configuration (model, capabilities and tools). Note that all capabilities in an Agent can
-	use all tools. If you want to restrict tool availability, just define more Agents. Agents are intentionally "narrow" in scope.
+	Agents are defined entirely by their configuration (model, capability and tools). Agents are intentionally "narrow" in scope.
 	You can use as many as you want, either exposing them in the Endpoint or letting another Agent use them as a tool.
+
+	### Configuration of an Agent
+
+	(See the file `agents.jsonc` of an Endpoint newly created using the `mge` CLI for a working example.)
+
+	To connect to any external LLM, possibly providing credentials, note that anything inside the "completion" dictionary will be
+	passed as arguments to the litellm `completion()` method in addition to `messages` and `tools` (if applicable).
+
+	## Known Limitations
+
+	- For now, calls to Agents to not use parallel execution.
+	- The management of tool calls is super-simplistic, just a counter to prevent infinite usage.
+	- There is no safe management of credentials. (You can restrict access to the configuration manually.)
 
 	Args:
 		schema (str): a schema (a unique name) to use for the Agent's ID.
