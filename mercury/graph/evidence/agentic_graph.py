@@ -148,13 +148,13 @@ class AgenticGraph(Agentic):
 		call = self.call.get(request['name'], None)
 
 		if call is None:
-			self.log_error('AgenticGraph does not have a function named "%s".' % request['function'])
+			self.log_error('AgenticGraph does not have a function named "%s".' % request['name'])
 			raise AgenticRunInvalidRequest
 
 		index = request['arguments'].get('index', None)
 
 		if index is None:
-			self.log_error('AgenticGraph function "%s" requires an "index" argument.' % request['function'])
+			self.log_error('AgenticGraph function "%s" requires an "index" argument.' % request['name'])
 			raise AgenticRunInvalidRequest
 
 		ret = {'finish_reason': 'stop', 'message': call(index)}

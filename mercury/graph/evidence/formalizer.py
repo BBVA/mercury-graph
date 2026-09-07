@@ -129,7 +129,7 @@ class Formalizer(Agentic):
 		call = self.call.get(request['name'], None)
 
 		if call is None:
-			self.log_error('Formalizer does not have a function named "%s".' % request['function'])
+			self.log_error('Formalizer does not have a function named "%s".' % request['name'])
 			raise AgenticRunInvalidRequest
 
 		ret = {'finish_reason': 'stop', 'message': call(request['arguments'])}
