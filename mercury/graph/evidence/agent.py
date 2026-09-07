@@ -102,5 +102,13 @@ class Agent(Agentic):
 		""" Simulates running the Agent with the given request.
 
 			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+		## NOTE:
+
+		The Endpoint takes care of validating the request according to the capabilities exposed by the Agent. It is not necessary to
+		validate again here and the Endpoint does not forward the dry_run() request to the Agent. This method is provided as a
+		requirement of the Agentic interface, but it is only used when you use Formalizers directly outside of an Endpoint.
 		"""
-		return {'status': 1, 'description': 'Not ready.'}
+
+		return {'status': 0, 'description': 'Valid request.'}
+
+
