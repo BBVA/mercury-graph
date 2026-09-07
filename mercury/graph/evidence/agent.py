@@ -245,7 +245,7 @@ class Agent(Agentic):
 
 			if self._meta_['state'] == self.states.COMPLETION_OK.value:
 				tools = []
-				for agentic in self.tools:
+				for agentic in self.tools.values():
 					capabilities = agentic.meta.get('capabilities', None)
 					if capabilities is None:
 						self.log_error('Error piloting Agent %s: capabilities missing for tool %s' % (self.id, agentic.id))
