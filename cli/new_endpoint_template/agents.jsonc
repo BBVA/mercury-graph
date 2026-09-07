@@ -16,6 +16,13 @@
 			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
 			"description": "This agent does EvidenceGraph creation and querying.",
 
+			// Upstream defines how the agent is exposed as a capability: You only provide a name and description since the interface
+			// details are created automatically by the Agent class.
+			"upstream": {
+				"name": "chat_with_reader",
+				"description": "Ask the agent questions about the EvidenceGraph in natural language."
+			},
+
 			// The first message is called "you_are" and goes with a role == "system". You can write something that will introduce
 			// every new conversation with the agent. It introduces the role the agent has in the endpoint and the tools at a high level.
 			// The Agent object will provide the LLM with all the capabilities of the tools at its disposal, describe what is not in
@@ -51,7 +58,12 @@
 		"name": "gru",
 
 		"extra_args": {
-			"description": "This is a supervision agent. For now, it can chat about the sources.",
+			"description": "This is a demo agent. It can chat about sources.",
+
+			"upstream": {
+				"name": "chat_with_gru",
+				"description": "Ask the agent questions about some Bertrand Russell works in natural language."
+			},
 
 			"you_are": [
 				"You are an agent with access to the Source with works from Bertrand Russell in PDF.",
