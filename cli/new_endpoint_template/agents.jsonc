@@ -14,40 +14,36 @@
 
 		"extra_args": {
 			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
-			"description": "This Agentic does the reading.",
+			"description": "This agent does EvidenceGraph creation and querying.",
 
-			"api_base": "http://localhost:11434",
-			"model_name": "ollama_chat/qwen3:8b",
+			// The first message is called "you_are" and goes with a role == "system". You can write something that will introduce
+			// every new conversation with the agent. It introduces the role the agent has in the endpoint and the tools at a high level.
+			// The Agent object will provide the LLM with all the capabilities of the tools at its disposal, describe what is not in
+			// the capabilities already..
+			// An empty list skips the message.
+			"you_are": [
+				"You are an agent with access to the EvidenceGraph.",
+				"It is built from ... The concepts mapped as nodes are ... the relations ..."
+			],
 
-			"capabilities": [
-				{
-					"type": "function",
-					"function": {
-						"name": "chat_with_reader",
-						"description": "Chat with READER agent.",
-						"parameters": {
-							"type": "object",
-							"properties": {
-								"message": {
-									"type": "string",
-									"description": "Message to send to the READER agent."
-								}
-							},
-							"required": ["message"]
-						},
-						"returns": {
-							"type": "array",
-							"items": {
-								"type": "string"
-							}
-						}
-					}
-				}
-			]
+			// The second message is called "you_must" and goes with a role == "developer". You explain what the Agent is expected
+			// to do with the user prompt that will follow this message.
+			"you_must": [
+				"You must use the formalizer to identify the nodes the user is asking about.",
+				"Ask the user for clarification about any ambiguous nodes."
+			],
+
+			"completion": {
+				"model": "ollama_chat/qwen3:8b",
+				"api_base": "http://localhost:11434",
+				"tool_choice": "auto",
+				"think": false
+			}
 		},
 
-		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
+		// "tools" declares what tools does the evidence graph expect. The endpoint will find them and provide them via `add_tool()`.
 		// Provide a list of tool names
+		// Providing tools to an agent automatically builds the expected litellm tool_calls from the capabilities of the tools.
 		"tools": ["wikipedia_2025", "GLiNER2", "e_graph"]
 	},
 
@@ -55,48 +51,27 @@
 		"name": "gru",
 
 		"extra_args": {
-			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
-			"description": "This Agentic does the supervision.",
+			"description": "This is a supervision agent. For now, it can chat about the sources.",
 
-			// These two arguments are mandatory for litellm completion:
-			"api_base": "http://localhost:11434",
-			"model_name": "ollama_chat/qwen3:8b",
+			"you_are": [
+				"You are an agent with access to the Source with works from Bertrand Russell in PDF.",
+				"The source constitutes a tree starting with the id 'russell' which is the name of the source.",
+				"You can navigate this tree calling the tools children_by_idx_russell and object_by_idx_russell."
+			],
 
-			// These extra arguments will be at any call if given.
-			"extra_litellm" : {
+			"you_must": [
+				"Answer the user's questions.",
+				"Share as much of your process as possible with the user. Each time you get new text from the source, share it."
+			],
+
+			"completion": {
+				"model": "ollama_chat/qwen3:8b",
+				"api_base": "http://localhost:11434",
 				"tool_choice": "auto",
 				"think": false
-			},
-
-			"capabilities": [
-				{
-					"type": "function",
-					"function": {
-						"name": "chat_with_gru",
-						"description": "Chat with GRU agent.",
-						"parameters": {
-							"type": "object",
-							"properties": {
-								"message": {
-									"type": "string",
-									"description": "Message to send to the GRU agent."
-								}
-							},
-							"required": ["message"]
-						},
-						"returns": {
-							"type": "array",
-							"items": {
-								"type": "string"
-							}
-						}
-					}
-				}
-			]
+			}
 		},
 
-		// "tools" declares what tools does the evidence graph expect. The endpoint will find them an provide them via `add_tool()`.
-		// Provide a list of tool names
-		"tools": ["wikipedia_2025", "GLiNER2", "e_graph"]
+		"tools": ["russell"]
 	}
 }
