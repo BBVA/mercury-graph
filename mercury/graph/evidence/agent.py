@@ -159,3 +159,103 @@ class Agent(Agentic):
 		return {'status': 0, 'description': 'Valid request.'}
 
 
+	def pilot(self, intent, just_once = False):
+		""" Pilots the Agent to a new state based on the given intent.
+
+		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
+		"""
+
+		if self.meta['state'] < 0:
+			self.log_error('Agent is in error state %d' % self._meta_['state'])
+
+			return
+
+		while self._meta_['state'] < intent:
+			if self._meta_['state'] == self.states.INITIAL.value:
+				self.completion = self.conf.get('completion', None)
+				if self.completion is None:
+					self.log_error('Completion configuration is missing for Agent %s' % self.id)
+					self._meta_['state'] = self.states.ERR_SETUP.value
+
+					break
+
+				upstream = self.conf.get('upstream', None)
+				if upstream is None or 'name' not in upstream or 'description' not in upstream:
+					self.log_error('Upstream configuration is missing or incomplete for Agent %s' % self.id)
+					self._meta_['state'] = self.states.ERR_SETUP.value
+
+					break
+
+				self.name = upstream['name']
+				self._meta_['capabilities'].append(self._capability(self.name, upstream['description']))
+
+				you_are = self.conf.get('you_are', None)
+				if you_are is not None:
+					if type(you_are) is list:
+						you_are = '\n'.join(you_are)
+
+					if you_are == '':
+						you_are = None
+					else:
+						you_are = {'role': 'system', 'content': you_are}
+
+				self.you_are = you_are
+
+				you_must = self.conf.get('you_must', None)
+				if you_must is not None:
+					if type(you_must) is list:
+						you_must = '\n'.join(you_must)
+
+					if you_must == '':
+						you_must = None
+					else:
+						you_must = {'role': 'developer', 'content': you_must}
+
+				self.you_must = you_must
+
+				self._meta_['state'] = self.states.SETUP_OK.value
+
+				if just_once:
+					break
+
+			if self._meta_['state'] == self.states.SETUP_OK.value:
+				if completion is None:
+					self.log_error('Error importing completion from litellm')
+					self._meta_['state'] = self.states.ERR_COMPLETION.value
+
+					break
+
+				self._meta_['state'] = self.states.COMPLETION_OK.value
+
+				if just_once:
+					break
+
+			if self._meta_['state'] == self.states.COMPLETION_OK.value:
+				tools = []
+				for agentic in self.tools:
+					capabilities = agentic.meta.get('capabilities', None)
+					if capabilities is None:
+						self.log_error('Error piloting Agent %s: capabilities missing for tool %s' % (self.id, agentic.id))
+						self._meta_['state'] = self.states.ERR_BUILDING_TOOLS.value
+
+						return
+
+					for capability in capabilities:
+						if 'type' in capability and capability['type'] == 'function' and 'function' in capability:
+							tools.append(capability)
+
+						else:
+							self.log_error('Error piloting Agent %s: invalid capability format for tool %s' % (self.id, agentic.id))
+							self._meta_['state'] = self.states.ERR_BUILDING_TOOLS.value
+
+							return
+
+				if len(tools) > 0:
+					self.completion['tools'] = tools
+
+				self._meta_['state'] = self.states.READY.value
+
+				if just_once:
+					break
+
+
