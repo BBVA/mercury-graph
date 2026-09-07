@@ -155,6 +155,16 @@ class Agent(Agentic):
 
 		meta['capabilities'] = []
 
+		upstream = self.conf.get('upstream', None)
+		if upstream is None or 'name' not in upstream or 'description' not in upstream:
+			self.log_error('Upstream configuration is missing or incomplete for Agent %s' % self.id)
+			meta['state'] = self.states.ERR_SETUP.value
+
+			return meta
+
+		self.name = upstream['name']
+		meta['capabilities'].append(self._capability(self.name, upstream['description']))
+
 		return meta
 
 
@@ -191,16 +201,6 @@ class Agent(Agentic):
 					self._meta_['state'] = self.states.ERR_SETUP.value
 
 					break
-
-				upstream = self.conf.get('upstream', None)
-				if upstream is None or 'name' not in upstream or 'description' not in upstream:
-					self.log_error('Upstream configuration is missing or incomplete for Agent %s' % self.id)
-					self._meta_['state'] = self.states.ERR_SETUP.value
-
-					break
-
-				self.name = upstream['name']
-				self._meta_['capabilities'].append(self._capability(self.name, upstream['description']))
 
 				you_are = self.conf.get('you_are', None)
 				if you_are is not None:
