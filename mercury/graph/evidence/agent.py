@@ -1,6 +1,12 @@
 from enum import Enum
 
-from .agentic import Agentic, AgenticRunInvalidState, AlwaysReadyState
+try:
+	from litellm import completion
+
+except ImportError:
+	completion = None
+
+from .agentic import Agentic, AgenticRunInvalidState, AgenticRunInvalidRequest, AgenticRunFailed
 
 
 class AgentState(Enum):
@@ -77,7 +83,48 @@ class Agent(Agentic):
 
 			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
-		raise AgenticRunInvalidState
+
+		if self._meta_['state'] != self.states.READY.value:
+			self.log_error('Agent %s is not ready for ._run.' % self.id)
+
+			raise AgenticRunInvalidState
+
+		if request['name'] != self.name:
+			self.log_error('Agent does not have a function named "%s".' % request['name'])
+
+			raise AgenticRunInvalidRequest
+
+		args = request['arguments']
+
+		messages = args.get('messages', None)
+		if messages is None:
+			if type(args) is dict and len(args) == 1:
+				args = next(iter(args.values()))
+
+			if type(args) is str:
+				messages = []
+
+				if self.you_are is not None:
+					messages.append(self.you_are)
+
+				if self.you_must is not None:
+					messages.append(self.you_must)
+
+				messages.append({'role': 'user', 'content': args})
+
+			else:
+				self.log_error('Agent _run received invalid arguments.')
+				raise AgenticRunInvalidRequest
+
+		try:
+			ret = completion(messages = messages, **self.completion)
+
+		except Exception as e:
+			self.log_error('Agent encountered an error during completion: %s' % str(e))
+			self._meta_['state'] = AgentState.ERR_COMPLETION.value
+			raise AgenticRunFailed
+
+		return ret
 
 
 	def _meta(self):
