@@ -73,3 +73,7 @@ options:
 ## Python implementation
 
 ::: cli.mge
+
+## A minimalistic Remote Endpoint CLI example
+
+::: mercury.graph.evidence.remote.remote_endpoint
