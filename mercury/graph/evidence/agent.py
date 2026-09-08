@@ -102,32 +102,48 @@ class Agent(Agentic):
 
 			raise AgenticRunInvalidState
 
-		if request['name'] != self.name:
-			self.log_error('Agent does not have a function named "%s".' % request['name'])
+		if type(request) == list:
+			messages = []
 
-			raise AgenticRunInvalidRequest
+			if self.you_are is not None:
+				messages.append(self.you_are)
 
-		args = request['arguments']
+			if self.you_must is not None:
+				messages.append(self.you_must)
 
-		messages = args.get('messages', None)
-		if messages is None:
-			if type(args) is dict and len(args) == 1:
-				args = next(iter(args.values()))
+			for msg in request:
+				if 'role' not in msg or 'content' not in msg:
+					self.log_error('Invalid message format in request.')
+					raise AgenticRunInvalidRequest
 
-			if type(args) is str:
-				messages = []
+				messages.append(msg)
 
-				if self.you_are is not None:
-					messages.append(self.you_are)
-
-				if self.you_must is not None:
-					messages.append(self.you_must)
-
-				messages.append({'role': 'user', 'content': args})
-
-			else:
-				self.log_error('Agent _run received invalid arguments.')
+		else:
+			if request['name'] != self.name:
+				self.log_error('Agent does not have a function named "%s".' % request['name'])
 				raise AgenticRunInvalidRequest
+
+			args = request['arguments']
+
+			messages = args.get('messages', None)
+			if messages is None:
+				if type(args) is dict and len(args) == 1:
+					args = next(iter(args.values()))
+
+				if type(args) is str:
+					messages = []
+
+					if self.you_are is not None:
+						messages.append(self.you_are)
+
+					if self.you_must is not None:
+						messages.append(self.you_must)
+
+					messages.append({'role': 'user', 'content': args})
+
+				else:
+					self.log_error('Agent _run received invalid arguments.')
+					raise AgenticRunInvalidRequest
 
 		try:
 			ret = completion(messages = messages, **self.completion)
