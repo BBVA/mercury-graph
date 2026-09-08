@@ -127,6 +127,12 @@ def test_agent_run_requests_and_failures(monkeypatch):
 	agent.pilot(agent.states.READY.value)
 	assert agent.run({'name': 'test_agent', 'arguments': {'messages': [{'role': 'user', 'content': 'given'}]}}) == {'content': 'answer'}
 	assert calls[-1]['messages'] == [{'role': 'user', 'content': 'given'}]
+	assert agent.run([{'role': 'user', 'content': 'listed'}]) == {'content': 'answer'}
+	assert calls[-1]['messages'] == [
+		{'role': 'system', 'content': 'System.'},
+		{'role': 'developer', 'content': 'Developer.'},
+		{'role': 'user', 'content': 'listed'}
+	]
 	assert agent.run({'name': 'test_agent', 'arguments': {'query': 'generated'}}) == {'content': 'answer'}
 	assert calls[-1]['messages'] == [
 		{'role': 'system', 'content': 'System.'},
@@ -138,6 +144,8 @@ def test_agent_run_requests_and_failures(monkeypatch):
 		agent.run({'name': 'other', 'arguments': {'messages': []}})
 	with pytest.raises(AgenticRunInvalidRequest):
 		agent.run({'name': 'test_agent', 'arguments': {'first': 1, 'second': 2}})
+	with pytest.raises(AgenticRunInvalidRequest):
+		agent.run([{'role': 'user'}])
 
 	def fail(**kwargs):
 		"""Raises the error reported by a failed completion service."""
