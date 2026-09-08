@@ -352,34 +352,21 @@ class Endpoint(Agentic):
 
 		is_pure_call = type(request) == dict and 'name' in request and 'arguments' in request
 
-		if is_pure_call or (self.num_capabilities > 1):
-			if not is_pure_call:
-				raise AgenticFailedToFindCapability
-
+		if is_pure_call:
 			name = request['name']
 
 			agentic = self.agentic_by_capability.get(name, None)
 
 			if agentic is None:
 				raise AgenticFailedToFindCapability
+		else:
+			# In this case, the Endpoint itself behaves like a single Agent capable of long conversations.
 
-			response = agentic.run(request)
+			if self.num_capabilities > 1:
+				# The caller wants to run a long conversation (is_pure_call == False), but the Endpoint cannot know which Agent to call.
+				raise AgenticFailedToFindCapability
 
-			finish_reason = response.get('finish_reason', None)
-
-			if finish_reason is None:
-				raise AgenticFailedToParseOutput
-
-			if finish_reason == 'stop' or finish_reason == 'error':		# Canonical 'finish_reason' values first.
-				return response
-
-			if finish_reason != 'tool_calls':							# Try to guess other names
-				if not finish_reason.lower().startswith('tool'):
-					return response										# Non-canonical finish_reason, let the caller handle it.
-
-			return self._response_loop(agentic, request, response)
-
-		agentic = next(iter(self.agentic_by_capability.values()))
+			agentic = next(iter(self.agentic_by_capability.values()))		# There is only one capability
 
 		response = agentic.run(request)
 
