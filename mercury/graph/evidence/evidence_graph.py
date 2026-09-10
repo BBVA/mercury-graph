@@ -125,8 +125,27 @@ class EvidenceGraph(Agentic):
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'evidence_graph', schema = schema, endpoint = endpoint, logger = logger)
 
+		if schema is None:			# This allows finding out the class name (to link tools) without actually instantiating a full object.
+			return
+
+		self.states = GraphState
+
 		self.conf = extra_args
 		self.name = schema
+
+		self._graph	= None
+
+		self._formalizer = None
+
+		self._entities = None
+		self._relation = None
+		self._known_id = None
+
+		self._id_nodes = None
+		self._id_edges = None
+		self._is_same  = None
+
+		self._sources = None
 
 		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
