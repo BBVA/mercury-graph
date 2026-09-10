@@ -409,6 +409,9 @@ class EvidenceGraph(Agentic):
 		self._graph	= None
 
 		self._formalizer = None
+		self._entities = None
+		self._relation = None
+		self._known_id = None
 
 		self._id_nodes = None
 		self._id_edges = None
