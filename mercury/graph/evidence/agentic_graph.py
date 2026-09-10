@@ -12,6 +12,7 @@ from mercury.graph.core import Graph
 class GraphState(Enum):
 	""" The `GraphState` is an enumeration that defines all possible states of an AgenticGraph. """
 
+	ERR_BUILDING		= -2	# Something failed during the building of the graph.
 	ERR_GRAPH_INIT		= -1	# Something failed loading the graph.
 
 	INITIAL				=  0	# The initial state of the graph.
