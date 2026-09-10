@@ -280,7 +280,112 @@ class EvidenceGraph(Agentic):
 
 	def crawl(self, index):
 		# TODO: Implement the crawl functionality for the EvidenceGraph.
-		raise NotImplementedError("Crawl functionality is not yet implemented.")
+	def _connect_downstream(self):
+		""" Connects the EvidenceGraph to downstream components or systems.
+
+		This parses the configuration and locates every necessary downstream Agentic: the Formalizer, its ontologies, Agentics with
+		capabilities to do entity extraction, etc. and the Sources.
+
+		Returns:
+			(bool): True if the connection was successful, False otherwise.
+		"""
+
+		agentics = self.conf.get('agentics', None)
+
+		if agentics is None:
+			self.log_error('No agentics configuration found in EvidenceGraph "%s".' % self.name)
+
+			return False
+
+		try:
+			formalizer	= agentics['formalizer']
+
+			assert type(formalizer) is str and formalizer != ''
+
+			id_nodes = agentics['id_nodes']
+			id_edges = agentics['id_edges']
+			is_same	 = agentics['is_same']
+			sources	 = agentics['sources']
+
+			if type(sources) is not list:
+				assert type(sources) is str
+				sources = [sources]
+
+		except:
+			self.log_error('Error parsing agentics configuration in EvidenceGraph "%s".' % self.name)
+
+			return False
+
+		endpoint_name = self.id.split('/')[0]
+
+		ag = Formalizer(schema = None, extra_args = None)
+		class_name_formalizer = ag.id
+
+		key = '%s/%s_%s' % (endpoint_name, class_name_formalizer, formalizer)
+
+		if key not in self.tools:
+			self.log_error('Formalizer "%s" not found in tools for EvidenceGraph "%s".' % (formalizer, self.name))
+
+			return False
+
+		self._formalizer = self.tools[key]
+
+		self._entities = self._formalizer._entities
+		self._relation = self._formalizer._relation
+		self._known_id = self._formalizer._known_id
+
+		ag = Agent(schema = None, extra_args = None)
+		class_name_agent = ag.id
+
+		def get_tool(name):
+			key = '%s/%s_%s' % (endpoint_name, class_name_formalizer, name)
+
+			if key in self.tools:
+				return self.tools[key]
+
+			key = '%s/%s_%s' % (endpoint_name, class_name_agent, name)
+			if key in self.tools:
+				return self.tools[key]
+
+			return None
+
+		if id_nodes is not None:
+			self._id_nodes = get_tool(id_nodes)
+
+			if self._id_nodes is None:
+				self.log_error('"id_nodes" tool "%s" not found for EvidenceGraph "%s".' % (id_nodes, self.name))
+				return False
+
+		if id_edges is not None:
+			self._id_edges = get_tool(id_edges)
+
+			if self._id_edges is None:
+				self.log_error('"id_edges" tool "%s" not found for EvidenceGraph "%s".' % (id_edges, self.name))
+				return False
+
+		if is_same is not None:
+			self._is_same = get_tool(is_same)
+
+			if self._is_same is None:
+				self.log_error('"is_same" tool "%s" not found for EvidenceGraph "%s".' % (is_same, self.name))
+				return False
+
+		ag = Source(schema = None, extra_args = None)
+		class_name_source = ag.id
+
+		self._sources = []
+		for source in sources:
+			key = '%s/%s_%s' % (endpoint_name, class_name_source, source)
+
+			if key in self.tools:
+				self._sources.append(self.tools[key])
+			else:
+				self.log_error('"sources" tool "%s" not found for EvidenceGraph "%s".' % (source, self.name))
+				return False
+
+		return True
+
+
 
 
 	def _capabilities(self):
