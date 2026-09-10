@@ -1,0 +1,34 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+	"e_graph": {
+		"name": "e_graph",
+
+		"extra_args": {
+			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
+			"description": "This evidence graph is a demo for development.",
+
+			// This is where the AgenticGraph will persist itself. The "initial_nodes" and "initial_edges" are only used when the graph
+			// is first created for the first time. It is a pickle of a NetworkX graph.
+			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
+			"persistence" : {"type" : "pickle", "$path" : "graphs/e_graph.pickle"},
+
+			// This dictionary allows using different names or disabling (making null) the various components of the EvidenceGraph.
+			// The names (values) must match the "tools" the Formalizer expects the Endpoint to provide.
+			// Sources is a list with any number of Source tools, everything else is a single tool or null.
+			"agentics": {"formalizer": "GLiNER2", "id_nodes": "GLiNER2", "id_edges": null, "is_same": null, "sources": ["wikipedia_2025"]}
+		},
+
+		// "tools" declares what tools does the evidence graph expect. The endpoint will find them and provide them via `add_tool()`.
+		// Provide a list of tool names
+		"tools": ["wikipedia_2025", "GLiNER2"]
+	}
+}

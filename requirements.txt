@@ -5,3 +5,10 @@ networkx
 scikit-learn
 anywidget
 traitlets
+chromadb
+lxml
+regex
+gliner2
+litellm
+fastapi
+uvicorn
