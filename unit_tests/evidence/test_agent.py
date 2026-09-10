@@ -39,6 +39,7 @@ def agent_conf(**extra):
 
 def test_agent_metadata_and_invalid_setup():
 	"""Verifies construction metadata, capability creation, and invalid setup handling."""
+	Agent(schema = None, extra_args = {})
 	logger = []
 	bad = Agent(schema = 'bad', extra_args = {}, logger = logger)
 

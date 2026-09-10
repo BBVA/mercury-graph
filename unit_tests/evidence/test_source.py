@@ -14,6 +14,7 @@ def _conf(path):
 
 def test_source(tmp_path):
 	""" Exercise Source initialization, piloting, and capability calls. """
+	Source(schema = None, extra_args = {})
 	(tmp_path / 'source.md').write_text('# Source\n')
 	conf = _conf(tmp_path)
 	s = Source(schema = 'any', extra_args = conf)

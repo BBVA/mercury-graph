@@ -98,6 +98,7 @@ def _ready_formalizer(monkeypatch, include_relation = True, include_known_id = T
 
 def test_formalizer_initialization_and_calls():
 	"""Exercise initial metadata, capability registration, and invalid calls."""
+	Formalizer(schema = None, extra_args = {})
 	formalizer = Formalizer(schema = 'any', extra_args = {'description': ['One', 'Two']})
 	assert type(formalizer) is Formalizer
 	assert formalizer.conf == {'description': ['One', 'Two']}
