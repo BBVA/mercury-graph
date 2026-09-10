@@ -386,6 +386,26 @@ class EvidenceGraph(Agentic):
 		return True
 
 
+	def close(self, endpoint_locked):
+		""" Closes the EvidenceGraph, persists it to disk and releases any resources it holds.
+
+		(See [`Agentic.close()`][mercury.graph.evidence.Agentic.close].)
+		"""
+
+		if endpoint_locked and self._graph is not None and self._fname is not None:
+			ntx = self._graph.networkx
+			with open(self._fname, 'wb') as f:
+				pickle.dump(ntx, f)
+
+		self._graph	= None
+
+		self._formalizer = None
+
+		self._id_nodes = None
+		self._id_edges = None
+		self._is_same  = None
+
+		self._sources = None
 
 
 	def _capabilities(self):
