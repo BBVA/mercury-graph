@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 290" role="img" aria-labelledby="title desc">
+  <title id="title">Read first warning</title>
+  <desc id="desc">A yellow warning triangle with a minimal black pictogram of a seated person reading a book and the words READ FIRST.</desc>
+  <rect width="240" height="290" rx="18" fill="#FFD83D"/>
+  <path d="M120 25 218 198H22Z" fill="#FFD83D" stroke="#151515" stroke-linejoin="round" stroke-width="14"/>
+  <!-- head -->
+  <circle cx="120" cy="89" r="13" fill="#151515"/>
+  <!-- seated body, legs and chair-free ground line -->
+  <path d="M108 107 92 132l25 25 30 1m-30-1-20 22m20-22 29 22m-54 0h73" fill="none" stroke="#151515" stroke-linecap="round" stroke-linejoin="round" stroke-width="11"/>
+  <!-- open book -->
+  <path d="M101 115q14-8 27 3 13-11 27-3v32q-14-8-27 3-13-11-27-3Z" fill="#FFD83D" stroke="#151515" stroke-linejoin="round" stroke-width="8"/>
+  <path d="M128 118v29" fill="none" stroke="#151515" stroke-width="6"/>
+  <text x="120" y="250" fill="#151515" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="800" letter-spacing="1" text-anchor="middle">READ FIRST</text>
+</svg>

@@ -3,3 +3,4 @@ include mercury/graph/
 graft mercury/graph/
 
 recursive-include tutorials *
+recursive-include cli *

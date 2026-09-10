@@ -1,7 +1,8 @@
-## Latest version 3.2.6
+## Latest version 3.3.x
 
 | Release  | Feature link to discussion | State |
 | -------- | -------------------------- | ----- |
+| 3.3.1 | Elements to build Evidence Graphs | IN PROGRESS |
 | 3.2.6 | Adds GraphFeatures (huge thanks to @ArturoSbr, @GasparGarciaBaez and @mikegrados for the contribution!) and adds compatibility with Spark Connect in Databricks (huge thanks to @rjurney!) | READY |
 | 3.2.5 | Fixes Moebius utf-8 issue, adds create_tutorials(), <br>adds generate_color_palette(), improves Moebius example, <br>adds python 3.13 support. | READY |
 | 3.2.4 | Implements Moebius as anywidget for modern Jupyterlab | READY |

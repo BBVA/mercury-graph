@@ -4,7 +4,7 @@ build-backend	= 'setuptools.build_meta'
 
 [project]
 name			= 'mercury-graph'
-version			= '3.2.6'
+version			= '3.3.1'
 description		= 'mercury-graph offers graph analytics capabilities with a technology-agnostic API'
 license			= {file = "LICENSE"}
 requires-python = '>=3.8'
@@ -14,7 +14,7 @@ classifiers		= ['Programming Language :: Python :: 3',
 keywords		= ['graph', 'embedding', 'graph embedding', 'graph exploration', 'graph metrics', 'graph visualization']
 authors			= [{name = 'Mercury Team', email = 'mercury.group@bbva.com'}]
 readme			= 'README.md'
-dependencies 	= ['numpy', 'pandas', 'scipy', 'networkx', 'scikit-learn', 'anywidget', 'traitlets']
+dependencies 	= ['numpy', 'pandas', 'scipy', 'networkx', 'scikit-learn', 'anywidget', 'traitlets', 'chromadb', 'lxml', 'regex', 'gliner2', 'litellm', 'fastapi', 'uvicorn']
 
 [project.optional-dependencies]
 dev = ['pytest', 'coverage', 'flake8', 'graphframes-latest', 'pyspark', 'matplotlib', 'seaborn', 'pyyaml', 'setuptools>=61.0', 'ipywidgets', 'pyvis']
@@ -22,10 +22,11 @@ doc = ['mkdocs', 'mkdocstrings[python]', 'mkdocs-material', 'mkdocs-minify-plugi
 
 [tool.setuptools]
 include-package-data = true
+script-files = ['cli/mge']
+
+[tool.setuptools.package-data]
+cli = ['mge', 'mge.py', 'favicon.ico', 'new_endpoint_template/*', 'new_endpoint_template/**/*']
 
 [tool.setuptools.packages.find]
-include 		= ['mercury*', 'tutorials*']
+include 		= ['mercury*', 'tutorials*', 'cli*']
 exclude 		= ['docker', 'unit_tests']
-
-[tool.pytest.ini_options]
-testpaths 		= ["unit_tests"]
