@@ -153,18 +153,32 @@ class EvidenceGraph(Agentic):
 	def _run(self, request):
 		""" Runs the EvidenceGraph with the given request.
 
-			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
+		(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
-		raise AgenticRunInvalidState
+
+		call = self.call.get(request['name'], None)
+
+		if call is None:
+			self.log_error('EvidenceGraph does not have a function named "%s".' % request['name'])
+			raise AgenticRunInvalidRequest
+
+		index = request['arguments'].get('index', None)
+
+		if index is None:
+			self.log_error('EvidenceGraph function "%s" requires an "index" argument.' % request['name'])
+			raise AgenticRunInvalidRequest
+
+		ret = {'finish_reason': 'stop', 'message': call(index)}
+
+		return ret
 
 
 	def _meta(self):
-		# TODO: Make this an AgenticGraph (It DOES override the _capabilities, but this method can be inherited)
-
 		""" Returns the metadata of the EvidenceGraph.
 
-			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
+		(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
+
 		meta = {}
 		meta['state'] = GraphState.INITIAL.value
 
@@ -178,12 +192,19 @@ class EvidenceGraph(Agentic):
 
 
 	def _dry_run(self, request):
-		# TODO: Make this an AgenticGraph (This method must disappear but not without testing)
 		""" Simulates running the EvidenceGraph with the given request.
 
 			(See [`Agentic.dry_run()`][mercury.graph.evidence.Agentic.dry_run].)
+
+		## NOTE:
+
+		The Endpoint takes care of validating the request according to the capabilities exposed by the EvidenceGraph. It is not necessary to
+		validate again here and the Endpoint does not forward the dry_run() request to the EvidenceGraph. This method is provided as a
+		requirement of the Agentic interface, but it is only used when you use Formalizers directly outside of an Endpoint.
 		"""
-		return {'status': 1, 'description': 'Not ready.'}
+
+		return {'status': 0, 'description': 'Valid request.'}
+
 
 
 	def crawl(self, index):
