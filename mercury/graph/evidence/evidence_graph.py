@@ -1,5 +1,13 @@
-from .agentic import Agentic, AgenticRunInvalidState, AlwaysReadyState
-from .agentic_graph import GraphState
+import os, pickle
+
+import pandas as pd
+import networkx as nx
+
+from .agentic import Agentic, AgenticRunInvalidRequest
+from .source import Source
+from .agentic_graph import GraphState, MultiGraph
+from .formalizer import Formalizer
+from .agent import Agent
 
 
 class EvidenceGraph(Agentic):
@@ -205,6 +213,69 @@ class EvidenceGraph(Agentic):
 
 		return {'status': 0, 'description': 'Valid request.'}
 
+
+	def pilot(self, intent, just_once = False):
+		""" Pilots the EvidenceGraph to a new state based on the given intent.
+
+		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
+		"""
+
+		def new_graph():
+			""" Creates an empty new graph when there is no persisted graph to load. The pandas dataframes are empty with just
+			column headers as required by a nx.digraph. The class `MultiGraph` overrides the behavior and converts it into a multigraph.
+			"""
+
+			keys = {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}
+
+			nodes = pd.DataFrame({keys['id']: pd.Series(dtype='str')})
+
+			edges = pd.DataFrame({keys['src']: pd.Series(dtype='str'), keys['dst']: pd.Series(dtype='str')})
+
+			return MultiGraph(data = edges, keys = keys, nodes = nodes)
+
+		if self.meta['state'] < 0:
+			self.log_error('EvidenceGraph is in error state %d' % self._meta_['state'])
+
+			return
+
+		while self._meta_['state'] < intent:
+			if self._meta_['state'] == self.states.INITIAL.value:
+				try:
+					self._fname = self.conf.get('persistence', None)
+					if self._fname is None:
+						self._graph = new_graph()
+					else:
+						self._fname = self._fname['path']
+						parent_dir	= os.path.dirname(self._fname)
+
+						if parent_dir:
+							os.makedirs(parent_dir, exist_ok = True)
+
+						if os.path.isfile(self._fname):
+							with open(self._fname, 'rb') as f:
+								ntx = pickle.load(f)			# A NetworkX graph object saved by this class.
+							self._graph = MultiGraph(data = ntx)
+						else:
+							self._graph = new_graph()
+
+				except:
+					self.log_error('Graph could not be created and initialized for EvidenceGraph "%s".' % self.name)
+					self._meta_['state'] = self.states.ERR_GRAPH_INIT.value
+					break
+
+				self._meta_['state'] = self.states.GRAPH_LOADED_OK.value
+
+				if just_once:
+					break
+
+			if self._meta_['state'] == self.states.GRAPH_LOADED_OK.value:
+				if self._connect_downstream():
+					self._meta_['state'] = self.states.READY.value
+
+				else:
+					self._meta_['state'] = self.states.ERR_BUILDING.value
+
+				break
 
 
 	def crawl(self, index):
