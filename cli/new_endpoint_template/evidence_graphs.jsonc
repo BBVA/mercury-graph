@@ -21,9 +21,10 @@
 			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
 			"persistence" : {"type" : "pickle", "$path" : "graphs/e_graph.pickle"},
 
-			// This dictionary allows using different names or disabling (making null) relations or known_ids.
+			// This dictionary allows using different names or disabling (making null) the various components of the EvidenceGraph.
 			// The names (values) must match the "tools" the Formalizer expects the Endpoint to provide.
-			"agentics": {"formalizer": "GLiNER2", "node_merge": null, "edge_merge": null, "sources": ["wikipedia_2025"]}
+			// Sources is a list with any number of Source tools, everything else is a single tool or null.
+			"agentics": {"formalizer": "GLiNER2", "id_nodes": "GLiNER2", "id_edges": null, "is_same": null, "sources": ["wikipedia_2025"]}
 		},
 
 		// "tools" declares what tools does the evidence graph expect. The endpoint will find them and provide them via `add_tool()`.
