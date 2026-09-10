@@ -108,6 +108,9 @@ class Formalizer(Agentic):
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'formalizer', schema = schema, endpoint = endpoint, logger = logger)
 
+		if schema is None:			# This allows finding out the class name (to link tools) without actually instantiating a full object.
+			return
+
 		self.states = FormalizerState
 
 		self.conf = extra_args
