@@ -9,26 +9,28 @@
       
       
       
+        <link rel="prev" href="../evidence_source/">
       
-        <link rel="next" href="reference/core/">
+      
+        <link rel="next" href="../evidence_formats/">
       
       
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>mercury-graph</title>
+        <title>mercury.graph.evidence_how - mercury-graph</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -47,11 +49,11 @@
       
     
     
-      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mercury-graph" class="md-skip">
+        <a href="#evidencegraph-in-production" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +94,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="mercury-graph" class="md-header__button md-logo" aria-label="mercury-graph" data-md-component="logo">
+    <a href="../.." title="mercury-graph" class="md-header__button md-logo" aria-label="mercury-graph" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m19 2-5 4.5v11l5-4.5zM6.5 5C4.55 5 2.45 5.4 1 6.5v14.66c0 .25.25.5.5.5.1 0 .15-.07.25-.07 1.35-.65 3.3-1.09 4.75-1.09 1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.31 4.75 1.06.1.05.15.03.25.03.25 0 .5-.25.5-.5V6.5c-.6-.45-1.25-.75-2-1V19c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V6.5C10.55 5.4 8.45 5 6.5 5"/></svg>
@@ -112,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              mercury.graph.evidence_how
             
           </span>
         </div>
@@ -235,7 +237,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="mercury-graph" class="md-nav__button md-logo" aria-label="mercury-graph" data-md-component="logo">
+    <a href="../.." title="mercury-graph" class="md-nav__button md-logo" aria-label="mercury-graph" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m19 2-5 4.5v11l5-4.5zM6.5 5C4.55 5 2.45 5.4 1 6.5v14.66c0 .25.25.5.5.5.1 0 .15-.07.25-.07 1.35-.65 3.3-1.09 4.75-1.09 1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.31 4.75 1.06.1.05.15.03.25.03.25 0 .5-.25.5-.5V6.5c-.6-.45-1.25-.75-2-1V19c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V6.5C10.55 5.4 8.45 5 6.5 5"/></svg>
@@ -262,37 +264,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Home
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="." class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -308,65 +283,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#agentic-graphs-and-evidence-graphs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agentic Graphs and Evidence Graphs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reference
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Reference">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#repository" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repository
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -375,8 +291,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -404,13 +322,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -431,7 +347,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -449,7 +365,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/core/" class="md-nav__link">
+      <a href="../core/" class="md-nav__link">
         
   
   
@@ -477,7 +393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/embeddings/" class="md-nav__link">
+      <a href="../embeddings/" class="md-nav__link">
         
   
   
@@ -505,7 +421,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/evidence_intro/" class="md-nav__link">
+      <a href="../evidence_intro/" class="md-nav__link">
         
   
   
@@ -533,7 +449,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/evidence/" class="md-nav__link">
+      <a href="../evidence/" class="md-nav__link">
         
   
   
@@ -561,7 +477,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/evidence_source/" class="md-nav__link">
+      <a href="../evidence_source/" class="md-nav__link">
         
   
   
@@ -586,10 +502,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="reference/evidence_how/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    mercury.graph.evidence_how
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -605,6 +548,70 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#intention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Intention
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-power-of-oss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The power of OSS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#some-details-on-how-the-entityrelationship-identification-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Some details on how the entity/relationship identification works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#some-lessons-on-maintaining-systems-that-explicitly-handle-evidence-from-literature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Some lessons on maintaining systems that explicitly handle evidence from literature
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -617,7 +624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/evidence_formats/" class="md-nav__link">
+      <a href="../evidence_formats/" class="md-nav__link">
         
   
   
@@ -645,7 +652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/evidence_cli/" class="md-nav__link">
+      <a href="../evidence_cli/" class="md-nav__link">
         
   
   
@@ -673,7 +680,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/ml/" class="md-nav__link">
+      <a href="../ml/" class="md-nav__link">
         
   
   
@@ -701,7 +708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/viz/" class="md-nav__link">
+      <a href="../viz/" class="md-nav__link">
         
   
   
@@ -756,10 +763,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#agentic-graphs-and-evidence-graphs" class="md-nav__link">
+  <a href="#intention" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agentic Graphs and Evidence Graphs
+        Intention
       
     </span>
   </a>
@@ -767,30 +774,35 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#reference" class="md-nav__link">
+  <a href="#the-power-of-oss" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reference
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Reference">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#repository" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repository
+        The power of OSS
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#some-details-on-how-the-entityrelationship-identification-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Some details on how the entity/relationship identification works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#some-lessons-on-maintaining-systems-that-explicitly-handle-evidence-from-literature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Some lessons on maintaining systems that explicitly handle evidence from literature
+      
+    </span>
+  </a>
   
 </li>
       
@@ -812,6 +824,46 @@
   
 
 
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../core/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    API
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
               
               <article class="md-content__inner md-typeset">
                 
@@ -822,71 +874,79 @@
   
 
 
-<h1 id="mercury-graph">mercury-graph</h1>
-<p><strong><code>mercury-graph</code></strong> is a Python library that offers <strong>graph analytics capabilities with a technology-agnostic API</strong>, enabling users
-to apply a curated range of performant and scalable algorithms and utilities regardless of the underlying data framework.</p>
-<p>The consistent, scikit-like interface abstracts away the complexities of internal transformations, allowing users to effortlessly switch
-between different graph representations to leverage optimized algorithms implemented using pure Python,
-<a href="https://numba.pydata.org/"><strong>numba</strong></a>, <a href="https://networkx.org/"><strong>networkx</strong></a> and
-PySpark <a href="https://graphframes.github.io/graphframes/docs/_site/index.html"><strong>GraphFrames</strong></a>.</p>
-<h2 id="agentic-graphs-and-evidence-graphs">Agentic Graphs and Evidence Graphs</h2>
+<h1 id="evidencegraph-in-production">EvidenceGraph in Production</h1>
+<h2 id="intention">Intention</h2>
+<p>In some ways, <code>mercury.graph.EvidenceGraph</code> is a PoC implementation. You can very easily test the concept and build systems that provide
+evidence graph-based reasoning on a single computer, with everything persisted to your file system, graphs in RAM, and simple LLM models
+that run on commodity GPUs. The architecture is easy to extend, but to achieve production-level performance, most of it would have to be re-implemented/extended/maintained in a more robust way.</p>
+<h2 id="the-power-of-oss">The power of OSS</h2>
+<p>Hopefully, <code>mercury.graph.EvidenceGraph</code> is being released early enough to become the core of a community effort and enough people see the
+value of evidence graphs to contribute to the project. You are all more than welcome <a href="https://github.com/BBVA/mercury-graph#contributing">CONTRIBUTING</a>.</p>
+<h2 id="some-details-on-how-the-entityrelationship-identification-works">Some details on how the entity/relationship identification works</h2>
 <hr />
-<div class="maturity-warning" role="note" aria-label="Early release warning">
-<img
-  src="../../images/warning-read-first-reader.svg"
-  width="128px"
-  alt="Read first"
->
-</div>
-
-<blockquote>
-<p><strong>Early release — developer and research preview</strong></p>
-<p>Version <strong>3.3.1</strong> is the first release of <strong>EvidenceGraph</strong>. It is intended for developers and researchers who want to help shape a well-defined idea at an early stage: building traceable, evidence-aware knowledge graphs from text.</p>
-<p>This release provides the core structure and enough working code to explore, extend and test that direction. <strong>It does not yet provide settled answers to many of its most important design questions</strong> -- for example, how entities and relations should best be resolved and merged; how agents should use graph tools effectively; and how an EvidenceGraph should be queried reliably through natural language.</p>
-<p><strong>All main classes also have known limitations</strong> that will need to be addressed as the library evolves. EvidenceGraph is therefore <strong>not ready for productive use</strong>. We discourage production deployments at this stage and cannot support them.</p>
-<p>If you are interested in experimenting, contributing, challenging assumptions and helping build a community around this approach, this is the right time to join. We will clearly communicate when the library is ready for productive use.</p>
-</blockquote>
-<hr />
-<p>Since version 3.3.1, <code>mercury-graph</code> can build and serve Evidence Graphs: structured, traceable representations of knowledge extracted
-from text that can be queried by both humans and LLM agents.</p>
-<p>The library includes a very lightweight <strong>Agentic framework</strong> that provides an Agentic API to any class derived from it. It is intended
-to operate with OSS LLMs that can run locally, but also works with any LLM that can be accessed through litellm, including: AWS Bedrock,
-OpenAI, Anthropic and Google's models.</p>
-<p>As a first example, any Mercury Graph can be exposed through the <strong>AgenticGraph</strong> class, which simply adds the Agentic interface to an
-existing graph. This allows graphs to be queried directly, either programmatically or in natural language through an <strong>Agent</strong>. The
-framework provides <strong>Agents</strong> that can communicate in natural language and use the <strong>AgenticGraph</strong> as a tool. Everything can be
-contained inside an <strong>Endpoint</strong> and maintained and served to the outside world by a cli via REST API.</p>
-<p>Furthermore, the library provides an <strong>EvidenceGraph</strong> class that represents a graph of evidence extracted from the text contained in
-a <strong>Source</strong>. An <strong>EvidenceGraph</strong> is built from a <strong>Source</strong>, which manages and indexes documents as chunks, together with a
-<strong>Formalizer</strong>, which extracts entities and relationships from the text.</p>
-<p><strong>Agents</strong> within an <strong>Endpoint</strong> containing an <strong>EvidenceGraph</strong> can interact with any Agentic object in the Endpoint—including the <strong>EvidenceGraph</strong>, the <strong>Source</strong>, and the <strong>Formalizer</strong>—to answer questions about the underlying documents while providing precise,
-traceable references to the relevant source passages.</p>
-<p>(See <a href="reference/evidence/"><code>evidence</code></a> for submodule reference, <a href="reference/evidence_source/"><code>evidence_source</code></a> for the
-components of the <strong>Source</strong> class, <a href="reference/evidence_cli/"><code>mge</code></a> for the cli and <a href="reference/evidence_how/"><code>evidence_how</code></a> for
-usage guidelines.)</p>
-<h2 id="reference">Reference</h2>
-<p>Currently implemented <strong>submodules</strong> in <code>mercury.graph</code> include:</p>
+<p>From <em>Gliner2: An efficient multi-task information extraction system with schema-driven interface</em> (Zaratiana et al., 2025):</p>
 <ul>
-<li>
-<p><a href="reference/core/"><strong><code>mercury.graph.core</code></strong></a>, with the main classes of the library that create and store the graphs' data and properties.</p>
-</li>
-<li>
-<p><a href="reference/embeddings/"><strong><code>mercury.graph.embeddings</code></strong></a>, with classes that calculate graph embeddings in different ways, such as
-following the Node2Vec algorithm.</p>
-</li>
-<li>
-<p><a href="reference/evidence/"><strong><code>mercury.graph.evidence</code></strong></a>, anything related with evidence graphs using agents.</p>
-</li>
-<li>
-<p><a href="reference/ml/"><strong><code>mercury.graph.ml</code></strong></a>, with graph theory and machine learning algorithms such as Louvain community detection,
-spectral clustering, Markov chains, spreading activation-based diffusion models and graph random walkers.</p>
-</li>
-<li>
-<p><a href="reference/viz/"><strong><code>mercury.graph.viz</code></strong></a>, with capabilities for graph visualization.</p>
-</li>
+<li>Can a small, CPU-friendly model replace the patchwork of NER, classification, and structured-extraction tools in an evidence pipeline?</li>
+<li>A schema can be the interface: describe what matters, then extract it without writing task-specific prompts or models.</li>
+<li>Local, private inference for sensitive documents is especially relevant when evidence cannot leave the organization.</li>
+<li>It approaches GPT-4o on zero-shot NER while running on standard CPU hardware, but it does not claim to beat LLMs everywhere.</li>
 </ul>
-<h3 id="repository">Repository</h3>
-<p>The website for the GitHub repository can be found <a href="https://github.com/BBVA/mercury-graph">here</a>.</p>
+<div class="highlight"><pre><span></span><code><span class="nc">@article</span><span class="p">{</span><span class="nl">zaratiana2025gliner2</span><span class="p">,</span>
+<span class="w">  </span><span class="na">title</span><span class="p">=</span><span class="s">{Gliner2: An efficient multi-task information extraction system with schema-driven interface}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">author</span><span class="p">=</span><span class="s">{Zaratiana, Urchade and Pasternak, Gil and Boyd, Oliver and Hurn-Maloney, George and Lewis, Ash}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">journal</span><span class="p">=</span><span class="s">{arXiv preprint arXiv:2507.18546}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">year</span><span class="p">=</span><span class="s">{2025}</span>
+<span class="p">}</span>
+</code></pre></div>
+<h2 id="some-lessons-on-maintaining-systems-that-explicitly-handle-evidence-from-literature">Some lessons on maintaining systems that explicitly handle evidence from literature</h2>
+<p>We have also listed some recommendations in bullet-form with lessons learned from the literature about similar systems.</p>
+<hr />
+<p>From <em>Atomic Task Graph: A Unified Framework for Agentic Planning and Execution</em> (Zhang et al., 2026):</p>
+<ul>
+<li>Make the execution graph explicit.</li>
+<li>Execute the graph directly.</li>
+<li>Record execution state.</li>
+<li>Repair locally instead of globally.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="nc">@article</span><span class="p">{</span><span class="nl">zhang2026atomic</span><span class="p">,</span>
+<span class="w">  </span><span class="na">title</span><span class="p">=</span><span class="s">{Atomic Task Graph: A Unified Framework for Agentic Planning and Execution}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">author</span><span class="p">=</span><span class="s">{Zhang, Yue and Chen, Sihan and Huang, Ziwen and Cui, Hanyun and Ji, Kangye and Wang, Zhi}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">journal</span><span class="p">=</span><span class="s">{arXiv preprint arXiv:2607.01942}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">year</span><span class="p">=</span><span class="s">{2026}</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<p>From <em>Automatic Ontology Construction Using LLMs as an External Layer of Memory, Verification, and Planning for Hybrid Intelligent Systems</em> (Salovskii et al., 2026):</p>
+<ul>
+<li>Do not graph everything. Graph the concepts, states, relations, and rules needed for important questions.</li>
+<li>Never let an LLM write directly to trusted memory. Write candidate deltas, validate, then publish.</li>
+<li>Preserve provenance on every fact. Source, timestamp, extraction method, confidence, and version.</li>
+<li>Use graphs where structure matters. Multi-hop relationships, constraints, state transitions, consistency, and explanation.</li>
+<li>Evaluate by task class, not generic answer quality. Compare text RAG and graph-assisted systems specifically on multi-hop QA, rule application, contradiction detection, temporal state, and planning.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="nc">@article</span><span class="p">{</span><span class="nl">salovskii2026automatic</span><span class="p">,</span>
+<span class="w">  </span><span class="na">title</span><span class="p">=</span><span class="s">{Automatic Ontology Construction Using LLMs as an External Layer of Memory, Verification, and Planning for Hybrid Intelligent Systems}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">author</span><span class="p">=</span><span class="s">{Salovskii, Pavel and Gorshkova, Iuliia}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">journal</span><span class="p">=</span><span class="s">{arXiv preprint arXiv:2604.20795}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">year</span><span class="p">=</span><span class="s">{2026}</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<p>From <em>Evidence-in-the-Loop: Trace-Driven Optimization for Customer-Service LLM Agents</em> (Wu et al., 2026):</p>
+<ul>
+<li>Keep hard controls outside the LLM.</li>
+<li>Normalize evidence into an auditable contract.</li>
+<li>Isolate evidence channels: Use feature flags and versioned components.</li>
+<li>Do not allow online self-modification.</li>
+<li>Separate optimization datasets from acceptance datasets</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="nc">@article</span><span class="p">{</span><span class="nl">wu2026evidence</span><span class="p">,</span>
+<span class="w">  </span><span class="na">title</span><span class="p">=</span><span class="s">{Evidence-in-the-Loop: Trace-Driven Optimization for Customer-Service LLM Agents}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">author</span><span class="p">=</span><span class="s">{Wu, Chunming and Qiu, Dafei and Yuan, Congde and Quan, Charles and Wu, Jun and Li, Suipeng and Wu, Mo and Xie, Gavin and Chen, Hope and Yao, Max}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">journal</span><span class="p">=</span><span class="s">{arXiv preprint arXiv:2607.18039}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">year</span><span class="p">=</span><span class="s">{2026}</span>
+<span class="p">}</span>
+</code></pre></div>
 
 
 
@@ -963,10 +1023,10 @@ spectral clustering, Markov chains, spreading activation-based diffusion models 
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["tabs", "navigation.indexes", "navigation.path", "navigation.expand", "search.suggest", "search.highlight", "search.share", "content.footnote.tooltips"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["tabs", "navigation.indexes", "navigation.path", "navigation.expand", "search.suggest", "search.highlight", "search.share", "content.footnote.tooltips"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
