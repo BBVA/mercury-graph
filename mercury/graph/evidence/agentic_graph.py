@@ -12,6 +12,7 @@ from mercury.graph.core import Graph
 class GraphState(Enum):
 	""" The `GraphState` is an enumeration that defines all possible states of an AgenticGraph. """
 
+	ERR_BUILDING		= -2	# Something failed during the building of the graph.
 	ERR_GRAPH_INIT		= -1	# Something failed loading the graph.
 
 	INITIAL				=  0	# The initial state of the graph.
@@ -148,13 +149,13 @@ class AgenticGraph(Agentic):
 		call = self.call.get(request['name'], None)
 
 		if call is None:
-			self.log_error('AgenticGraph does not have a function named "%s".' % request['function'])
+			self.log_error('AgenticGraph does not have a function named "%s".' % request['name'])
 			raise AgenticRunInvalidRequest
 
 		index = request['arguments'].get('index', None)
 
 		if index is None:
-			self.log_error('AgenticGraph function "%s" requires an "index" argument.' % request['function'])
+			self.log_error('AgenticGraph function "%s" requires an "index" argument.' % request['name'])
 			raise AgenticRunInvalidRequest
 
 		ret = {'finish_reason': 'stop', 'message': call(index)}

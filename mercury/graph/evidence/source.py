@@ -58,6 +58,9 @@ class Source(Agentic):
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'source', schema = schema, endpoint = endpoint, logger = logger)
 
+		if schema is None:			# This allows finding out the class name (to link tools) without actually instantiating a full object.
+			return
+
 		self.states = SourceState
 
 		self.conf = extra_args
@@ -78,13 +81,13 @@ class Source(Agentic):
 		call = self.call.get(request['name'], None)
 
 		if call is None:
-			self.log_error('Source does not have a function named "%s".' % request['function'])
+			self.log_error('Source does not have a function named "%s".' % request['name'])
 			raise AgenticRunInvalidRequest
 
 		index = request['arguments'].get('index', None)
 
 		if index is None:
-			self.log_error('Source function "%s" requires an "index" argument.' % request['function'])
+			self.log_error('Source function "%s" requires an "index" argument.' % request['name'])
 			raise AgenticRunInvalidRequest
 
 		ret = {'finish_reason': 'stop', 'message': call(index)}

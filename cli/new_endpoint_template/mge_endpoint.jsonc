@@ -41,6 +41,9 @@
 	// An integer limit to keep it simple and have a target to refactor in the future.
 	"max_tool_calls_per_query": 10,
 
+	// Whether the endpoint should return the history of tool calls in a valid response. (Error responses always include the history.)
+	"tool_call_history": true,
+
 	// When loading, if the file exists, the Endpoint will pilot itself to the state of the last save.
 	"auto_pilot": {"load" : ["state"], "file_name" : "mge_endpoint_autopilot.pickle"},
 

@@ -253,6 +253,8 @@ def test_endpoint_dry_run_request_issues(tmp_path, monkeypatch):
 	assert endpoint.dry_run({}) == {'status': 0, 'description': 'Valid request.'}
 	monkeypatch.setattr(endpoint, '_request_issues', lambda request: 'bad request')
 	assert endpoint.dry_run({}) == {'status': 2, 'description': 'bad request'}
+	endpoint._meta_['state'] = EndPointState.INITIAL.value
+	assert endpoint.dry_run({}) == {'status': 1, 'description': 'Not ready.'}
 
 
 def test_endpoint_request_issues(tmp_path, monkeypatch):
@@ -362,6 +364,16 @@ def test_endpoint_pilot_states(tmp_path, monkeypatch):
 	endpoint.pilot(EndPointState.ALL_READY.value, just_once = True)
 	assert endpoint.meta['state'] == EndPointState.ERR_TOOL_CAPS.value
 
+	endpoint.meta['state'] = EndPointState.LOADED_OBJ.value
+	monkeypatch.setattr(endpoint, '_link_objects', lambda: True)
+	endpoint.pilot(EndPointState.LINKED_OBJ.value, just_once = True)
+	assert endpoint.meta['state'] == EndPointState.LINKED_OBJ.value
+
+	endpoint.meta['state'] = EndPointState.LINKED_OBJ.value
+	monkeypatch.setattr(endpoint, '_expose_api', lambda: True)
+	endpoint.pilot(EndPointState.EXPOSED_API.value, just_once = True)
+	assert endpoint.meta['state'] == EndPointState.EXPOSED_API.value
+
 
 def test_endpoint_research_capabilities(tmp_path):
 	endpoint = _make_endpoint(tmp_path, 'research_capabilities')
@@ -431,6 +443,10 @@ def test_endpoint_run_routes_and_errors(tmp_path, monkeypatch):
 	assert endpoint._run({'name': 'cap', 'arguments': {}}) == tool_response
 
 	endpoint.num_capabilities = 1
+	endpoint._meta_['state'] = EndPointState.INITIAL.value
+	with pytest.raises(AgenticRunInvalidState):
+		endpoint._run({'name': 'cap', 'arguments': {}})
+	endpoint._meta_['state'] = EndPointState.ALL_READY.value
 	agentic.run.return_value = {}
 	with pytest.raises(AgenticFailedToParseOutput):
 		endpoint._run({'role': 'user', 'content': 'hi'})
@@ -448,7 +464,56 @@ def test_endpoint_run_routes_and_errors(tmp_path, monkeypatch):
 def test_endpoint_response_loop_placeholder(tmp_path):
 	endpoint = _make_endpoint(tmp_path, 'response_loop_placeholder')
 	with pytest.raises(AgenticFailedToParseOutput):
-		endpoint._response_loop(Mock(), {}, {})
+		endpoint._response_loop(Mock(), {'arguments': {}}, {})
+
+
+def test_endpoint_response_loop_tool_calls(tmp_path):
+	endpoint = _make_endpoint(tmp_path, 'response_loop_tool_calls')
+	endpoint.conf['max_tool_calls_per_query'] = 3
+	endpoint.conf['tool_call_history'] = True
+	tool = Mock()
+	tool.run.return_value = 'result'
+	endpoint.tools_by_capability = {'tool': tool}
+
+	def response(tool_calls):
+		return {'finish_reason': 'tool_calls', 'message': {'role': 'assistant', 'tool_calls': tool_calls}}
+
+	call = {'id': 'call', 'function': {'name': 'tool', 'arguments': '{"value": 1}'}}
+	agentic = Mock()
+	agentic.run.return_value = {'finish_reason': 'stop'}
+	result = endpoint._response_loop(agentic, {'arguments': {'content': 'hello'}}, response([call]))
+	assert result['history'][-1] == {'role': 'tool', 'tool_call_id': 'call', 'content': 'result'}
+	tool.run.assert_called_once_with({'name': 'tool', 'arguments': {'value': 1}, 'id': 'call'})
+
+	endpoint.conf['max_tool_calls_per_query'] = 1
+	assert 'Maximum' in endpoint._response_loop(Mock(), [], response([call]))['message']['content']
+	endpoint.conf['max_tool_calls_per_query'] = 3
+	assert 'missing a valid' in endpoint._response_loop(Mock(), [], response([{}]))['message']['content']
+	with pytest.raises(AgenticFailedToParseOutput):
+		endpoint._response_loop(Mock(), [], {'finish_reason': 'tool_calls', 'message': {}})
+	assert 'not found' in endpoint._response_loop(Mock(), [], response([{'function': {'name': 'missing'}}]))['message']['content']
+	assert 'Could not parse' in endpoint._response_loop(Mock(), [], response([{'function': {'name': 'tool', 'arguments': '{'}}]))['message']['content']
+
+	tool.run.side_effect = ValueError('failed')
+	assert 'failed' in endpoint._response_loop(Mock(), [], response([{'function': {'name': 'tool'}}]))['message']['content']
+	tool.run.side_effect = None
+
+	class Message:
+		def model_dump(self):
+			return {'role': 'assistant', 'tool_calls': [call]}
+
+	agentic.run.side_effect = [{'finish_reason': 'tool_calls', 'message': {'role': 'assistant', 'tool_calls': [call]}}, {'finish_reason': 'done'}]
+	endpoint.conf['max_tool_calls_per_query'] = 5
+	assert endpoint._response_loop(agentic, [], {'finish_reason': 'tool_calls', 'message': Message()})['finish_reason'] == 'done'
+
+	endpoint.conf['max_tool_calls_per_query'] = 2
+	assert 'Maximum' in endpoint._response_loop(Mock(), [], response([call]))['message']['content']
+
+	agentic.run.side_effect = None
+	agentic.run.return_value = {}
+	endpoint.conf['max_tool_calls_per_query'] = 3
+	with pytest.raises(AgenticFailedToParseOutput):
+		endpoint._response_loop(agentic, [], response([call]))
 
 
 def test_endpoint_load_objects(tmp_path):

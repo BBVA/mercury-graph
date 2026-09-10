@@ -11,6 +11,26 @@ PySpark [**GraphFrames**](https://graphframes.github.io/graphframes/docs/_site/i
 
 ## Agentic Graphs and Evidence Graphs
 
+----
+<div class="maturity-warning" role="note" aria-label="Early release warning">
+<img
+  src="../../images/warning-read-first-reader.svg"
+  width="128px"
+  alt="Read first"
+>
+</div>
+
+> **Early release — developer and research preview**
+>
+> Version **3.3.1** is the first release of **EvidenceGraph**. It is intended for developers and researchers who want to help shape a well-defined idea at an early stage: building traceable, evidence-aware knowledge graphs from text.
+>
+> This release provides the core structure and enough working code to explore, extend and test that direction. **It does not yet provide settled answers to many of its most important design questions** -- for example, how entities and relations should best be resolved and merged; how agents should use graph tools effectively; and how an EvidenceGraph should be queried reliably through natural language.
+>
+> **All main classes also have known limitations** that will need to be addressed as the library evolves. EvidenceGraph is therefore **not ready for productive use**. We discourage production deployments at this stage and cannot support them.
+>
+> If you are interested in experimenting, contributing, challenging assumptions and helping build a community around this approach, this is the right time to join. We will clearly communicate when the library is ready for productive use.
+----
+
 Since version 3.3.1, `mercury-graph` can build and serve Evidence Graphs: structured, traceable representations of knowledge extracted
 from text that can be queried by both humans and LLM agents.
 

@@ -352,34 +352,21 @@ class Endpoint(Agentic):
 
 		is_pure_call = type(request) == dict and 'name' in request and 'arguments' in request
 
-		if is_pure_call or (self.num_capabilities > 1):
-			if not is_pure_call:
-				raise AgenticFailedToFindCapability
-
+		if is_pure_call:
 			name = request['name']
 
 			agentic = self.agentic_by_capability.get(name, None)
 
 			if agentic is None:
 				raise AgenticFailedToFindCapability
+		else:
+			# In this case, the Endpoint itself behaves like a single Agent capable of long conversations.
 
-			response = agentic.run(request)
+			if self.num_capabilities > 1:
+				# The caller wants to run a long conversation (is_pure_call == False), but the Endpoint cannot know which Agent to call.
+				raise AgenticFailedToFindCapability
 
-			finish_reason = response.get('finish_reason', None)
-
-			if finish_reason is None:
-				raise AgenticFailedToParseOutput
-
-			if finish_reason == 'stop' or finish_reason == 'error':		# Canonical 'finish_reason' values first.
-				return response
-
-			if finish_reason != 'tool_calls':							# Try to guess other names
-				if not finish_reason.lower().startswith('tool'):
-					return response										# Non-canonical finish_reason, let the caller handle it.
-
-			return self._response_loop(agentic, request, response)
-
-		agentic = next(iter(self.agentic_by_capability.values()))
+			agentic = next(iter(self.agentic_by_capability.values()))		# There is only one capability
 
 		response = agentic.run(request)
 
@@ -911,28 +898,45 @@ class Endpoint(Agentic):
 				failed or were not allowed.
 		"""
 
-		# TODO: This method has not yet passed the notebook with tool call tests. Requires debugging as a server before approval.
+		if type(request) == dict:
+			message = request['arguments']
+			message['role'] = 'user'
+			history = [message]
 
-		history = list(request) if type(request) == list else [request]
-		calls = 1	# The initial call to agentic was already made by _run().
+		else:
+			history = request												# The Endpoint expects the request to be a conversation.
+
+		n_calls	  = 1														# The initial call to agentic was already made by _run().
 		max_calls = int(self.conf.get('max_tool_calls_per_query', 0))
 
 		while True:
-			message = response.get('message', {})
-			if type(message) != dict:
+			try:
+				message = response['message']
+				if type(message) != dict:									# If not a dict, it must be a litellm.types.utils.Message
+					message = message.model_dump()
+
+			except Exception:
 				raise AgenticFailedToParseOutput
 
 			history.append(message)
+
 			tool_calls = message.get('tool_calls', None)
 			if type(tool_calls) != list or len(tool_calls) == 0:
 				raise AgenticFailedToParseOutput
 
 			for tool_call in tool_calls:
-				function = tool_call.get('function', {}) if type(tool_call) == dict else {}
-				name = function.get('name', None) if type(function) == dict else None
-				call_id = tool_call.get('id', None) if type(tool_call) == dict else None
+				try:
+					function = dict(tool_call['function'])
+					name	 = function['name']
+					call_id  = tool_call.get('id', None)
 
-				if calls >= max_calls:
+				except Exception:
+					reason = 'Tool call is missing a valid "function" object.'
+					error_message = {'role': 'tool', 'content': reason}
+					history.append(error_message)
+					return {'finish_reason': 'error', 'message': error_message, 'history': history}
+
+				if n_calls >= max_calls:
 					reason = 'Maximum number of tool calls per query exceeded.'
 					error_message = {'role': 'tool', 'tool_call_id': call_id, 'content': reason}
 					history.append(error_message)
@@ -959,7 +963,7 @@ class Endpoint(Agentic):
 				if call_id is not None:
 					tool_request['id'] = call_id
 
-				calls += 1
+				n_calls += 1
 				try:
 					tool_response = tool.run(tool_request)
 				except Exception as e:
@@ -970,13 +974,13 @@ class Endpoint(Agentic):
 
 				history.append({'role': 'tool', 'tool_call_id': call_id, 'content': tool_response})
 
-			if calls >= max_calls:
+			if n_calls >= max_calls:
 				reason = 'Maximum number of tool calls per query exceeded.'
 				error_message = {'role': 'assistant', 'content': reason}
 				history.append(error_message)
 				return {'finish_reason': 'error', 'message': error_message, 'history': history}
 
-			calls += 1
+			n_calls += 1
 			response = agentic.run(history)
 			finish_reason = response.get('finish_reason', None)
 			if finish_reason is None:
@@ -984,5 +988,8 @@ class Endpoint(Agentic):
 
 			if finish_reason == 'tool_calls' or finish_reason.lower().startswith('tool'):
 				continue
+
+			if self.conf.get('tool_call_history', False):
+				response['history'] = history
 
 			return response

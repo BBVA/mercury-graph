@@ -108,6 +108,9 @@ class Formalizer(Agentic):
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'formalizer', schema = schema, endpoint = endpoint, logger = logger)
 
+		if schema is None:			# This allows finding out the class name (to link tools) without actually instantiating a full object.
+			return
+
 		self.states = FormalizerState
 
 		self.conf = extra_args
@@ -129,7 +132,7 @@ class Formalizer(Agentic):
 		call = self.call.get(request['name'], None)
 
 		if call is None:
-			self.log_error('Formalizer does not have a function named "%s".' % request['function'])
+			self.log_error('Formalizer does not have a function named "%s".' % request['name'])
 			raise AgenticRunInvalidRequest
 
 		ret = {'finish_reason': 'stop', 'message': call(request['arguments'])}
