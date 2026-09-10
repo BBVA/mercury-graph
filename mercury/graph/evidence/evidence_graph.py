@@ -208,7 +208,7 @@ class EvidenceGraph(Agentic):
 
 		The Endpoint takes care of validating the request according to the capabilities exposed by the EvidenceGraph. It is not necessary to
 		validate again here and the Endpoint does not forward the dry_run() request to the EvidenceGraph. This method is provided as a
-		requirement of the Agentic interface, but it is only used when you use Formalizers directly outside of an Endpoint.
+		requirement of the Agentic interface, but it is only used when you use EvidenceGraphs directly outside of an Endpoint.
 		"""
 
 		return {'status': 0, 'description': 'Valid request.'}
@@ -282,7 +282,7 @@ class EvidenceGraph(Agentic):
 		# TODO: Implement the crawl functionality for the EvidenceGraph.
 
 		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('Formalizer is not ready for hint_edges.')
+			self.log_error('EvidenceGraph is not ready for crawl.')
 
 			return None
 
