@@ -280,6 +280,15 @@ class EvidenceGraph(Agentic):
 
 	def crawl(self, index):
 		# TODO: Implement the crawl functionality for the EvidenceGraph.
+
+		if self._meta_['state'] != self.states.READY.value:
+			self.log_error('Formalizer is not ready for hint_edges.')
+
+			return None
+
+		raise NotImplementedError('Crawl functionality is not yet implemented.')
+
+
 	def _connect_downstream(self):
 		""" Connects the EvidenceGraph to downstream components or systems.
 
