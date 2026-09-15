@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  EvidenceGraph Wikipedia-style example dump
+  CC0 1.0 Universal: public-domain example content.
+-->
+<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mediawiki.org/xml/export-0.11/ http://www.mediawiki.org/xml/export-0.11.xsd" version="0.11" xml:lang="en">
+  <siteinfo>
+    <sitename>EvidenceGraph Example Wiki</sitename>
+    <dbname>evidencegraph_example</dbname>
+    <base>https://example.org/wiki/Main_Page</base>
+    <generator>MediaWiki 1.41</generator>
+    <case>first-letter</case>
+    <namespaces>
+      <namespace key="-2" case="first-letter">Media</namespace>
+      <namespace key="-1" case="first-letter">Special</namespace>
+      <namespace key="0" case="first-letter" />
+      <namespace key="6" case="first-letter">File</namespace>
+    </namespaces>
+  </siteinfo>
+  <page>
+    <title>Riverside Robotics Club</title>
+    <ns>0</ns>
+    <id>1</id>
+    <revision>
+      <id>101</id>
+      <parentid>0</parentid>
+      <timestamp>2026-09-15T12:00:00Z</timestamp>
+      <contributor>
+        <username>ExampleEditor</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created an example page</comment>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve">'''Riverside Robotics Club''' is a student club at [[Riverside High School]].
+
+Elena Ruiz is the science teacher at Riverside High School. She advises the Riverside Robotics Club.
+
+[[File:Helios_Solar_Car.svg|thumb|The Helios Solar Car]]
+
+== The Helios project ==
+
+The club built the [[Helios Solar Car]] for the [[Brookdale Science Fair]]. Noah Kim leads the Helios project.
+
+=== The team ===
+
+Noah Kim is a student at Riverside High School. Priya Shah is also a student at Riverside High School.
+
+* Noah Kim builds the car body.
+* Priya Shah connects the battery.
+* Elena Ruiz checks the safety plan.
+
+# The team chooses a design.
+# The team builds the solar car.
+# The team tests the solar car.
+
+=== Equipment ===
+
+{| class="wikitable"
+! Item !! Owner !! Use
+|-
+| Solar panel || Riverside Robotics Club || Collects sunlight
+|-
+| Battery || Riverside Robotics Club || Stores energy
+|-
+| Small motor || Noah Kim || Moves the car
+|}
+
+&lt;blockquote&gt;Elena Ruiz says that the team should test the car before the science fair.&lt;/blockquote&gt;
+
+----
+
+The team tests the Helios Solar Car in the science laboratory. The science laboratory is inside Riverside High School.&lt;ref&gt;The laboratory has tables, tools, and a charging station.&lt;/ref&gt;</text>
+      <sha1>0000000000000000000000000000000000000000</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Riverside High School</title>
+    <ns>0</ns>
+    <id>2</id>
+    <revision>
+      <id>102</id>
+      <parentid>0</parentid>
+      <timestamp>2026-09-15T12:01:00Z</timestamp>
+      <contributor>
+        <username>ExampleEditor</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created an example page</comment>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve">'''Riverside High School''' is a public school in Brookdale.
+
+Maya Singh is the principal of Riverside High School.
+
+== People ==
+
+Elena Ruiz teaches science at Riverside High School. Noah Kim and Priya Shah study at Riverside High School.
+
+== Places ==
+
+The science laboratory is inside Riverside High School. The science laboratory is next to the school library.
+
+== School event ==
+
+Riverside High School hosts the Brookdale Science Fair every spring.</text>
+      <sha1>0000000000000000000000000000000000000000</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Brookdale Science Fair</title>
+    <ns>0</ns>
+    <id>3</id>
+    <revision>
+      <id>103</id>
+      <parentid>0</parentid>
+      <timestamp>2026-09-15T12:02:00Z</timestamp>
+      <contributor>
+        <username>ExampleEditor</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created an example page</comment>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve">'''Brookdale Science Fair''' takes place at Riverside High School.
+
+Noah Kim presents the Helios Solar Car at the Brookdale Science Fair. Priya Shah helps Noah Kim during the presentation.
+
+== Awards ==
+
+Maya Singh gives the teamwork award to the Riverside Robotics Club.
+
+The award recognizes the work of Noah Kim, Priya Shah, and Elena Ruiz.</text>
+      <sha1>0000000000000000000000000000000000000000</sha1>
+    </revision>
+  </page>
+</mediawiki>
