@@ -1,11 +1,5 @@
 from enum import Enum
 
-try:
-	from litellm import completion
-
-except ImportError:
-	completion = None
-
 from .agentic import Agentic, AgenticRunInvalidState, AgenticRunInvalidRequest, AgenticRunFailed
 
 
@@ -98,7 +92,8 @@ class Agent(Agentic):
 
 		self.states = AgentState
 
-		self.conf = extra_args
+		self.conf		= extra_args
+		self.completion = None
 
 		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
@@ -158,7 +153,7 @@ class Agent(Agentic):
 					raise AgenticRunInvalidRequest
 
 		try:
-			ret = completion(messages = messages, **self.completion)
+			ret = self.completion(messages = messages, **self.comp_args)
 
 		except Exception as e:
 			self.log_error('Agent encountered an error during completion: %s' % str(e))
@@ -223,8 +218,8 @@ class Agent(Agentic):
 
 		while self._meta_['state'] < intent:
 			if self._meta_['state'] == self.states.INITIAL.value:
-				self.completion = self.conf.get('completion', None)
-				if self.completion is None:
+				self.comp_args = self.conf.get('completion', None)
+				if self.comp_args is None:
 					self.log_error('Completion configuration is missing for Agent %s' % self.id)
 					self._meta_['state'] = self.states.ERR_SETUP.value
 
@@ -260,9 +255,15 @@ class Agent(Agentic):
 					break
 
 			if self._meta_['state'] == self.states.SETUP_OK.value:
-				if completion is None:
-					self.log_error('Error importing completion from litellm')
-					self._meta_['state'] = self.states.ERR_COMPLETION.value
+				if self.completion is None:
+					try:
+						from litellm import completion
+
+					except ImportError:
+						self.log_error('Error importing completion from litellm')
+						self._meta_['state'] = self.states.ERR_COMPLETION.value
+
+					self.completion = completion
 
 					break
 
@@ -292,7 +293,7 @@ class Agent(Agentic):
 							return
 
 				if len(tools) > 0:
-					self.completion['tools'] = tools
+					self.comp_args['tools'] = tools
 
 				self._meta_['state'] = self.states.READY.value
 
