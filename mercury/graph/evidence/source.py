@@ -3,8 +3,6 @@ import os, pickle
 from collections import OrderedDict
 from pathlib import Path
 
-import chromadb as chroma
-
 from .agentic import Agentic, AgenticRunInvalidRequest
 from .source_parts import SourceState, SourceMaker, SourceFile, SourceEntity
 
@@ -276,6 +274,8 @@ class Source(Agentic):
 			return True			# This is the neat way to disable ChromaDB.
 
 		try:
+			import chromadb as chroma
+
 			self._chroma = chroma.PersistentClient(path = chroma_path)
 
 		except:
