@@ -2,15 +2,6 @@ import os, warnings
 
 from enum import Enum
 
-try:
-	os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
-	os.environ.setdefault('USE_TF', '0')
-
-	from gliner2 import AutoExtractor
-
-except ImportError:
-	AutoExtractor = None
-
 from .agentic import Agentic, AgenticRunInvalidRequest
 from .agentic_graph import AgenticGraph
 
@@ -193,6 +184,15 @@ class Formalizer(Agentic):
 
 					break
 
+				try:
+					os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+					os.environ.setdefault('USE_TF', '0')
+
+					from gliner2 import AutoExtractor
+
+				except ImportError:
+					AutoExtractor = None
+
 				library = model_config.get('library', None)
 				if library != 'gliner2' or AutoExtractor is None:
 					self.log_error('Missing gliner2.AutoExtractor or unsupported model library while piloting Formalizer %s.' % self.id)
@@ -200,6 +200,8 @@ class Formalizer(Agentic):
 					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
 
 					break
+
+				self.AutoExtractor = AutoExtractor
 
 				model = model_config.get('model', None)
 				if model is None:
@@ -226,7 +228,7 @@ class Formalizer(Agentic):
 				try:
 					with warnings.catch_warnings():
 						warnings.simplefilter('ignore')
-						self._model = AutoExtractor.from_pretrained(model, **args)
+						self._model = self.AutoExtractor.from_pretrained(model, **args)
 
 					self._meta_['state'] = self.states.MODEL_LOADED_OK.value
 
