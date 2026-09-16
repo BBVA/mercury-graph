@@ -184,6 +184,14 @@ def test_agent_imports_litellm_during_pilot(monkeypatch):
 	assert agent.completion is None
 	agent.pilot(agent.states.READY.value, just_once = True)
 	assert agent.completion is complete
+	assert agent.completion() is None
+
+	monkeypatch.setitem(sys.modules, 'litellm', None)
+	missing = Agent(schema = 'missing_import', extra_args = agent_conf(), logger = [])
+	missing.pilot(missing.states.READY.value, just_once = True)
+	with pytest.raises(UnboundLocalError):
+		missing.pilot(missing.states.READY.value, just_once = True)
+	assert missing.meta['state'] == missing.states.ERR_COMPLETION.value
 
 
 # if __name__ == "__main__":

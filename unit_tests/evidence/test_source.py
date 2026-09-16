@@ -62,6 +62,7 @@ def test_source_pilot_outcomes(tmp_path, monkeypatch):
 
 		def __init__(self, index, typ, src, dst, size, extensions, pdf):
 			self.state = SourceState.INITIAL.value
+			self.src = src
 
 		def build_indices(self):
 			""" Return the configured index-building result. """
@@ -75,6 +76,14 @@ def test_source_pilot_outcomes(tmp_path, monkeypatch):
 	assert just_once.meta['state'] == SourceState.MAKER_INIT_OK.value
 	just_once.pilot(100, just_once = True)
 	assert just_once.meta['state'] == SourceState.MAKER_READY_OK.value
+
+	(tmp_path / 'source').mkdir()
+	monkeypatch.chdir(tmp_path)
+	relative = _conf(tmp_path)
+	relative['src_path'] = 'source'
+	relative_source = Source(schema = 'relative', extra_args = relative)
+	relative_source.pilot(100, just_once = True)
+	assert relative_source._maker.src == str(tmp_path / 'source')
 
 	failed_indices = Source(schema = 'failed_indices', extra_args = _conf(tmp_path))
 	DummyMaker.build_result = False
