@@ -142,7 +142,7 @@ class Source(Agentic):
 			if self.endpoint != self and hasattr(self.endpoint, 'home'):
 				path = '%s/%s' % (self.endpoint.home, path)
 
-			# It may not exist yet, and will be created byt the SourceMaker. Relative paths are relative to the endpoint's home directory.
+			# It may not exist yet, and will be created by the SourceMaker. Relative paths are relative to the endpoint's home directory.
 
 			return path
 
