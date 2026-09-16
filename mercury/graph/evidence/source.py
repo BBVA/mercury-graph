@@ -132,6 +132,20 @@ class Source(Agentic):
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
 
+		def ValidatedPath(path):
+			if path is None or path.startswith('/'):
+				return path
+
+			if os.path.exists(path):
+				return os.path.abspath(path)
+
+			if self.endpoint != self and hasattr(self.endpoint, 'home'):
+				path = '%s/%s' % (self.endpoint.home, path)
+
+			# It may not exist yet, and will be created byt the SourceMaker. Relative paths are relative to the endpoint's home directory.
+
+			return path
+
 		if self.meta['state'] < 0:
 			self.log_error('Source is in error state %d' % self._meta_['state'])
 			return
@@ -140,8 +154,8 @@ class Source(Agentic):
 			if self._meta_['state'] == self.states.INITIAL.value:
 				try:
 					typ = self.conf['type']
-					src = self.conf['src_path']
-					dst = self.conf['dst_path']
+					src = ValidatedPath(self.conf['src_path'])
+					dst = ValidatedPath(self.conf['dst_path'])
 					siz = self.conf.get('cluster_size', 256)
 					ext = self.conf.get('extensions', None)
 					pdf = self.conf.get('pdf_to_markdown', None)
