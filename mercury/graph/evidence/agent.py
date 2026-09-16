@@ -67,6 +67,15 @@ class Agent(Agentic):
 	To connect to any external LLM, possibly providing credentials, note that anything inside the "completion" dictionary will be
 	passed as arguments to the litellm `completion()` method in addition to `messages` and `tools` (if applicable).
 
+	### Pulling the cost map from github
+
+	By default, litellm will pull the [model cost map](https://docs.litellm.ai/docs/proxy/custom_model_cost_map) from GitHub to keep it
+	updated, if you want to disable this behavior, set:
+
+	```bash
+	export LITELLM_LOCAL_MODEL_COST_MAP="True"
+	```
+
 	## Known Limitations
 
 	- For now, calls to Agents to not use parallel execution.
