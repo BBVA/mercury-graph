@@ -1,10 +1,8 @@
-import importlib
 import sys
+import types
 
 import networkx as nx
 import pytest
-
-import mercury.graph.evidence.formalizer as formalizer_module
 
 from mercury.graph.evidence import Formalizer
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest
@@ -62,6 +60,18 @@ class DummyModel:
 		return {'text': text, 'format': format}
 
 
+def set_gliner_extractor(monkeypatch, extractor):
+	"""Makes Formalizer's deferred GLiNER import return the supplied extractor.
+
+	Args:
+		monkeypatch (pytest.MonkeyPatch): pytest fixture used to restore the module cache.
+		extractor (type): class returned by importing ``gliner2.AutoExtractor``.
+	"""
+	module = types.ModuleType('gliner2')
+	module.AutoExtractor = extractor
+	monkeypatch.setitem(sys.modules, 'gliner2', module)
+
+
 def _configuration(**extra):
 	"""Return a complete Formalizer configuration, optionally extended by extra."""
 	conf = {
@@ -74,7 +84,7 @@ def _configuration(**extra):
 
 def _ready_formalizer(monkeypatch, include_relation = True, include_known_id = True):
 	"""Build a ready Formalizer with deterministic model and ontology tools."""
-	monkeypatch.setattr(formalizer_module, 'AutoExtractor', DummyModel)
+	set_gliner_extractor(monkeypatch, DummyModel)
 	DummyModel.loaded = []
 	DummyModel.fail_loading = False
 	ontologies = None
@@ -127,7 +137,7 @@ def test_formalizer_pilot_model_outcomes(monkeypatch):
 	no_model.pilot(100)
 	assert no_model.meta['state'] == FormalizerState.ERR_MODEL_INIT.value
 
-	monkeypatch.setattr(formalizer_module, 'AutoExtractor', DummyModel)
+	set_gliner_extractor(monkeypatch, DummyModel)
 	DummyModel.fail_loading = True
 	failed = Formalizer(schema = 'failed', extra_args = _configuration(), logger = [])
 	failed.pilot(100)
@@ -138,7 +148,7 @@ def test_formalizer_pilot_model_outcomes(monkeypatch):
 
 def test_formalizer_pilot_ontology_outcomes(monkeypatch):
 	"""Cover stepwise piloting and all ontology configuration failures."""
-	monkeypatch.setattr(formalizer_module, 'AutoExtractor', DummyModel)
+	set_gliner_extractor(monkeypatch, DummyModel)
 	DummyModel.loaded = []
 	DummyModel.fail_loading = False
 	stepwise = Formalizer(schema = 'stepwise', extra_args = _configuration())
@@ -170,7 +180,7 @@ def test_formalizer_pilot_ready_and_optional_capabilities(monkeypatch):
 
 def test_formalizer_pilot_just_once_reaches_each_stage(monkeypatch):
 	"""Stop after model, ontology, and ready transitions when requested."""
-	monkeypatch.setattr(formalizer_module, 'AutoExtractor', DummyModel)
+	set_gliner_extractor(monkeypatch, DummyModel)
 	DummyModel.fail_loading = False
 	formalizer = Formalizer(schema = 'staged', extra_args = _configuration())
 	formalizer.tools['formalizer_staged/agentic_graph_entities'] = DummyOntology({})
@@ -224,12 +234,11 @@ def test_formalizer_request_state_errors_and_close():
 
 
 def test_formalizer_handles_missing_gliner_dependency(monkeypatch):
-	"""Cover the optional GLiNER import fallback without changing its environment."""
-	with monkeypatch.context() as context:
-		context.setitem(sys.modules, 'gliner2', None)
-		importlib.reload(formalizer_module)
-		assert formalizer_module.AutoExtractor is None
-	importlib.reload(formalizer_module)
+	"""Cover the optional GLiNER import fallback when the Formalizer is piloted."""
+	monkeypatch.setitem(sys.modules, 'gliner2', None)
+	formalizer = Formalizer(schema = 'missing_gliner', extra_args = _configuration(), logger = [])
+	formalizer.pilot(FormalizerState.READY.value)
+	assert formalizer.meta['state'] == FormalizerState.ERR_MODEL_INIT.value
 
 
 # if __name__ == "__main__":

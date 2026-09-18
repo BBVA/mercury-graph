@@ -1,0 +1,4 @@
+src	dst	relation	id
+person|Fritz	company|bar	is_ceo	id_fritz_ceo_bar
+person|Otto	company|germany|chemical|MeinBier	is_ceo|german_company	id_otto_ceo_g_mb
+company|germany|chemical|MeinBier	country|Germany	company_in_country	id_mb_in_g

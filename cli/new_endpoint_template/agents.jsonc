@@ -51,7 +51,7 @@
 		// "tools" declares what tools does the evidence graph expect. The endpoint will find them and provide them via `add_tool()`.
 		// Provide a list of tool names
 		// Providing tools to an agent automatically builds the expected litellm tool_calls from the capabilities of the tools.
-		"tools": ["wikipedia_2025", "GLiNER2", "e_graph"]
+		"tools": ["mediawiki_example", "GLiNER2", "e_graph"]
 	},
 
 	"gru": {
@@ -67,7 +67,7 @@
 
 			"you_are": [
 				"You are an agent with access to the Source with works from Bertrand Russell in PDF.",
-				"The source constitutes a tree starting with the id 'russell' which is the name of the source.",
+				"The source constitutes a tree starting with the id 'pdf_example' which is the name of the source.",
 				"You can navigate this tree calling the tools children_by_idx_russell and object_by_idx_russell."
 			],
 
@@ -84,6 +84,6 @@
 			}
 		},
 
-		"tools": ["russell"]
+		"tools": ["pdf_example"]
 	}
 }

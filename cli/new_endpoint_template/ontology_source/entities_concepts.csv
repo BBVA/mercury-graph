@@ -1,0 +1,7 @@
+id	definition
+person	A human
+company	A company
+country	A country
+person|ceo	The CEO of a company is a subclass of person
+company|germany	A German company is a subclass of company
+company|germany|chemical	A German chemical company is a subclass of a subclass

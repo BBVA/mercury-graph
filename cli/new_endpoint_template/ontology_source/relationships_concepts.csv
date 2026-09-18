@@ -1,0 +1,4 @@
+id	src	dest	definition
+is_ceo	person	company	A person is the CEO of a company.
+is_ceo|german_company	person	company|germany	A person is the CEO of a company located in Germany.
+company_in_country	company	country	A company is located in a country.
