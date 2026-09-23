@@ -23,6 +23,12 @@ def _endpoint(state = 100, state_name = 'READY', lock = None):
 	return endpoint
 
 
+def test_mge_home_uses_package_cli_fallback(monkeypatch):
+	path = '%s/cli/' % mge.pathlib.Path(mge.mg.__file__).resolve().parent
+	monkeypatch.setattr(mge.os.path, 'exists', lambda candidate: candidate == '%s/new_endpoint_template' % path)
+	assert mge.mge_home() == path
+
+
 def test_file_logger_and_http_server(monkeypatch, tmp_path):
 	log_file = tmp_path / 'events.log'
 	logger = mge.MgeFileLogger(str(log_file))
@@ -71,6 +77,7 @@ def test_file_logger_and_http_server(monkeypatch, tmp_path):
 	with pytest.raises(mge.HTTPException) as error:
 		server.dry_run({})
 	assert (error.value.status_code, error.value.detail) == (500, 'broken')
+
 	class ErrorEndpoint:
 		def __init__(self, error):
 			self.error = error
