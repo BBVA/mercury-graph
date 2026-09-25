@@ -34,6 +34,25 @@ From *Gliner2: An efficient multi-task information extraction system with schema
 }
 ```
 
+## Finding symbolic structure in vector representations
+
+----
+
+From *The Emergent Symbolic Structure of Artificial Neural Networks* (McCoy et al., 2026):
+
+  * It is a different approach (vector embeddings) but in a supervised way, based on human-provided ontologies.
+  * It has code https://github.com/tommccoy1/discover/ that implements “DISsecting COmpositionality in VEctor Representations” (DISCOVER).
+  * So, despite starting directly from a sentence embedding, it may be usable, to detect or confirm relations in the EvidenceGraph.
+
+```bibtex
+@article{mccoy2026emergent,
+  title={The Emergent Symbolic Structure of Artificial Neural Networks},
+  author={McCoy, R. Thomas and Soulos, Paul and Linzen, Tal and Smolensky, Paul},
+  journal={arXiv preprint arXiv:2608.29530},
+  year={2026}
+}
+```
+
 ## Some lessons on maintaining systems that explicitly handle evidence from literature
 
 We have also listed some recommendations in bullet-form with lessons learned from the literature about similar systems.
