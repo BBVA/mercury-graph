@@ -1,6 +1,10 @@
 id
-company|bar
-company|germany|chemical|MeinBier
-country|Germany
-person|Fritz
-person|Otto
+organization|school|Riverside High School
+organization|club|Riverside Robotics Club
+person|principal|Maya Singh
+person|teacher|Elena Ruiz
+person|student|Noah Kim
+person|student|Priya Shah
+event|Brookdale Science Fair
+project|Helios Solar Car
+place|room|laboratory|science laboratory
