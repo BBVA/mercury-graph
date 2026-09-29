@@ -73,6 +73,20 @@ def test_wiki_markdown_writer():
 	assert writer._render_inline(inline)
 
 
+def test_wiki_markdown_writer_inline_backreferences():
+	""" Inline links and emphasis keep the captured text instead of literal backreferences. """
+
+	writer = WikiMarkdownWriter(None)
+
+	assert writer._render_inline('[[Page]]') == 'Page'
+	assert writer._render_inline('[[Page|shown text]]') == 'shown text'
+	assert writer._render_inline('[https://example.com label]') == '[label](https://example.com)'
+	assert writer._render_inline("'''bold'''") == '**bold**'
+	assert writer._render_inline("''italic''") == '*italic*'
+	assert writer._render_inline("'''Riverside Robotics Club''' is a club at [[Riverside High School]].") == \
+		'**Riverside Robotics Club** is a club at Riverside High School.'
+
+
 def test_pdf_to_markdown(tmp_path):
 	""" Stores absolute source and destination paths for descendant converters. """
 
