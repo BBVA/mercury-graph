@@ -257,7 +257,13 @@ class Source(Agentic):
 		if child._children is None:
 			return {'type': str(child.entity_type), 'content': child.content}
 
-		return {'type': 'SourceEntity: %s' % child.entity_type, 'description': child.description}
+		ret = {'type': 'SourceEntity: %s' % child.entity_type, 'description': child.description}
+
+		content = child.content
+		if content:
+			ret['content'] = content
+
+		return ret
 
 
 	def close(self, endpoint_locked):

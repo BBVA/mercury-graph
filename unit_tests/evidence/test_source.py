@@ -147,6 +147,21 @@ def test_source_tree_delegation(tmp_path):
 	assert len(s.logger) == 3
 
 
+def test_source_paragraph_content(tmp_path):
+	""" A paragraph returns its description and its whole text, even when it spans several lines. """
+	(tmp_path / 'source.md').write_text('# Source\n\nFirst half of a\nsentence.\n')
+	s = Source(schema = 'tree', extra_args = _conf(tmp_path))
+	s.pilot(100)
+
+	header_index = s.get_children_idx('tree|source.md')[0]
+	paragraph_index = [i for i in s.get_children_idx(header_index) if i.endswith('paragraph_1')][0]
+
+	paragraph = s.child(paragraph_index)
+	assert 'description' in paragraph
+	assert paragraph['content'] == 'First half of a sentence.'
+	assert 'content' not in s.child(header_index)
+
+
 def test_source_chroma_setup(tmp_path, monkeypatch):
 	""" Exercise Chroma client and collection setup outcomes. """
 	def set_chroma_client(client):
