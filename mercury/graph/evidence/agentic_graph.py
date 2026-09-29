@@ -383,7 +383,8 @@ class AgenticGraph(Agentic):
 
 		for i, ix in enumerate(ii):
 			if i == last:
-				tree[ix] = None
+				if ix not in tree:			# A parent added after its children must keep them.
+					tree[ix] = None
 
 			else:
 				if ix not in tree or tree[ix] is None:
