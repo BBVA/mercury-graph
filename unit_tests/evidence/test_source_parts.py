@@ -295,24 +295,5 @@ def test_source_entity(tmp_path):
 	assert entity.child('source|source.md|header|missing') is None
 
 
-def test_source_entity_paragraph_content(tmp_path):
-	""" A paragraph spanning several lines has its lines joined as content, while its children stay single-line. """
-
-	path = tmp_path / 'source.md'
-	path.write_text('# Source\n\nFirst half of a\nsentence.\n')
-	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
-	file = SourceFile('source|source.md', maker, str(path))
-
-	header = file.child(file.get_children_idx(file.index)[0])
-	paragraph = header.child([i for i in header.get_children_idx() if i.endswith('paragraph_1')][0])
-
-	assert paragraph.content == 'First half of a sentence.'
-	assert [paragraph.child(i).content for i in paragraph.get_children_idx()] == ['First half of a', 'sentence.']
-	assert header.content == ''
-
-	file.lines = lambda span: None
-	assert paragraph.content == ''
-
-
 # if __name__ == "__main__":
 # 	pytest.main([__file__])

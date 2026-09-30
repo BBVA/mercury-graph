@@ -34,21 +34,10 @@ class SourceEntity(SourceNode):
 
 	@property
 	def content(self):
-		""" Returns the content of this SourceEntity. Only SourceEntity without children have content, except paragraphs.
-
-		A paragraph can span multiple lines, but its children are single-line entities, so a sentence can be split across them. The
-		content of a paragraph is its lines joined with single spaces.
-		"""
+		""" Returns the content of this SourceEntity. Only SourceEntity without children have content. """
 
 		if self._children is not None:
-			if self._type != SourceEntityType.PARAGRAPH.value:
-				return ''
-
-			lines = self._parent.lines(self._line)
-			if lines is None:
-				return ''
-
-			return ' '.join(line.strip() for line in lines)
+			return ''
 
 		if self._span is None:
 			return self._parent.lines(self._line)
