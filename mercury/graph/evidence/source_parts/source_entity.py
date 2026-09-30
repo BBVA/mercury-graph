@@ -34,13 +34,21 @@ class SourceEntity(SourceNode):
 
 	@property
 	def content(self):
-		""" Returns the content of this SourceEntity. Only SourceEntity without children have content. """
+		""" Returns the content of this SourceEntity. Only SourceEntity without children have content.
+
+		The TEXT leaf of a paragraph spans all its lines: its content is those lines joined with single spaces, as Markdown renders them.
+		"""
 
 		if self._children is not None:
 			return ''
 
 		if self._span is None:
-			return self._parent.lines(self._line)
+			lines = self._parent.lines(self._line)
+
+			if self._type == SourceEntityType.TEXT.value and lines is not None:
+				return ' '.join(line.strip() for line in lines)
+
+			return lines
 
 		return self._parent.line_slice(self._line, self._span)
 
