@@ -1,4 +1,5 @@
 src	dst	relation	id
-person|Fritz	company|bar	is_ceo	id_fritz_ceo_bar
-person|Otto	company|germany|chemical|MeinBier	is_ceo|german_company	id_otto_ceo_g_mb
-company|germany|chemical|MeinBier	country|Germany	company_in_country	id_mb_in_g
+person|teacher|Elena Ruiz	organization|school|Riverside High School	teaches_at	id_elena_teaches_rhs
+organization|club|Riverside Robotics Club	organization|school|Riverside High School	belongs_to	id_club_in_rhs
+person|student|Noah Kim	project|Helios Solar Car	works_on|leads	id_noah_leads_helios
+event|Brookdale Science Fair	organization|school|Riverside High School	takes_place_at	id_fair_at_rhs

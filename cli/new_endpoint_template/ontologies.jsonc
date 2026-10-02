@@ -62,7 +62,7 @@
 			"description": [
 				"This AgenticGraph holds the keys to every entity and relation that has been identified. E.g., if location|country|city",
 				"is defined in 'entities', this can hold ids such as: location|country|city|Helsinki or location|country|city|Anchorage.",
-				"Also, if is_ceo(person, company) is defined in 'relationships', this holds ids for specific instances.",
+				"Also, if teaches_at(person|teacher, organization|school) is defined in 'relationships', this holds ids for specific instances.",
 				"This does not contain any other information (that belongs in the EvidenceGraph)."
 			],
 			"initial_nodes" : {"type" : "csv", "$path" : "ontology_source/known_ids_nodes.csv"},

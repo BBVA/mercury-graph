@@ -1,4 +1,11 @@
 id	src	dest	definition
-is_ceo	person	company	A person is the CEO of a company.
-is_ceo|german_company	person	company|germany	A person is the CEO of a company located in Germany.
-company_in_country	company	country	A company is located in a country.
+studies_at	person|student	organization|school	A student studies at a school.
+teaches_at	person|teacher	organization|school	A teacher teaches at a school.
+is_principal_of	person|principal	organization|school	A person is the principal of a school.
+advises	person|teacher	organization|club	A teacher advises a club.
+belongs_to	organization|club	organization|school	A club belongs to a school.
+works_on	person	project	A person works on a project.
+works_on|leads	person	project	A person leads a project.
+presents	person	project	A person presents a project at an event.
+takes_place_at	event	organization|school	An event takes place at a school.
+located_in	place	organization|school	A place is located inside a school.
