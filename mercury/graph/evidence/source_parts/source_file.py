@@ -164,15 +164,15 @@ class SourceFile(SourceNode):
 		Header 2 and the Title. The Title has content (the title itself) and no children. Header 2 has two children: the Subtitle and
 		the Paragraph. This becomes:
 
-		| entity       | content             | description                | children                  |
-		| ------------ | ------------------- | -------------------------- | ------------------------- |
-		| HEADER_1     |                     | "Title: The life of birds" | Title_1, HEADER_2         |
-		| Title_1      | "The life of birds" |                            |                           |
-		| HEADER_2     |                     | "Section 1: Overview"      | Subtitle_1_1, PARAGRAPH   |
-		| Subtitle_1_1 | "Overview"          |                            |                           |
-		| PARAGRAPH    |                     | "Content of 1.1"           | Text_1, Link_1            |
-		| Text_1       | "Bla, [pio](a.md)." |                            |                           |
-		| Link_1       | "[pio](a.md)"       |                            |                           |
+		| entity       | content               | description                | children                  |
+		| ------------ | --------------------- | -------------------------- | ------------------------- |
+		| HEADER_1     |                       | "Title: The life of birds" | Title_1, HEADER_2         |
+		| Title_1      | "The life of birds"   |                            |                           |
+		| HEADER_2     |                       | "Section 1: Overview"      | Subtitle_1_1, PARAGRAPH   |
+		| Subtitle_1_1 | "Overview"            |                            |                           |
+		| PARAGRAPH    |                       | "Content of 1.1"           | Text_1, Link_1            |
+		| Text_1       | "Bla, `[pio](a.md)`." |                            |                           |
+		| Link_1       | "`[pio](a.md)`"       |                            |                           |
 
 		Note that, range-wise, HEADER_1 covers all the lines in the file from itself to the line before the next HEADER_1 (possibly the
 		whole file), but Title_1 is only the slice of the line that contains the title. The same applies to HEADER_2, etc.
