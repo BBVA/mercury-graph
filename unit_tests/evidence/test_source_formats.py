@@ -70,6 +70,65 @@ def test_markdown_parser_paragraph_text_is_one_leaf():
 	assert children[1]['line'] == 0 and children[1]['span'] == slice(20, 42)
 
 
+def _lines_of(parts, ent_type):
+	""" Returns the line ranges of all the parsed parts of one entity type. """
+
+	return [part['line'] for part in parts if part['ent_type'] == ent_type.value]
+
+
+@pytest.mark.parametrize('char', ['`', '~'])
+def test_markdown_parser_fence_does_not_close_with_shorter_fence(char):
+	""" A fence opened with four markers is not closed by an inner fence of three, so nothing inside becomes a heading. """
+
+	content = ['# Doc', char*4 + 'markdown', char*3, '# Not a header', char*4, 'After']
+	parts = MarkdownParser(content).parse()
+
+	assert _lines_of(parts, SourceEntityType.CODE_BLOCK) == [slice(1, 5)]
+	assert _lines_of(parts, SourceEntityType.HEADER_1) == [slice(0, 6)]
+	assert _lines_of(parts, SourceEntityType.PARAGRAPH) == [slice(5, 6)]
+
+
+def test_markdown_parser_fence_closes_with_longer_fence():
+	""" A closing fence longer than the opening one closes the block. """
+
+	parts = MarkdownParser(['```', 'code', '`````', 'After']).parse()
+
+	assert _lines_of(parts, SourceEntityType.CODE_BLOCK) == [slice(0, 3)]
+	assert _lines_of(parts, SourceEntityType.PARAGRAPH) == [slice(3, 4)]
+
+
+def test_markdown_parser_fence_does_not_close_with_other_marker():
+	""" A tilde fence does not close a backtick fence. """
+
+	parts = MarkdownParser(['```', '~~~', '# Not a header', '```', 'After']).parse()
+
+	assert _lines_of(parts, SourceEntityType.CODE_BLOCK) == [slice(0, 4)]
+	assert _lines_of(parts, SourceEntityType.HEADER_1) == []
+	assert _lines_of(parts, SourceEntityType.PARAGRAPH) == [slice(4, 5)]
+
+
+@pytest.mark.parametrize('content', [['```', 'code', '# Not a header'], ['````', '```', '# Not a header', 'more']])
+def test_markdown_parser_unclosed_fence_reaches_the_end(content):
+	""" A fence that is never closed, even if it contains shorter fences, is code until the end of the document. """
+
+	parts = MarkdownParser(content).parse()
+
+	assert _lines_of(parts, SourceEntityType.CODE_BLOCK) == [slice(0, len(content))]
+	assert _lines_of(parts, SourceEntityType.HEADER_1) == []
+
+
+def test_markdown_parser_three_backtick_fence():
+	""" A regular three backtick fence closes with three backticks and keeps one TEXT leaf per line. """
+
+	content = ['```text', 'code', '```', 'After']
+	parts = MarkdownParser(content).parse()
+	code = next(part for part in parts if part['ent_type'] == SourceEntityType.CODE_BLOCK.value)
+
+	assert code['line'] == slice(0, 3)
+	assert [part['line'] for part in parts if part['parent'] == code['index']] == [0, 1, 2]
+	assert _lines_of(parts, SourceEntityType.PARAGRAPH) == [slice(3, 4)]
+
+
 def test_wiki_markdown_writer():
 	""" Renders basic blocks and tolerates the supported wikitext constructs. """
 
