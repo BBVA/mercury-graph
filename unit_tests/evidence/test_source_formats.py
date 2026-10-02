@@ -6,6 +6,15 @@ from mercury.graph.evidence.formats import PdfToMarkdown, MDbyPDFoxide, WikiMark
 from mercury.graph.evidence.source_parts import MarkdownParser, SourceEntityType
 
 
+def test_markdown_parser_keeps_text_after_a_quote_link():
+	"""Keeps text on either side of an inline link in a block quote."""
+
+	parts = MarkdownParser(['> before [link](page.md) tail']).parse()
+
+	assert any(part['ent_type'] == SourceEntityType.TEXT.value and part['span'] == slice(2, 9) for part in parts)
+	assert any(part['ent_type'] == SourceEntityType.TEXT.value and part['span'] == slice(24, 29) for part in parts)
+
+
 def test_markdown_parser():
 	""" Builds line-based entity descriptions for the supported Markdown constructs. """
 
