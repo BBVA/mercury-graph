@@ -93,11 +93,9 @@ class MarkdownParser:
 			fence = self.FENCE.match(text)
 
 			if fence:
-				marker = fence.group(1)[0]
-
 				if in_fence is None:
-					in_fence = marker
-				elif marker == in_fence:
+					in_fence = fence.group(1)
+				elif self._closes_fence(text, in_fence):
 					in_fence = None
 
 				continue
@@ -175,10 +173,10 @@ class MarkdownParser:
 	def _fenced_code(self, line, parent):
 		""" Adds a fenced code block and line text children. """
 
-		marker = self.FENCE.match(self._content[line]).group(1)[0]
+		opening = self.FENCE.match(self._content[line]).group(1)
 		end = line + 1
 		while end < len(self._content):
-			if self.FENCE.match(self._content[end]) and self.FENCE.match(self._content[end]).group(1)[0] == marker:
+			if self._closes_fence(self._content[end], opening):
 				end += 1
 
 				break
@@ -191,6 +189,14 @@ class MarkdownParser:
 			self._add('text', part, SourceEntityType.TEXT.value, item, slice(0, len(self._content[item])), None)
 
 		return end
+
+
+	def _closes_fence(self, text, opening):
+		""" Returns whether a line closes a fence: same marker character, repeated at least as many times as the opening fence. """
+
+		fence = self.FENCE.match(text)
+
+		return bool(fence) and fence.group(1)[0] == opening[0] and len(fence.group(1)) >= len(opening)
 
 
 	def _quote(self, line, parent, headers):
