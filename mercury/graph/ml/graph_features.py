@@ -1,4 +1,6 @@
 # Imports
+from __future__ import annotations
+
 import warnings
 from itertools import product
 from typing import Union, List

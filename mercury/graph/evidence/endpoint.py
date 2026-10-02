@@ -314,8 +314,8 @@ class Endpoint(Agentic):
 
 		elif cmd == LockState.FORCE_FREE:
 			try:
-				os.path.remove(self.lock_fn)
-			except Exception:
+				os.remove(self.lock_fn)
+			except FileNotFoundError:
 				pass
 
 			open(self.free_fn, 'w').close()		# No need to check if it exists.

@@ -161,6 +161,22 @@ def test_agentic_graph_loads_pickle_nodes_and_csv_edges(tmp_path):
 	graph.close(False)
 
 
+def test_agentic_graph_index_tree_does_not_depend_on_node_order(tmp_path):
+	""" Verifies that a parent listed after its children keeps them in the navigation tree. """
+	trees = []
+	for n, order in enumerate([['person', 'person|teacher'], ['person|teacher', 'person']]):
+		nodes_path = tmp_path / ('nodes_%d.csv' % n)
+		pd.DataFrame([{'id': i, 'definition': i} for i in order]).to_csv(nodes_path, index = False, sep = '\t')
+		graph = AgenticGraph(schema = 'entities', extra_args = {'initial_nodes': {'type': 'csv', 'path': str(nodes_path)}})
+
+		graph.pilot(graph.states.READY.value)
+		assert graph.get_children_idx('entities|person') == ['entities|person|teacher']
+		assert graph.child('entities|person') == {'definition': 'person'}
+		trees.append(graph._indices)
+
+	assert trees[0] == trees[1]
+
+
 def test_agentic_graph_handles_initialization_errors(tmp_path):
 	""" Verifies errors during graph creation and attempts to reuse an invalid graph. """
 	logger = []

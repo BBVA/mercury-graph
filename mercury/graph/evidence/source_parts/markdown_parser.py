@@ -11,6 +11,9 @@ class MarkdownParser:
 	multiline entity or a character slice for a single line entity.  SourceFile owns
 	the construction of SourceEntity objects from these items.
 
+	The text of a paragraph is a single TEXT leaf spanning all its lines, so sentences
+	are never split by line breaks.  Links and images inside it are separate leaves.
+
 	Args:
 		content (list of str): Markdown lines without their newline characters.
 	"""
@@ -263,7 +266,7 @@ class MarkdownParser:
 
 
 	def _paragraph(self, line, parent, section, headers):
-		""" Adds adjacent ordinary lines as a paragraph with inline children. """
+		""" Adds adjacent ordinary lines as a paragraph with one TEXT child for its whole text and LINK and IMAGE children. """
 
 		end = line
 		while end < len(self._content) and end not in headers and self._content[end].strip():
@@ -276,19 +279,20 @@ class MarkdownParser:
 			end += 1
 
 		part = self._add('paragraph', parent, SourceEntityType.PARAGRAPH.value, slice(line, end), None, 'Content of %s' % section)
+		self._add('text', part, SourceEntityType.TEXT.value, slice(line, end), None, None)
 
 		for item in range(line, end):
-			self._inline(part, item, 0, len(self._content[item]))
+			self._inline(part, item, 0, len(self._content[item]), text = False)
 
 		return end
 
 
-	def _inline(self, parent, line, start, stop):
-		""" Adds TEXT, LINK, and IMAGE leaves which partition a range in one line. """
+	def _inline(self, parent, line, start, stop, text = True):
+		""" Adds TEXT, LINK, and IMAGE leaves which partition a range in one line. With text = False, only LINK and IMAGE leaves. """
 
 		cursor = start
 		for match in self.LINK.finditer(self._content[line], start, stop):
-			if match.start() > cursor:
+			if text and match.start() > cursor:
 				self._add('text', parent, SourceEntityType.TEXT.value, line, slice(cursor, match.start()), None)
 
 			typ = SourceEntityType.IMAGE.value if match.group(0).startswith('!') else SourceEntityType.LINK.value
@@ -296,7 +300,7 @@ class MarkdownParser:
 			self._add(etp, parent, typ, line, slice(match.start(), match.end()), None)
 			cursor = match.end()
 
-		if cursor < stop:
+		if text and cursor < stop:
 			self._add('text', parent, SourceEntityType.TEXT.value, line, slice(cursor, stop), None)
 
 
