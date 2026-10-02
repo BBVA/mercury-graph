@@ -20,4 +20,3 @@ components. This should be seen as a starting point that will evolve into a more
 ::: mercury.graph.evidence.source_parts.SourceMaker
 ::: mercury.graph.evidence.source_parts.SourceFile
 ::: mercury.graph.evidence.source_parts.SourceEntity
-

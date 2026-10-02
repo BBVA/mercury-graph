@@ -6,6 +6,15 @@ from mercury.graph.evidence.formats import PdfToMarkdown, MDbyPDFoxide, WikiMark
 from mercury.graph.evidence.source_parts import MarkdownParser, SourceEntityType
 
 
+def test_markdown_parser_keeps_text_after_a_quote_link():
+	"""Keeps text on either side of an inline link in a block quote."""
+
+	parts = MarkdownParser(['> before [link](page.md) tail']).parse()
+
+	assert any(part['ent_type'] == SourceEntityType.TEXT.value and part['span'] == slice(2, 9) for part in parts)
+	assert any(part['ent_type'] == SourceEntityType.TEXT.value and part['span'] == slice(24, 29) for part in parts)
+
+
 def test_markdown_parser():
 	""" Builds line-based entity descriptions for the supported Markdown constructs. """
 
@@ -49,6 +58,18 @@ def test_markdown_parser_header_stack_and_block_transition():
 	assert next(part for part in parts if part['index'] == 'paragraph_1')['line'] == slice(1, 2)
 
 
+def test_markdown_parser_paragraph_text_is_one_leaf():
+	""" A paragraph written over several lines has one TEXT leaf for all its lines, and its links as separate leaves. """
+
+	content = ['Noah Kim studies at [Riverside](school.md). Priya Shah studies at Riverside High', 'School.']
+	parts = MarkdownParser(content).parse()
+	children = [part for part in parts if part['parent'] == 'paragraph_1']
+
+	assert [part['ent_type'] for part in children] == [SourceEntityType.TEXT.value, SourceEntityType.LINK.value]
+	assert children[0]['line'] == slice(0, 2) and children[0]['span'] is None
+	assert children[1]['line'] == 0 and children[1]['span'] == slice(20, 42)
+
+
 def test_wiki_markdown_writer():
 	""" Renders basic blocks and tolerates the supported wikitext constructs. """
 
@@ -71,6 +92,20 @@ def test_wiki_markdown_writer():
 	assert writer._render_line('# item').startswith('1.')
 	assert writer._render_line('; term : definition').startswith('**term:**')
 	assert writer._render_inline(inline)
+
+
+def test_wiki_markdown_writer_inline_backreferences():
+	""" Inline links and emphasis keep the captured text instead of literal backreferences. """
+
+	writer = WikiMarkdownWriter(None)
+
+	assert writer._render_inline('[[Page]]') == 'Page'
+	assert writer._render_inline('[[Page|shown text]]') == 'shown text'
+	assert writer._render_inline('[https://example.com label]') == '[label](https://example.com)'
+	assert writer._render_inline("'''bold'''") == '**bold**'
+	assert writer._render_inline("''italic''") == '*italic*'
+	assert writer._render_inline("'''Riverside Robotics Club''' is a club at [[Riverside High School]].") == \
+		'**Riverside Robotics Club** is a club at Riverside High School.'
 
 
 def test_pdf_to_markdown(tmp_path):

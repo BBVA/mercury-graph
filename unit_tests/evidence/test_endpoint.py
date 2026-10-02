@@ -73,6 +73,9 @@ def test_endpoint_lock(tmp_path):
 	assert endpoint.lock(LockState.FORCE_FREE) == LockState.FREE
 	assert endpoint.lock(LockState.LOCK) == LockState.LOCK
 	assert endpoint.lock(LockState.FORCE_FREE) == LockState.FREE
+	assert not os.path.exists(endpoint.lock_fn)
+	assert os.path.isfile(endpoint.free_fn)
+	assert endpoint.lock(LockState.INIT_IF_NONE) == LockState.FREE
 
 	with pytest.raises(ValueError):
 		endpoint.lock('what?')
