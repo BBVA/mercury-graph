@@ -1,8 +1,9 @@
 import json
+import urllib.error
 
 import pytest
 
-from mercury.graph.evidence.remote import RemoteEndpoint
+from mercury.graph.evidence.remote import RemoteEndpoint, RemoteEndpointError
 
 import mercury.graph.evidence.remote.remote_endpoint as remote_endpoint_module
 
@@ -43,14 +44,31 @@ def _capability():
 	}
 
 
+def _capability_with(name, properties, required):
+	""" Returns a capability with the given name, argument properties and required argument names. """
+
+	capability = _capability()
+	capability['function']['name'] = name
+	capability['function']['parameters']['properties'] = properties
+	capability['function']['parameters']['required'] = required
+
+	return capability
+
+
 def _mock_responses(monkeypatch, values):
-	""" Mocks endpoint HTTP calls returning values in order. Returns the list where the requests are recorded. """
+	""" Mocks endpoint HTTP calls returning values in order, or raising them if they are exceptions. Returns the list where the
+	requests are recorded.
+	"""
 
 	requests = []
 
 	def urlopen(request):
 		requests.append(request)
-		return Response(values.pop(0))
+		value = values.pop(0)
+		if isinstance(value, Exception):
+			raise value
+
+		return Response(value)
 
 	monkeypatch.setattr(remote_endpoint_module.urllib.request, 'urlopen', urlopen)
 	monkeypatch.setattr(remote_endpoint_module.json, 'load', lambda response: response.value)
@@ -124,6 +142,80 @@ def test_remote_endpoint_run_request(monkeypatch):
 		{'name': 'answer', 'arguments': {'question': 'question'}},
 		{'name': 'answer', 'arguments': 'question'}
 	]
+
+
+def test_remote_endpoint_run_text_arguments(monkeypatch):
+	""" Wraps a text into the only required string argument, or the only argument, and fails before sending it otherwise. """
+
+	search = _capability_with('search', {'question': {'type': 'string'}, 'limit': {'type': 'integer'}}, ['question'])
+	echo   = _capability_with('echo', {'text': {'type': 'string'}}, [])
+	count  = _capability_with('count', {'limit': {'type': 'integer'}}, ['limit'])
+	pair   = _capability_with('pair', {'a': {'type': 'string'}, 'b': {'type': 'string'}}, ['a', 'b'])
+	maybe  = _capability_with('maybe', {'a': {'type': 'string'}, 'b': {'type': 'string'}}, [])
+	ping   = _capability_with('ping', {}, [])
+
+	stop = {'finish_reason': 'stop', 'message': 'answer'}
+	requests = _mock_responses(monkeypatch, [{'capabilities': [search, echo, count, pair, maybe, ping]}, stop, stop])
+	endpoint = RemoteEndpoint('http://endpoint')
+
+	endpoint.run('search', 'question')
+	endpoint.run('echo', 'hello')
+
+	assert [json.loads(request.data) for request in requests[1:]] == [
+		{'name': 'search', 'arguments': {'question': 'question'}},
+		{'name': 'echo', 'arguments': {'text': 'hello'}}
+	]
+
+	with pytest.raises(RemoteEndpointError, match = '"count" takes its argument "limit" as integer, not as text'):
+		endpoint.run('count', 'ten')
+
+	with pytest.raises(RemoteEndpointError, match = '"pair" takes 2 required arguments but only one text was given.*: a, b'):
+		endpoint.run('pair', 'text')
+
+	with pytest.raises(RemoteEndpointError, match = '"maybe" takes 2 optional arguments but only one text was given'):
+		endpoint.run('maybe', 'text')
+
+	with pytest.raises(RemoteEndpointError, match = r'"ping" takes no arguments\. Pass an empty dictionary: \{\}\.'):
+		endpoint.run('ping', 'text')
+
+	assert len(requests) == 3
+
+
+def test_remote_endpoint_run_last_response(monkeypatch):
+	""" Keeps the complete response in last_response, returns the content of an agent with history and raises on errors. """
+
+	answer = {'finish_reason': 'stop', 'message': {'role': 'assistant', 'content': 'Elena Ruiz.'}, 'history': [{'role': 'user'}]}
+	error  = {'finish_reason': 'error', 'message': {'role': 'assistant', 'content': 'The tool failed.'}, 'history': [{'role': 'user'}]}
+
+	_mock_responses(monkeypatch, [{'capabilities': [_capability()]}, answer, error, error])
+	endpoint = RemoteEndpoint('http://endpoint')
+
+	assert endpoint.last_response is None
+
+	assert endpoint.run('answer', 'Who teaches?') == 'Elena Ruiz.'
+	assert endpoint.last_response == answer
+
+	with pytest.raises(RemoteEndpointError, match = 'The tool failed.'):
+		endpoint.run('answer', 'Who teaches?')
+	assert endpoint.last_response == error
+
+	assert endpoint.run('answer', {'question': 'Who teaches?'}, easy = False) == error
+	assert endpoint.last_response == error
+
+
+def test_remote_endpoint_run_resets_last_response(monkeypatch):
+	""" Leaves last_response empty when a call does not get a response. """
+
+	stop = {'finish_reason': 'stop', 'message': 'answer'}
+	_mock_responses(monkeypatch, [{'capabilities': [_capability()]}, stop, urllib.error.URLError('refused')])
+	endpoint = RemoteEndpoint('http://endpoint')
+
+	endpoint.run('answer', 'question')
+	assert endpoint.last_response == stop
+
+	with pytest.raises(urllib.error.URLError):
+		endpoint.run('answer', 'question')
+	assert endpoint.last_response is None
 
 
 def test_remote_endpoint_dry_run(monkeypatch):

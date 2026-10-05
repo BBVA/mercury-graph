@@ -2,6 +2,10 @@ import json
 import urllib.request
 
 
+class RemoteEndpointError(Exception):
+	""" Raised when a request to a remote Endpoint cannot be made or the Endpoint answers with an error. """
+
+
 class RemoteEndpoint:
 	""" This is a utility class for interacting with an Endpoint that is served using the `mge` CLI.
 
@@ -10,13 +14,18 @@ class RemoteEndpoint:
 	Args:
 		base_url (str): The URL of the endpoint as shown by the CLI (E.g., Uvicorn running on http://0.0.0.0:8765 (Press CTRL+C to quit))
 
+	Attributes:
+		capabilities (list): The capabilities of the remote endpoint, in the OpenAI tools format, as given by its metadata.
+		last_response (dict): The complete response of the last call to `run()`, including the `history` of an agent's tool calls when
+			the Endpoint provides it. None before the first call and when the last call did not get a response.
 	"""
 
 	def __init__(self, base_url):
 		self.base_url = base_url
 
-		self.capabilities = self.get_capabilities()
-		self._functions	  = self._parse_capabilities()
+		self.capabilities  = self.get_capabilities()
+		self._functions	   = self._parse_capabilities()
+		self.last_response = None
 
 
 	def get_capabilities(self):
@@ -99,23 +108,27 @@ class RemoteEndpoint:
 	def run(self, fun_name, args, easy = True):
 		""" Run a function on the remote endpoint.
 
+		The complete response is always stored in `last_response`, so the `history` of an agent's tool calls can be inspected after
+		an easy call.
+
 		Args:
 			fun_name (str): The name of the function to run.
-			args (dict): The arguments to pass to the function.
-			easy (bool, optional): If True, attempts to simplify argument passing and result handling. Defaults to True.
+			args (dict or str): The arguments to pass to the function. When `easy` is True, it can also be a string, which becomes the
+				value of the only required argument (or of the only argument, if none is required) when that argument is a string.
+			easy (bool, optional): If True, simplifies argument passing and returns the result itself: the `message` of the response,
+				or its `content` for an agent. A response that finishes with an error raises a RemoteEndpointError instead. If False,
+				returns the complete response. Defaults to True.
 
 		Returns:
-			(Any): The result of the function execution, potentially simplified if `easy` is True.
+			(Any): The result of the function when `easy` is True, the complete response otherwise.
 		"""
 
 		fun = self._functions[fun_name]
 
-		if easy:
+		if easy and type(args) is str:
+			args = self._text_as_arguments(fun_name, fun, args)
 
-			if type(args) is str and len(fun['arguments']) == 1:
-				key, val = next(iter(fun['arguments'].items()))
-				if val['type'] == 'string':
-					args = {key: args}
+		self.last_response = None
 
 		data = json.dumps({'name': fun_name, 'arguments': args}).encode('utf-8')
 
@@ -124,18 +137,55 @@ class RemoteEndpoint:
 		with urllib.request.urlopen(req) as response:
 			result = json.load(response)
 
-		if easy:
+		self.last_response = result
 
-			if type(result) is dict and 'finish_reason' in result and 'message' in result and not 'history' in result:
-				if result['finish_reason'] == 'stop':
-					message = result['message']
+		if not easy or type(result) is not dict or 'finish_reason' not in result or 'message' not in result:
+			return result
 
-					if type(message) is dict and 'content' in message:
-						message = message['content']
+		message = result['message']
 
-					return message
+		if type(message) is dict and 'content' in message:
+			message = message['content']
 
-		return result
+		if str(result['finish_reason']).lower().startswith('error'):
+			raise RemoteEndpointError('"%s" finished with an error: %s' % (fun_name, message))
+
+		return message
+
+
+	def _text_as_arguments(self, fun_name, fun, text):
+		""" Builds the arguments of a function from a single text, as `run()` does when `easy` is True.
+
+		Args:
+			fun_name (str): The name of the function.
+			fun (dict): The function, as parsed by `_parse_capabilities()`.
+			text (str): The text.
+
+		Returns:
+			(dict): The arguments, with the text as the value of the only required argument (or of the only argument, if none is
+				required) when that argument is a string.
+		"""
+
+		arguments = fun['arguments']
+
+		names = [nam for nam, arg in arguments.items() if arg['required']]
+		kind  = 'required'
+		if len(names) == 0:
+			names = list(arguments.keys())
+			kind  = 'optional'
+
+		if len(names) == 1 and arguments[names[0]]['type'] == 'string':
+			return {names[0]: text}
+
+		if len(names) == 0:
+			raise RemoteEndpointError('"%s" takes no arguments. Pass an empty dictionary: {}.' % fun_name)
+
+		if len(names) > 1:
+			reason = 'takes %d %s arguments but only one text was given' % (len(names), kind)
+		else:
+			reason = 'takes its argument "%s" as %s, not as text' % (names[0], arguments[names[0]]['type'])
+
+		raise RemoteEndpointError('"%s" %s. Pass a dictionary with its arguments: %s.' % (fun_name, reason, ', '.join(arguments.keys())))
 
 
 	def dry_run(self, fun_name, args):
