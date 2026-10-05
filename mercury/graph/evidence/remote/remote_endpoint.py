@@ -16,7 +16,7 @@ class RemoteEndpoint:
 		self.base_url = base_url
 
 		self.capabilities = self.get_capabilities()
-		self.functions	  = self.get_functions()
+		self._functions	  = self._parse_capabilities()
 
 
 	def get_capabilities(self):
@@ -37,11 +37,41 @@ class RemoteEndpoint:
 		return capabilities
 
 
-	def get_functions(self):
-		""" Fetch the functions exposed by the remote endpoint.
+	def list_capabilities(self):
+		""" List the names of the capabilities exposed by the remote endpoint.
+
+		Each name is unique in the Endpoint and is the first argument of `run()`.
 
 		Returns:
-			(dict): A dictionary of functions with their descriptions and arguments.
+			(list): The names of the capabilities, in the order given by the Endpoint.
+		"""
+
+		return list(self._functions.keys())
+
+
+	def describe(self, name):
+		""" Describe a capability of the remote endpoint: what it does and which arguments it takes.
+
+		Args:
+			name (str): The name of the capability, as returned by `list_capabilities()`.
+
+		Returns:
+			(dict): A dictionary with the keys 'name', 'description' and 'arguments'. 'arguments' maps each argument name to a
+				dictionary with its 'type', 'description' and whether it is 'required'.
+		"""
+
+		fun = self._functions[name]
+
+		arguments = {nam: dict(arg) for nam, arg in fun['arguments'].items()}
+
+		return {'name': name, 'description': fun['description'], 'arguments': arguments}
+
+
+	def _parse_capabilities(self):
+		""" Parse the capabilities of the remote endpoint into a dictionary of functions, used by `run()` and `describe()`.
+
+		Returns:
+			(dict): A dictionary, keyed by capability name, with the description and the arguments of each capability.
 		"""
 
 		functions = {}
@@ -59,9 +89,9 @@ class RemoteEndpoint:
 			args = {}
 
 			for nam, val in cap['function']['parameters']['properties'].items():
-				args[nam] = {'typ': val['type'], 'dsc': val.get('description', ''), 'req': nam in req}
+				args[nam] = {'type': val['type'], 'description': val.get('description', ''), 'required': nam in req}
 
-			functions[key] = {'dsc': dsc, 'args': args}
+			functions[key] = {'description': dsc, 'arguments': args}
 
 		return functions
 
@@ -78,13 +108,13 @@ class RemoteEndpoint:
 			(Any): The result of the function execution, potentially simplified if `easy` is True.
 		"""
 
-		fun = self.functions[fun_name]
+		fun = self._functions[fun_name]
 
 		if easy:
 
-			if type(args) is str and len(fun['args']) == 1:
-				key, val = next(iter(fun['args'].items()))
-				if val['typ'] == 'string':
+			if type(args) is str and len(fun['arguments']) == 1:
+				key, val = next(iter(fun['arguments'].items()))
+				if val['type'] == 'string':
 					args = {key: args}
 
 		data = json.dumps({'name': fun_name, 'arguments': args}).encode('utf-8')
@@ -119,7 +149,7 @@ class RemoteEndpoint:
 			(dict): The result of the dry run.
 		"""
 
-		fun = self.functions[fun_name]
+		fun = self._functions[fun_name]
 
 		data = json.dumps({'name': fun_name, 'arguments': args}).encode('utf-8')
 
