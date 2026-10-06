@@ -1,1 +1,1 @@
-from .remote_endpoint import RemoteEndpoint
+from .remote_endpoint import RemoteEndpoint, RemoteEndpointError

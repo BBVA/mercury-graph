@@ -1,7 +1,14 @@
 id	definition
-person	A human
-company	A company
-country	A country
-person|ceo	The CEO of a company is a subclass of person
-company|germany	A German company is a subclass of company
-company|germany|chemical	A German chemical company is a subclass of a subclass
+person	A human being.
+person|student	A person who studies at a school.
+person|teacher	A person who teaches a subject at a school.
+person|principal	A person who leads a school.
+organization	A group of people or an institution.
+organization|school	An educational institution where students study and teachers teach.
+organization|club	A group of students who share an activity.
+event	Something that takes place at a given time and place, such as a fair.
+place	A physical location, such as a building or a room.
+place|room	A room inside a building.
+place|room|laboratory	A room equipped for scientific work.
+project	A piece of work built by a team, such as a machine or a car.
+award	A prize given to recognize work.
