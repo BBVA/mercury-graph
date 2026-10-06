@@ -1,4 +1,5 @@
 import json
+import urllib.error
 import urllib.request
 
 
@@ -35,13 +36,12 @@ class RemoteEndpoint:
 			(list): A list of capabilities exposed by the remote endpoint.
 		"""
 
-		with urllib.request.urlopen('%s/meta' % self.base_url) as response:
-			meta = json.load(response)
+		meta = self._request('meta', what = 'Reading the metadata')
 
 		capabilities = meta.get('capabilities')
 
 		if capabilities is None:
-			raise RuntimeError('The Endpoint metadata does not expose capabilities.')
+			raise RemoteEndpointError('The Endpoint metadata does not expose capabilities.')
 
 		return capabilities
 
@@ -69,7 +69,7 @@ class RemoteEndpoint:
 				dictionary with its 'type', 'description' and whether it is 'required'.
 		"""
 
-		fun = self._functions[name]
+		fun = self._function(name)
 
 		arguments = {nam: dict(arg) for nam, arg in fun['arguments'].items()}
 
@@ -121,21 +121,22 @@ class RemoteEndpoint:
 
 		Returns:
 			(Any): The result of the function when `easy` is True, the complete response otherwise.
+
+		Raises:
+			RemoteEndpointError: if the function does not exist, its arguments are not valid (checked before sending them), the
+				Endpoint cannot be reached or answers with an HTTP error, or, when `easy` is True, the response finishes with an error.
 		"""
 
-		fun = self._functions[fun_name]
+		fun = self._function(fun_name)
 
 		if easy and type(args) is str:
 			args = self._text_as_arguments(fun_name, fun, args)
 
+		self._check_arguments(fun_name, fun, args)
+
 		self.last_response = None
 
-		data = json.dumps({'name': fun_name, 'arguments': args}).encode('utf-8')
-
-		req = urllib.request.Request('%s/run' % self.base_url, data = data, headers = {'content-type': 'application/json'})
-
-		with urllib.request.urlopen(req) as response:
-			result = json.load(response)
+		result = self._request('run', {'name': fun_name, 'arguments': args}, '"%s"' % fun_name)
 
 		self.last_response = result
 
@@ -191,6 +192,8 @@ class RemoteEndpoint:
 	def dry_run(self, fun_name, args):
 		""" Perform a dry run of a function on the remote endpoint.
 
+		The arguments are not checked by the client: validating them is what the Endpoint does in a dry run.
+
 		Args:
 			fun_name (str): The name of the function to dry run.
 			args (dict): The arguments to pass to the function.
@@ -199,13 +202,113 @@ class RemoteEndpoint:
 			(dict): The result of the dry run.
 		"""
 
-		fun = self._functions[fun_name]
+		self._function(fun_name)
 
-		data = json.dumps({'name': fun_name, 'arguments': args}).encode('utf-8')
+		return self._request('dry_run', {'name': fun_name, 'arguments': args}, 'The dry run of "%s"' % fun_name)
 
-		req = urllib.request.Request('%s/dry_run' % self.base_url, data = data, headers = {'content-type': 'application/json'})
 
-		with urllib.request.urlopen(req) as response:
-			result = json.load(response)
+	def _function(self, name):
+		""" Returns a function, as parsed by `_parse_capabilities()`, or raises a RemoteEndpointError if it does not exist.
 
-		return result
+		Args:
+			name (str): The name of the function.
+
+		Returns:
+			(dict): The function.
+		"""
+
+		fun = self._functions.get(name)
+
+		if fun is None:
+			raise RemoteEndpointError('"%s" is not a capability of this Endpoint. Use list_capabilities() to see them.' % name)
+
+		return fun
+
+
+	def _check_arguments(self, fun_name, fun, args):
+		""" Checks that the arguments of a function are a dictionary with all its required arguments and no unknown ones.
+
+		Args:
+			fun_name (str): The name of the function.
+			fun (dict): The function, as parsed by `_parse_capabilities()`.
+			args (Any): The arguments to check.
+		"""
+
+		arguments = fun['arguments']
+
+		if len(arguments) == 0:
+			hint = 'It takes no arguments: pass {}.'
+		else:
+			hint = 'Its arguments are: %s.' % ', '.join(arguments.keys())
+
+		if type(args) is not dict:
+			raise RemoteEndpointError('"%s" takes its arguments as a dictionary, not as %s. %s' % (fun_name, type(args).__name__, hint))
+
+		unknown = [nam for nam in args if nam not in arguments]
+		missing = [nam for nam, arg in arguments.items() if arg['required'] and nam not in args]
+
+		problems = []
+
+		if unknown:
+			problems.append('has no argument%s %s' % ('s' if len(unknown) > 1 else '', ', '.join('"%s"' % nam for nam in unknown)))
+
+		if missing:
+			problems.append('is missing its required argument%s %s'
+							% ('s' if len(missing) > 1 else '', ', '.join('"%s"' % nam for nam in missing)))
+
+		if problems:
+			raise RemoteEndpointError('"%s" %s. %s' % (fun_name, ' and '.join(problems), hint))
+
+
+	def _request(self, path, payload = None, what = None):
+		""" Sends a request to the remote endpoint and returns its decoded JSON answer, translating failures into RemoteEndpointError.
+
+		Args:
+			path (str): The path of the request, without the base URL (E.g., 'meta' or 'run').
+			payload (dict, optional): The JSON body of a POST request. If None, the request is a GET.
+			what (str, optional): What the request does, to start the error message (E.g., '"chat_with_reader"').
+
+		Returns:
+			(Any): The decoded JSON answer.
+		"""
+
+		url = '%s/%s' % (self.base_url, path)
+
+		if payload is None:
+			req = url
+		else:
+			data = json.dumps(payload).encode('utf-8')
+			req	 = urllib.request.Request(url, data = data, headers = {'content-type': 'application/json'})
+
+		try:
+			with urllib.request.urlopen(req) as response:
+				return json.load(response)
+
+		except urllib.error.HTTPError as e:
+			raise RemoteEndpointError('%s failed on the Endpoint (HTTP %d): %s'
+									  % (what or 'The request', e.code, self._error_detail(e))) from e
+
+		except (urllib.error.URLError, ConnectionError) as e:
+			raise RemoteEndpointError('No Endpoint is answering at %s. Start it with `mge serve <endpoint> ALL_READY <port>`.'
+									  % self.base_url) from e
+
+
+	def _error_detail(self, error):
+		""" Extracts the `detail` that the Endpoint sends with an HTTP error.
+
+		Args:
+			error (urllib.error.HTTPError): The error.
+
+		Returns:
+			(str): The detail, or a sentence saying that there is none.
+		"""
+
+		try:
+			detail = json.loads(error.read()).get('detail')
+		except Exception:
+			detail = None
+
+		if not detail:
+			return 'the Endpoint gave no details.'
+
+		return str(detail)
