@@ -3,6 +3,11 @@ import urllib.error
 import urllib.request
 
 
+# The capabilities of the agents in the `mge new` template. When `easy` is True, `run()` returns only the content of their answer.
+# TODO: The Endpoint metadata does not say which capabilities belong to agents yet. Replace this list when it does.
+AGENT_CAPABILITIES = {'chat_with_gru', 'chat_with_reader'}
+
+
 class RemoteEndpointError(Exception):
 	""" Raised when a request to a remote Endpoint cannot be made or the Endpoint answers with an error. """
 
@@ -116,8 +121,8 @@ class RemoteEndpoint:
 			args (dict or str): The arguments to pass to the function. When `easy` is True, it can also be a string, which becomes the
 				value of the only required argument (or of the only argument, if none is required) when that argument is a string.
 			easy (bool, optional): If True, simplifies argument passing and returns the result itself: the `message` of the response,
-				or its `content` for an agent. A response that finishes with an error raises a RemoteEndpointError instead. If False,
-				returns the complete response. Defaults to True.
+				or its `content` for an agent (a capability in `AGENT_CAPABILITIES`). A response that finishes with an error raises a
+				RemoteEndpointError instead. If False, returns the complete response. Defaults to True.
 
 		Returns:
 			(Any): The result of the function when `easy` is True, the complete response otherwise.
@@ -145,11 +150,14 @@ class RemoteEndpoint:
 
 		message = result['message']
 
-		if type(message) is dict and 'content' in message:
-			message = message['content']
-
 		if str(result['finish_reason']).lower().startswith('error'):
+			if type(message) is dict:
+				message = message.get('content', message)
+
 			raise RemoteEndpointError('"%s" finished with an error: %s' % (fun_name, message))
+
+		if fun_name in AGENT_CAPABILITIES and type(message) is dict:		# An agent answers with {'role': ..., 'content': ...}
+			message = message.get('content')
 
 		return message
 

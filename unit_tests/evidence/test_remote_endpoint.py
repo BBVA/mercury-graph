@@ -67,7 +67,8 @@ def _capabilities():
 		_capability_with('count', {'limit': {'type': 'integer'}}, ['limit']),
 		_capability_with('pair', {'a': {'type': 'string'}, 'b': {'type': 'string'}}, ['a', 'b']),
 		_capability_with('maybe', {'a': {'type': 'string'}, 'b': {'type': 'string'}}, []),
-		_capability_with('ping', {}, [])
+		_capability_with('ping', {}, []),
+		_capability_with('chat_with_reader', {'content': {'type': 'string'}}, ['content'])
 	]
 
 
@@ -135,7 +136,7 @@ def test_remote_endpoint_list_capabilities(monkeypatch):
 
 	endpoint, _ = _endpoint(monkeypatch)
 
-	assert endpoint.list_capabilities() == ['answer', 'search', 'echo', 'count', 'pair', 'maybe', 'ping']
+	assert endpoint.list_capabilities() == ['answer', 'search', 'echo', 'count', 'pair', 'maybe', 'ping', 'chat_with_reader']
 
 
 def test_remote_endpoint_describe(monkeypatch):
@@ -198,7 +199,25 @@ def test_remote_endpoint_run_returns_agent_content(monkeypatch):
 
 	endpoint, _ = _endpoint(monkeypatch, _stop({'role': 'assistant', 'content': 'Elena Ruiz.'}))
 
-	assert endpoint.run('answer', 'question') == 'Elena Ruiz.'
+	assert endpoint.run('chat_with_reader', 'question') == 'Elena Ruiz.'
+
+
+def test_remote_endpoint_run_keeps_message_of_other_capabilities(monkeypatch):
+	""" Returns the whole message of a capability that is not an agent's, even if it looks like an agent's message. """
+
+	message = {'role': 'assistant', 'content': 'Elena Ruiz.'}
+	endpoint, _ = _endpoint(monkeypatch, _stop(message))
+
+	assert endpoint.run('answer', 'question') == message
+
+
+def test_remote_endpoint_run_keeps_object_with_content(monkeypatch):
+	""" Returns a whole object that has a content but is not a chat message, such as a Source leaf. """
+
+	leaf = {'type': 'SourceEntity: SourceEntityType.TEXT', 'content': 'Noah Kim studies at Riverside High School.'}
+	endpoint, _ = _endpoint(monkeypatch, _stop(leaf))
+
+	assert endpoint.run('answer', 'question') == leaf
 
 
 def test_remote_endpoint_run_returns_agent_content_with_history(monkeypatch):
@@ -207,7 +226,7 @@ def test_remote_endpoint_run_returns_agent_content_with_history(monkeypatch):
 	response = {'finish_reason': 'stop', 'message': {'role': 'assistant', 'content': 'Elena Ruiz.'}, 'history': [{'role': 'user'}]}
 	endpoint, _ = _endpoint(monkeypatch, response)
 
-	assert endpoint.run('answer', 'question') == 'Elena Ruiz.'
+	assert endpoint.run('chat_with_reader', 'question') == 'Elena Ruiz.'
 
 
 def test_remote_endpoint_run_raises_on_error_finish(monkeypatch):
