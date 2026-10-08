@@ -34,7 +34,11 @@
 			// This is where the AgenticGraph will persist itself. The "initial_nodes" and "initial_edges" are only used when the graph
 			// is first created for the first time. It is a pickle of a NetworkX graph.
 			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
-			"persistence" : {"type" : "pickle", "$path" : "graphs/entities.pickle"}
+			"persistence" : {"type" : "pickle", "$path" : "graphs/entities.pickle"},
+
+			// This optional number (default is 50) limits the entries in every answer given to agents. Longer answers are cut and end
+			// with a "truncated" marker that asks for something more specific.
+			"max_results" : 50
 		},
 
 		// "tools" is expected by the Endpoint to make all Agentic configurations consistent. Ontologies do not use tools.

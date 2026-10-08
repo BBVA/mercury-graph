@@ -506,6 +506,15 @@ def test_relations_for_without_inheritance(tmp_path):
 	assert _call(graph, 'relations_for', concept = 'vehicle') == []
 
 
+def test_capability_definitions_are_not_shared(tmp_path):
+	""" Changing the definition of a capability of a graph does not change it in other graphs. """
+	first, second = AgenticGraph(schema = 'first', extra_args = {}), AgenticGraph(schema = 'second', extra_args = {})
+
+	first.meta['capabilities'][0]['function']['parameters']['required'].append('depth')
+
+	assert second.meta['capabilities'][0]['function']['parameters']['required'] == ['index']
+
+
 def test_agentic_graph_handles_initialization_errors(tmp_path):
 	""" Verifies errors during graph creation and attempts to reuse an invalid graph. """
 	logger = []

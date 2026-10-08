@@ -1,4 +1,4 @@
-import copy, os, pickle
+import os, pickle
 
 from enum import Enum
 
@@ -68,36 +68,72 @@ def _parameters(required, **properties):
 	return {'type': 'object', 'properties': properties, 'required': required}
 
 
-ID		= {'type': 'string', 'description': 'An id, written exactly as in the ontology (e.g., person|student). An empty string is the root.'}
-LIST	= {'type': 'array', 'items': {'type': 'object'}}
+def _named(value, name):
+	""" Returns a copy of a capability definition with {name} replaced by the name of the AgenticGraph in every text. """
+
+	if isinstance(value, dict):
+		return {key: _named(item, name) for key, item in value.items()}
+
+	if isinstance(value, list):
+		return [_named(item, name) for item in value]
+
+	return value.replace('{name}', name) if isinstance(value, str) else value
+
+
+LIST = {'type': 'array', 'items': {'type': 'object'}}
 
 CAPABILITIES = {
 	'children_by_idx': {
-		'description': 'Get the children of an id with their definitions, down to depth levels.',
-		'parameters': _parameters(['index'], index = ID, depth = {'type': 'integer', 'description': 'Number of levels to go down. Defaults to 1.'}),
+		'description': 'List what is under an id in the ontology "{name}", with definitions. Ids are hierarchical, with levels separated by '
+					   '"|" (e.g., "parent|child"). Use "" to list the top level and depth to see several levels at once. Entries with '
+					   '"more": true have children of their own.',
+		'parameters': _parameters(
+			['index'],
+			index = {'type': 'string', 'description': 'Exact id, with levels separated by "|" (e.g., "parent|child"). Use "" for the top level.'},
+			depth = {'type': 'integer', 'description': 'Number of levels to go down. Defaults to 1.'}
+		),
 		'returns': LIST
 	},
 	'node_by_idx': {
-		'description': 'Get the properties of a node by its id and its ancestors with their definitions.',
-		'parameters': _parameters(['index'], index = ID),
+		'description': 'Read a node of "{name}" by its exact id: its properties and its ancestors, which tell what kind of thing it is. '
+					   'Returns null if the id is not a node; use search_{name} to find ids.',
+		'parameters': _parameters(
+			['index'],
+			index = {'type': 'string', 'description': 'Exact id of the node, with levels separated by "|" (e.g., "parent|child").'}
+		),
 		'returns': {'type': 'object'}
 	},
 	'search': {
-		'description': 'Find the nodes whose id or definition contains a text, ignoring case.',
-		'parameters': _parameters(['text'], text = {'type': 'string', 'description': 'The text to find.'},
-								  limit = {'type': 'integer', 'description': 'Maximum number of results. Defaults to 20.'}),
+		'description': 'Find the nodes of "{name}" whose id or definition contains a text, such as a name, ignoring case. Use it first when '
+					   'you do not know the exact id.',
+		'parameters': _parameters(
+			['text'],
+			text  = {'type': 'string', 'description': 'Text to find, such as a name or a word of a definition.'},
+			limit = {'type': 'integer', 'description': 'Maximum number of results. Defaults to 20.'}
+		),
 		'returns': LIST
 	},
 	'edges': {
-		'description': 'Get the edges going out of or coming into a node, optionally only those of a relation and its descendants.',
-		'parameters': _parameters(['index'], index = ID,
-								  relation = {'type': 'string', 'description': 'Only return edges of this relation or of relations under it.'}),
+		'description': 'Get the relationships of an instance of "{name}" given its exact id: every edge going out of or coming into it, '
+					   'with its relation and the id at the other end. Optionally, only those of one relation and the relations under '
+					   'it. Use search_{name} to find the id.',
+		'parameters': _parameters(
+			['index'],
+			index	 = {'type': 'string', 'description': 'Exact id of the instance, with levels separated by "|" (e.g., "parent|child").'},
+			relation = {'type': 'string', 'description': 'Only return edges of this relation or of relations under it (e.g., "relation" '
+														 'also returns "relation|subtype").'}
+		),
 		'returns': LIST
 	},
 	'relations_for': {
-		'description': 'Get the relationships a concept can take part in, as src, dst or both.',
-		'parameters': _parameters(['concept'], concept = {'type': 'string', 'description': 'The id of a concept (e.g., person|student).'},
-								  inherited = {'type': 'boolean', 'description': 'Include the relationships of its ancestors. Defaults to true.'}),
+		'description': 'Get the types of relationship that a concept can take part in according to "{name}", and whether it is their '
+					   'source (src), destination (dst) or both. Includes those of its ancestors unless inherited is false.',
+		'parameters': _parameters(
+			['concept'],
+			concept	  = {'type': 'string', 'description': 'Exact id of a concept, with levels separated by "|" (e.g., "parent|child").'},
+			inherited = {'type': 'boolean', 'description': 'Include the relationships declared for the ancestors of the concept. Defaults '
+														   'to true.'}
+		),
 		'returns': LIST
 	}
 }
@@ -199,12 +235,23 @@ class AgenticGraph(Agentic):
 	## What the AgenticGraph exposes via the Agentic interface
 
 	All the internals of a graph are basically understood by the Formalizer and the EvidenceGraph. The AgenticGraph is an understandable
-	storage for concepts, entity indices and relationships and, via the Agentic interface that is what is accessible: A mechanism
-	similar to that of a source to retrieve, via unique indices, concepts, entities and relationships.
+	storage for concepts, entity indices and relationships, and that is what is accessible via the Agentic interface. Ids are used exactly
+	as in the .csv files (e.g., `person|student`), without the name of the AgenticGraph in front, and an empty id is the root:
+
+	- `children_by_idx_<name>`: the children of an id with their definitions, down to a given depth.
+	- `node_by_idx_<name>`: the properties of a node and its ancestors with their definitions.
+	- `search_<name>`: the nodes whose id or definition contains a text.
+	- `edges_<name>`: the edges from or to a node, optionally of a relation and its descendants. Only if the graph has edges.
+	- `relations_for_<name>`: the relationships a concept takes part in, including those of its ancestors. Only if its nodes declare
+	a `src` and a `dst`, like the relationships ontology.
+
+	Edges are not part of the hierarchy of ids. Every answer is limited to `max_results` entries (50 by default, configurable in
+	`extra_args`) and ends with a truncated marker when it has been cut.
 
 	## Known Limitations
 
-	There is no "graph language" exposed via the Agentic interface that allows for arbitrary graph oriented queries. Note that Agentic
+	There is no "graph language" exposed via the Agentic interface that allows for arbitrary graph oriented queries, only the capabilities
+	above. Note that Agentic
 	objects have a mechanism to access the objects directly and will typically bypass the Agentic interface for intense computations such
 	as crawling entire corpora. In the future, Agents, besides discovering the hierarchy tree may also have to modify it by creating or
 	updating concepts and relationships.
@@ -703,7 +750,7 @@ class AgenticGraph(Agentic):
 
 		self.call = {'%s_%s' % (name, self.name): run for name, run in available.items()}
 
-		return [{'type': 'function', 'function': dict(name = '%s_%s' % (name, self.name), **copy.deepcopy(CAPABILITIES[name]))} for name in available]
+		return [{'type': 'function', 'function': dict(name = '%s_%s' % (name, self.name), **_named(CAPABILITIES[name], self.name))} for name in available]
 
 
 	def _has_edges(self):
