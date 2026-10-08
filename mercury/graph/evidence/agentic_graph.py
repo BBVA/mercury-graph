@@ -1,4 +1,4 @@
-import os, pickle
+import copy, os, pickle
 
 from enum import Enum
 
@@ -10,9 +10,21 @@ from mercury.graph.core import Graph
 
 
 MAX_RESULTS = 50		# Default maximum number of entries in the answer of a capability (configurable as "max_results").
-TRUNCATED	= {'truncated': True, 'hint': 'There are more results. Ask for a more specific id or a smaller depth.'}
+TRUNCATED	= {'truncated': True, 'hint': 'There are more results. Ask for something more specific (a longer id or text, or a smaller depth).'}
 
 _MISSING	= object()	# Returned by AgenticGraph._subtree() for an id that is not in the navigation tree.
+
+
+def parent_of(index):
+	""" Returns the parent of a hierarchical id (the id without its last `|` level) or None if it has a single level. """
+
+	return index.rsplit('|', 1)[0] if '|' in index else None
+
+
+def descends_from(concept, ancestor):
+	""" Returns True if concept is ancestor or one of its descendants in the `|` hierarchy (person_group does not descend from person). """
+
+	return concept == ancestor or concept.startswith(ancestor + '|')
 
 
 def _positive_int(value, default):
@@ -23,6 +35,72 @@ def _positive_int(value, default):
 
 	except (TypeError, ValueError):
 		return default
+
+
+def _as_bool(value):
+	""" Returns False for False or a text such as "false", "no" or "0" and True for anything else. """
+
+	return str(value).strip().lower() not in ('false', 'no', '0')
+
+
+def _declares(attr, end):
+	""" Returns True if the attributes of a node declare end ('src' or 'dst') as a non-empty text. """
+
+	return isinstance(attr.get(end, None), str) and attr[end] != ''
+
+
+def _role(attr, concept, inherited):
+	""" Returns the role ('src', 'dst' or 'both') of a concept in a relationship given its attributes, or None if it takes no part.
+	With inherited, a concept also takes part where one of its ancestors does.
+	"""
+
+	roles = [end for end in ('src', 'dst') if _declares(attr, end) and (descends_from(concept, attr[end]) if inherited else concept == attr[end])]
+
+	if len(roles) == 0:
+		return None
+
+	return roles[0] if len(roles) == 1 else 'both'
+
+
+def _parameters(required, **properties):
+	""" Returns the JSON schema of the parameters of a capability. """
+
+	return {'type': 'object', 'properties': properties, 'required': required}
+
+
+ID		= {'type': 'string', 'description': 'An id, written exactly as in the ontology (e.g., person|student). An empty string is the root.'}
+LIST	= {'type': 'array', 'items': {'type': 'object'}}
+
+CAPABILITIES = {
+	'children_by_idx': {
+		'description': 'Get the children of an id with their definitions, down to depth levels.',
+		'parameters': _parameters(['index'], index = ID, depth = {'type': 'integer', 'description': 'Number of levels to go down. Defaults to 1.'}),
+		'returns': LIST
+	},
+	'node_by_idx': {
+		'description': 'Get the properties of a node by its id and its ancestors with their definitions.',
+		'parameters': _parameters(['index'], index = ID),
+		'returns': {'type': 'object'}
+	},
+	'search': {
+		'description': 'Find the nodes whose id or definition contains a text, ignoring case.',
+		'parameters': _parameters(['text'], text = {'type': 'string', 'description': 'The text to find.'},
+								  limit = {'type': 'integer', 'description': 'Maximum number of results. Defaults to 20.'}),
+		'returns': LIST
+	},
+	'edges': {
+		'description': 'Get the edges going out of or coming into a node, optionally only those of a relation and its descendants.',
+		'parameters': _parameters(['index'], index = ID,
+								  relation = {'type': 'string', 'description': 'Only return edges of this relation or of relations under it.'}),
+		'returns': LIST
+	},
+	'relations_for': {
+		'description': 'Get the relationships a concept can take part in, as src, dst or both.',
+		'parameters': _parameters(['concept'], concept = {'type': 'string', 'description': 'The id of a concept (e.g., person|student).'},
+								  inherited = {'type': 'boolean', 'description': 'Include the relationships of its ancestors. Defaults to true.'}),
+		'returns': LIST
+	}
+}
 
 
 class GraphState(Enum):
@@ -295,6 +373,7 @@ class AgenticGraph(Agentic):
 
 			if self._meta_['state'] == self.states.GRAPH_LOADED_OK.value:
 				self._build_indices()
+				self._meta_['capabilities'] = self._capabilities()		# Some capabilities depend on the content of the graph.
 				self._meta_['state'] = self.states.READY.value
 
 				break
@@ -419,6 +498,93 @@ class AgenticGraph(Agentic):
 		return entry
 
 
+	def _search(self, arguments):
+		""" Runs the search capability: the nodes whose id contains a text followed by those whose definition contains it. """
+
+		text = str(arguments['text']).strip().lower()
+
+		if not self._is_ready('search'):
+			return None
+
+		if text == '':
+			return []
+
+		limit = min(_positive_int(arguments.get('limit', 20), 20), self.conf.get('max_results', MAX_RESULTS))
+
+		return self._limited([self._described(index) for index in self._matching_nodes(text)], limit)
+
+
+	def _matching_nodes(self, text):
+		""" Returns the ids of the nodes whose id contains text followed by those whose definition contains it, each group sorted. """
+
+		in_id, in_definition = [], []
+		for index, definition in self._graph.networkx.nodes(data = 'definition'):
+			if text in index.lower():
+				in_id.append(index)
+			elif isinstance(definition, str) and text in definition.lower():
+				in_definition.append(index)
+
+		return sorted(in_id) + sorted(in_definition)
+
+
+	def _edges(self, arguments):
+		""" Runs the edges capability: the edges from or to a node, or only those of a relation and its descendants. Returns None if the
+		node does not exist.
+		"""
+
+		index	 = arguments['index']
+		relation = arguments.get('relation', None) or None
+
+		if not self._is_ready('edges') or index not in self._graph.networkx.nodes:
+			return None
+
+		edges = [edge for edge in self._node_edges(index) if relation is None or descends_from(str(edge.get('relation', '')), relation)]
+
+		return self._limited(edges, self.conf.get('max_results', MAX_RESULTS))
+
+
+	def _node_edges(self, index):
+		""" Returns the entries of the edges going out of or coming into a node, sorted by edge id. """
+
+		ntx	  = self._graph.networkx
+		edges = {}
+		for src, dst, key, attr in list(ntx.out_edges(index, keys = True, data = True)) + list(ntx.in_edges(index, keys = True, data = True)):
+			edges[(src, dst, key)] = dict({'id': key, 'src': src, 'dst': dst}, **attr)
+
+		return sorted(edges.values(), key = lambda edge: str(edge['id']))
+
+
+	def _relations_for(self, arguments):
+		""" Runs the relations_for capability: the relationships a concept takes part in (by inheritance by default), sorted by id. """
+
+		concept	  = arguments['concept']
+		inherited = _as_bool(arguments.get('inherited', True))
+
+		if not self._is_ready('relations_for'):
+			return None
+
+		entries = [self._relation_entry(index, attr, concept, inherited) for index, attr in sorted(self._graph.networkx.nodes(data = True))]
+
+		return self._limited([entry for entry in entries if entry is not None], self.conf.get('max_results', MAX_RESULTS))
+
+
+	def _relation_entry(self, index, attr, concept, inherited):
+		""" Returns the entry of a relationship with the role of a concept in it, or None if the concept takes no part in it. """
+
+		role = _role(attr, concept, inherited)
+
+		if role is None:
+			return None
+
+		return dict({'id': index, 'src': attr['src'], 'dst': attr['dst'], 'as': role}, **self._described(index))
+
+
+	def _limited(self, entries, limit):
+		""" Returns at most limit entries, followed by TRUNCATED if some were left out. """
+
+		return entries[:limit] + [TRUNCATED] if len(entries) > limit else entries
+
+
 	def _is_ready(self, function):
 		""" Returns True if the AgenticGraph is ready, logging an error naming the calling function if it is not. """
 
@@ -507,7 +673,11 @@ class AgenticGraph(Agentic):
 
 
 	def _capabilities(self):
-		""" Returns the capabilities of the AgenticGraph.
+		""" Returns the capabilities of the AgenticGraph and sets self.call to run them.
+
+		Some capabilities depend on the content of the graph: `edges` requires edges and `relations_for` requires nodes that declare a
+		`src` and a `dst`. Before the graph is loaded, only the capabilities that do not depend on the content are returned, and they are
+		set again once the graph is loaded.
 
 		Returns:
 			(list): A list of capabilities, each represented as a dictionary with the following keys:
@@ -523,57 +693,29 @@ class AgenticGraph(Agentic):
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
 
-		name_children_idx = 'children_by_idx_%s' % self.name
-		name_node_by_idx  = 'node_by_idx_%s' % self.name
+		available = {'children_by_idx': self._children_by_idx, 'node_by_idx': self._node_by_idx, 'search': self._search}
 
-		self.call = {name_children_idx: self._children_by_idx, name_node_by_idx: self._node_by_idx}
+		if self._has_edges():
+			available['edges'] = self._edges
 
-		return [
-			{
-				'type': 'function',
-				'function': {
-					'name': name_children_idx,
-					'description': 'Get the children of an id with their definitions, down to depth levels.',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'index': {
-								'type': 'string',
-								'description': 'Id whose children are required. An empty string is the root.'
-							},
-							'depth': {
-								'type': 'integer',
-								'description': 'Number of levels to go down. Defaults to 1.'
-							}
-						},
-						'required': ['index']
-					},
-					'returns': {
-						'type': 'array',
-						'items': {
-							'type': 'object'
-						}
-					}
-				}
-			},
-			{
-				'type': 'function',
-				'function': {
-					'name': name_node_by_idx,
-					'description': 'Get the properties of a node by its id and its ancestors with their definitions.',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'index': {
-								'type': 'string',
-								'description': 'Id of the node.'
-							}
-						},
-						'required': ['index']
-					},
-					'returns': {
-						'type': 'object'
-					}
-				}
-			}
-		]
+		if self._declares_relations():
+			available['relations_for'] = self._relations_for
+
+		self.call = {'%s_%s' % (name, self.name): run for name, run in available.items()}
+
+		return [{'type': 'function', 'function': dict(name = '%s_%s' % (name, self.name), **copy.deepcopy(CAPABILITIES[name]))} for name in available]
+
+
+	def _has_edges(self):
+		""" Returns True if the graph is loaded and has edges. """
+
+		return self._graph is not None and self._graph.networkx.number_of_edges() > 0
+
+
+	def _declares_relations(self):
+		""" Returns True if the graph is loaded and any of its nodes declares a src and a dst (like the relationships ontology). """
+
+		if self._graph is None:
+			return False
+
+		return any(_declares(attr, 'src') and _declares(attr, 'dst') for _, attr in self._graph.networkx.nodes(data = True))
