@@ -153,20 +153,20 @@ If anything is wrong, every problem is logged and the Formalizer does not become
 
 ## How agents explore an ontology
 
-Through the agent interface, an `AgenticGraph` is navigated by index, just like a `Source`. Every index starts with the name of the
-ontology, so the root of `entities` is `entities` and the concept `place|room` is `entities|place|room`. From there, an agent can
-list the children of an index or read the properties of a node. For example, the children of `known_ids|person|student` are
-`known_ids|person|student|Noah Kim` and `known_ids|person|student|Priya Shah`.
+Through the agent interface, an `AgenticGraph` is navigated by ID, in a similar way to a `Source`. Unlike in a `Source`, IDs are used
+exactly as they are written in the .csv files, without the name of the ontology in front, and an empty ID is the root. From there, an
+agent can list the children of an ID or read the properties of a node. For example, the children of `person|student` in `known_ids`
+are `person|student|Noah Kim` and `person|student|Priya Shah`.
 
-Relationship instances are found under `known_ids|_edge_`, organized by the ID of their source entity.
+Relationship instances (the edges of `known_ids`) are not part of this hierarchy: only nodes are navigated by ID.
 
 The exact capabilities are listed in the [`AgenticGraph`](evidence.md#mercury.graph.evidence.AgenticGraph) reference.
 
 
 ## Known limitations
 
-- Agents can only navigate the hierarchy one level at a time. Reaching a relationship instance takes many steps, and there is no way to
-  find all instances of a relationship type, the relationships a concept can take part in, or an instance by its name.
+- Agents can only navigate the hierarchy one level at a time and cannot read relationship instances. There is no way to find the
+  relationships of an instance, the relationships a concept can take part in, or an instance by its name.
 - [`Formalizer.is_a()`](evidence.md#mercury.graph.evidence.Formalizer.is_a), which should score whether something is a type of a
   given concept, is not implemented yet.
 
