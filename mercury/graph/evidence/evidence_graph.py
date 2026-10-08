@@ -48,9 +48,10 @@ class EvidenceGraph(Agentic):
 	`id_edges` identifying edges and `is_same` determining identity and category membership) are treated as separate functionality to
 	make it possible to have them handled by an Agent or an agent that supervises another Agentic, etc.
 
-	The `Formalizer` must have its three ontology `AgenticGraph` objects (entities, relationships, known_ids) defined. And the
-	`EvidenceGraph`	will modify these ontology objects as it integrates new evidence into the graph. It is highly recommended not to share
-	these `AgenticGraph` ontology objects with other `EvidenceGraph` instances.
+	The `Formalizer` must have its three ontology `AgenticGraph` objects (entities, relationships, known_ids) defined. Currently,
+	these ontology objects are only initialized from their initial .csv files and nothing modifies them at runtime. In the future, the
+	`EvidenceGraph` will modify them (e.g., adding new instances to `known_ids`) as it integrates new evidence into the graph. It is
+	highly recommended not to share these `AgenticGraph` ontology objects with other `EvidenceGraph` instances.
 
 	## Extraction of candidate entities and relationships
 

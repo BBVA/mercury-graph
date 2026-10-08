@@ -96,7 +96,7 @@ def _ready_formalizer(monkeypatch, include_relation = True, include_known_id = T
 			ontologies['known_ids'] = None
 	formalizer = Formalizer(schema = 'test', extra_args = _configuration(ontologies = ontologies))
 	entities = DummyOntology({'person': {'definition': 'A person'}, 'place': {'definition': 'A place'}})
-	relations = DummyOntology({'located': {'src': 'person', 'dest': 'place', 'definition': 'is located in'}})
+	relations = DummyOntology({'located': {'src': 'person', 'dst': 'place', 'definition': 'is located in'}})
 	formalizer.tools['formalizer_test/agentic_graph_entities'] = entities
 	if include_relation:
 		formalizer.tools['formalizer_test/agentic_graph_relationships'] = relations

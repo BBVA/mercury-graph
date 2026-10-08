@@ -383,7 +383,7 @@ class Formalizer(Agentic):
 			for id, _ in ntx.nodes.data('id'):
 				node = dict(ntx.nodes(data = True))[id]
 				src = node.get('src', None)
-				dst = node.get('dest', None)
+				dst = node.get('dst', None)
 				key = node.get('definition', None)
 				format[key] = [src, dst]
 
@@ -392,7 +392,7 @@ class Formalizer(Agentic):
 				if id in concepts:
 					node = dict(ntx.nodes(data = True))[id]
 					src = node.get('src', None)
-					dst = node.get('dest', None)
+					dst = node.get('dst', None)
 					key = node.get('definition', None)
 					format[key] = [src, dst]
 
