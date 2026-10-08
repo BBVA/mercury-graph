@@ -475,7 +475,9 @@ class Endpoint(Agentic):
 					break
 
 			if self._meta_['state'] == self.states.TOOLS_ARE_READY.value:
-				if self._research_capabilities():
+				if not self._expose_api():		# Exposed again because tools may change their capabilities while being piloted.
+					self._meta_['state'] = self.states.ERR_EXPOSING.value
+				elif self._research_capabilities():
 					self._meta_['state'] = self.states.ALL_READY.value
 				else:
 					self._meta_['state'] = self.states.ERR_TOOL_CAPS.value
@@ -754,7 +756,9 @@ class Endpoint(Agentic):
 
 		It also updates the Endpoint's meta with the capabilities.
 
-		The pilot() method calls this method when appropriate and sets the state according to the success.
+		The pilot() method calls this method when appropriate and sets the state according to the success. It is called twice: before
+		piloting the tools and again once every tool is ready, since tools may change their capabilities while being piloted (e.g., a
+		Formalizer without a relationships ontology removes `hint_edges`).
 
 		Returns:
 			(bool): True if no errors found exposing the capabilities, False otherwise.
