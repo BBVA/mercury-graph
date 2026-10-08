@@ -46,7 +46,7 @@
 		"extra_args": {
 			"description": [
 				"This ontology holds the relationships between entities. E.g., works_for, located_in, ...",
-				"It defined a relationship id as a key, src and dest define the type of entity the relationship connects as defined",
+				"It defined a relationship id as a key, src and dst define the type of entity the relationship connects as defined",
 				"in 'entities'. An attribute 'definition' explains the relationship. Hierarchy is defined by the | separator in the IDs."
 			],
 			"initial_nodes" : {"type" : "csv", "$path" : "ontology_source/relationships_concepts.csv"},

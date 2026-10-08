@@ -1,4 +1,4 @@
-id	src	dest	definition
+id	src	dst	definition
 studies_at	person|student	organization|school	A student studies at a school.
 teaches_at	person|teacher	organization|school	A teacher teaches at a school.
 is_principal_of	person|principal	organization|school	A person is the principal of a school.
