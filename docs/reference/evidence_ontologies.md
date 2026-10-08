@@ -139,6 +139,18 @@ The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) connects to th
 Only `entities` is required. Setting `relationships` or `known_ids` to `null` disables the Formalizer capabilities that need them.
 
 
+## Validation
+
+When the [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) is piloted, it checks that its three ontologies are coherent:
+every concept and relationship has its parent defined, relationships only connect existing concepts, and every known instance and
+edge is of an existing type. An edge must also connect instances of the types declared by its relationship or of their descendants:
+`person|student|Noah Kim` can be the `src` of `works_on|leads`, declared from `person`, but not of `teaches_at`, declared from
+`person|teacher`.
+
+If anything is wrong, every problem is logged and the Formalizer does not become ready. See
+[`validate_ontologies()`](#mercury.graph.evidence.formalizer.validate_ontologies) for the details.
+
+
 ## How agents explore an ontology
 
 Through the agent interface, an `AgenticGraph` is navigated by index, just like a `Source`. Every index starts with the name of the
@@ -155,7 +167,10 @@ The exact capabilities are listed in the [`AgenticGraph`](evidence.md#mercury.gr
 
 - Agents can only navigate the hierarchy one level at a time. Reaching a relationship instance takes many steps, and there is no way to
   find all instances of a relationship type, the relationships a concept can take part in, or an instance by its name.
-- The .csv files are not validated when loaded: a relationship can refer to a concept that is not in `entities`, and a concept does not
-  need its parent to be defined.
 - [`Formalizer.is_a()`](evidence.md#mercury.graph.evidence.Formalizer.is_a), which should score whether something is a type of a
   given concept, is not implemented yet.
+
+
+## Reference
+
+::: mercury.graph.evidence.formalizer.validate_ontologies
