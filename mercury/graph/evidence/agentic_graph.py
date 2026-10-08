@@ -273,84 +273,75 @@ class AgenticGraph(Agentic):
 
 
 	def get_children_idx(self, index = None):
-		""" Returns the children indices following the SourceNode interface.
+		""" Returns the ids of the children of an id following the SourceNode interface.
+
+		Ids are used exactly as in the .csv files that define the graph (e.g., `person|student`), without the name of the AgenticGraph in
+		front. None or an empty string is the root.
 
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
 		"""
 
-		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('AgenticGraph is not ready for get_children_idx.')
-
+		if not self._is_ready('get_children_idx'):
 			return None
 
-		if index is None or index == '':
-			index = self.name
+		subtree = self._subtree(index)
 
-		idx_stack = index.split('|')
-
-		if idx_stack.pop(0) != self.name:
+		if type(subtree) is not dict:
 			return None
 
-		d = self._indices
-		for i in idx_stack:
-			if i not in d:
-				return None
+		prefix = '' if index is None or index == '' else index + '|'
 
-			d = d[i]
-
-		if type(d) is dict:
-			return ['%s|%s' % (index, k) for k in d.keys()]
-
-		return None
+		return [prefix + key for key in subtree.keys()]
 
 
 	def child(self, index):
-		""" Returns the corresponding SourceNode object following the SourceNode interface and serializes it to a dictionary.
+		""" Returns the properties of the node with the given id following the SourceNode interface.
+
+		Ids are used exactly as in the .csv files that define the graph (e.g., `person|student`), without the name of the AgenticGraph in
+		front.
 
 		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
 		"""
 
+		if not self._is_ready('child') or index is None or index == '':
+			return None
+
+		return self._node_properties(index)
+
+
+	def _is_ready(self, function):
+		""" Returns True if the AgenticGraph is ready, logging an error naming the calling function if it is not. """
+
 		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('AgenticGraph is not ready for child.')
+			self.log_error('AgenticGraph is not ready for %s.' % function)
 
-			return None
+			return False
 
-		idx_stack = index.split('|')
+		return True
 
-		if idx_stack.pop(0) != self.name:
-			return None
 
-		d = self._indices
-		for i in idx_stack:
-			if i not in d:
+	def _subtree(self, index):
+		""" Returns the subtree of self._indices under an id (None for a leaf) or None if the id is not in the tree. """
+
+		if index is None or index == '':
+			return self._indices
+
+		subtree = self._indices
+		for level in index.split('|'):
+			if type(subtree) is not dict or level not in subtree:
 				return None
 
-			d = d[i]
+			subtree = subtree[level]
 
-		ntx = self._graph.networkx
+		return subtree
 
-		if idx_stack[0] != '_edge_':
-			ix = '|'.join(idx_stack)
 
-			try:
-				ret = dict(ntx.nodes(data = True))[ix]
+	def _node_properties(self, index):
+		""" Returns a copy of the properties of a node or None if it does not exist. """
 
-				return ret
+		nodes = self._graph.networkx.nodes
 
-			except:
-				return None
-
-		else:
-			idx_stack.pop(0)
-
-			try:
-				src, dst, key = '|'.join(idx_stack).split('||')
-				ret = dict(ntx.edges[src, dst, key])
-
-				return ret
-
-			except:
-				return None
+		return dict(nodes[index]) if index in nodes else None
 
 
 	def close(self, endpoint_locked):
@@ -369,8 +360,7 @@ class AgenticGraph(Agentic):
 
 	def _add_index_to_tree(self, index):
 		""" Adds an index to the hierarchical tree structure. It traverses the tree rooted at self._indices and adds dictionaries
-		as required. The same tree contains node and edge indices, but the latter have their index prefixed by `_edge_` which
-		places them in a dictionary under the `_edge_` key.
+		as required.
 
 		Args:
 			index (str): The index to add, represented as a string with components separated by '|'.
@@ -396,16 +386,14 @@ class AgenticGraph(Agentic):
 	def _build_indices(self):
 		""" Builds the indices for the AgenticGraph for the first time after it is loaded.
 
-		This builds a hierarchical tree structure of dictionaries, rooted at self._indices.
+		This builds a hierarchical tree structure of dictionaries, rooted at self._indices, with the ids of the nodes. Edges are not part
+		of the tree.
 		"""
 
 		self._indices = {}
 
 		for id, _ in self._graph.networkx.nodes.data('id'):
 			self._add_index_to_tree(id)
-
-		for src, dst, key in self._graph.networkx.edges.data(keys = True, data = False):
-			self._add_index_to_tree('_edge_|%s||%s||%s' % (src, dst, key))
 
 
 	def _capabilities(self):

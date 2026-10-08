@@ -82,11 +82,12 @@ def test_agentic_graph_creates_and_queries_default_graph():
 	graph.pilot(graph.states.READY.value)
 	assert graph.meta['state'] == graph.states.READY.value
 	assert graph.get_children_idx() == []
-	assert graph.get_children_idx('wrong') is None
-	assert graph.get_children_idx('empty|missing') is None
-	assert graph.child('wrong') is None
-	assert graph.child('empty|missing') is None
-	assert graph._run({'name': 'children_by_idx_empty', 'arguments': {'index': 'empty'}}) == {'finish_reason': 'stop', 'message': []}
+	assert graph.get_children_idx('') == []
+	assert graph.get_children_idx('missing') is None
+	assert graph.get_children_idx('missing|child') is None
+	assert graph.child('') is None
+	assert graph.child('missing') is None
+	assert graph._run({'name': 'children_by_idx_empty', 'arguments': {'index': ''}}) == {'finish_reason': 'stop', 'message': []}
 
 	graph.close(False)
 	assert graph._graph is None
@@ -114,15 +115,13 @@ def test_agentic_graph_loads_files_and_persists_graph(tmp_path):
 
 	graph.pilot(graph.states.READY.value)
 
-	assert graph.get_children_idx() == ['ontology|animal', 'ontology|_edge_']
-	assert graph.get_children_idx('ontology|animal') == ['ontology|animal|mammal', 'ontology|animal|bird']
-	assert graph.get_children_idx('ontology|animal|mammal') is None
-	assert graph.child('ontology|animal|mammal') == {'label': 'Mammal'}
-	assert graph.child('ontology|_edge_|animal|mammal||animal|bird||related') == {'weight': 2}
-	assert graph.child('ontology|_edge_|missing') is None
+	assert graph.get_children_idx() == ['animal']
+	assert graph.get_children_idx('animal') == ['animal|mammal', 'animal|bird']
+	assert graph.get_children_idx('animal|mammal') is None
+	assert graph.child('animal|mammal') == {'label': 'Mammal'}
+	assert graph._graph.networkx.edges['animal|mammal', 'animal|bird', 'related'] == {'weight': 2}
 	graph._graph.networkx.remove_node('animal|bird')
-	assert graph.child('ontology|animal|bird') is None
-	assert graph.child('ontology|_edge_|animal|mammal||animal|bird||related') is None
+	assert graph.child('animal|bird') is None
 	graph._graph.networkx.add_node('animal|bird', label = 'Bird')
 	graph._graph.networkx.add_edge('animal|mammal', 'animal|bird', key = 'related', weight = 2)
 
@@ -135,7 +134,8 @@ def test_agentic_graph_loads_files_and_persists_graph(tmp_path):
 
 	reloaded = AgenticGraph(schema = 'ontology', extra_args = config)
 	reloaded.pilot(reloaded.states.READY.value)
-	assert reloaded.child('ontology|animal|bird') == {'label': 'Bird'}
+	assert reloaded.child('animal|bird') == {'label': 'Bird'}
+	assert reloaded._graph.networkx.edges['animal|mammal', 'animal|bird', 'related'] == {'weight': 2}
 	reloaded.close(False)
 
 
@@ -157,7 +157,7 @@ def test_agentic_graph_loads_pickle_nodes_and_csv_edges(tmp_path):
 	)
 
 	graph.pilot(graph.states.READY.value)
-	assert graph.child('formats|root|child') == {'label': 'Child'}
+	assert graph.child('root|child') == {'label': 'Child'}
 	graph.close(False)
 
 
@@ -170,11 +170,48 @@ def test_agentic_graph_index_tree_does_not_depend_on_node_order(tmp_path):
 		graph = AgenticGraph(schema = 'entities', extra_args = {'initial_nodes': {'type': 'csv', 'path': str(nodes_path)}})
 
 		graph.pilot(graph.states.READY.value)
-		assert graph.get_children_idx('entities|person') == ['entities|person|teacher']
-		assert graph.child('entities|person') == {'definition': 'person'}
+		assert graph.get_children_idx('person') == ['person|teacher']
+		assert graph.child('person') == {'definition': 'person'}
 		trees.append(graph._indices)
 
 	assert trees[0] == trees[1]
+
+
+def test_agentic_graph_ids_do_not_include_the_ontology_name(tmp_path):
+	""" Verifies that ids are used exactly as in the .csv files, without the name of the ontology in front. """
+	nodes_path = tmp_path / 'nodes.csv'
+	pd.DataFrame([{'id': 'person', 'definition': 'A human being.'}, {'id': 'person|teacher', 'definition': 'A teacher.'}]).to_csv(nodes_path, index = False, sep = '\t')
+	graph = AgenticGraph(schema = 'entities', extra_args = {'initial_nodes': {'type': 'csv', 'path': str(nodes_path)}})
+
+	graph.pilot(graph.states.READY.value)
+
+	assert graph.get_children_idx() == ['person']
+	assert graph.get_children_idx('person') == ['person|teacher']
+	assert graph.child('person|teacher') == {'definition': 'A teacher.'}
+	assert graph._run({'name': 'node_by_idx_entities', 'arguments': {'index': 'person|teacher'}})['message'] == {'definition': 'A teacher.'}
+
+	assert graph.get_children_idx('entities') is None
+	assert graph.get_children_idx('entities|person') is None
+	assert graph.child('entities|person|teacher') is None
+
+
+def test_agentic_graph_edges_are_not_in_the_navigation_tree(tmp_path):
+	""" Verifies that edges stay in the graph but are not navigated as children or read as nodes. """
+	nodes_path = tmp_path / 'nodes.csv'
+	edges_path = tmp_path / 'edges.csv'
+	pd.DataFrame([{'id': 'person|Noah'}, {'id': 'project|Helios'}]).to_csv(nodes_path, index = False, sep = '\t')
+	pd.DataFrame([{'src': 'person|Noah', 'dst': 'project|Helios', 'relation': 'works_on', 'id': 'noah_helios'}]).to_csv(edges_path, index = False, sep = '\t')
+	graph = AgenticGraph(schema = 'known_ids', extra_args = {
+		'initial_nodes': {'type': 'csv', 'path': str(nodes_path)},
+		'initial_edges': {'type': 'csv', 'path': str(edges_path)}
+	})
+
+	graph.pilot(graph.states.READY.value)
+
+	assert graph._graph.networkx.number_of_edges() == 1
+	assert graph.get_children_idx() == ['person', 'project']
+	assert graph.get_children_idx('_edge_') is None
+	assert graph.child('_edge_|person|Noah||project|Helios||noah_helios') is None
 
 
 def test_agentic_graph_handles_initialization_errors(tmp_path):
