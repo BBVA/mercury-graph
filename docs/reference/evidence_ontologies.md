@@ -154,19 +154,23 @@ If anything is wrong, every problem is logged and the Formalizer does not become
 ## How agents explore an ontology
 
 Through the agent interface, an `AgenticGraph` is navigated by ID, in a similar way to a `Source`. Unlike in a `Source`, IDs are used
-exactly as they are written in the .csv files, without the name of the ontology in front, and an empty ID is the root. From there, an
-agent can list the children of an ID or read the properties of a node. For example, the children of `person|student` in `known_ids`
-are `person|student|Noah Kim` and `person|student|Priya Shah`.
+exactly as they are written in the .csv files, without the name of the ontology in front, and an empty ID is the root. An agent can:
 
-Relationship instances (the edges of `known_ids`) are not part of this hierarchy: only nodes are navigated by ID.
+- List the children of an ID, with their definitions, one or several levels down. For example, the children of `person|student` in
+  `known_ids` are `person|student|Noah Kim` and `person|student|Priya Shah`.
+- Read a node with its ancestors, to know what something is (`person|student|Noah Kim` is a `person|student`, which is a `person`).
+- Search the nodes whose ID or definition contains a text, to find something by its name.
+- In `relationships`, find the relationships a concept can take part in, including those declared for its ancestors.
+- In `known_ids`, find the relationship instances (the edges) of an instance, optionally only those of a type of relationship.
 
-The exact capabilities are listed in the [`AgenticGraph`](evidence.md#mercury.graph.evidence.AgenticGraph) reference.
+Relationship instances are not part of the hierarchy: they are only reached from the instances they connect. Every answer is limited
+in size and says when it has been cut. The exact capabilities are listed in the
+[`AgenticGraph`](evidence.md#mercury.graph.evidence.AgenticGraph) reference.
 
 
 ## Known limitations
 
-- Agents can only navigate the hierarchy one level at a time and cannot read relationship instances. There is no way to find the
-  relationships of an instance, the relationships a concept can take part in, or an instance by its name.
+- There is no graph query language: agents explore an ontology through the capabilities above, one question at a time.
 - [`Formalizer.is_a()`](evidence.md#mercury.graph.evidence.Formalizer.is_a), which should score whether something is a type of a
   given concept, is not implemented yet.
 

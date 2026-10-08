@@ -3,7 +3,7 @@ import os, warnings
 from enum import Enum
 
 from .agentic import Agentic, AgenticRunInvalidRequest
-from .agentic_graph import AgenticGraph
+from .agentic_graph import AgenticGraph, descends_from, parent_of
 
 
 class FormalizerState(Enum):
@@ -62,18 +62,6 @@ def validate_ontologies(entities, relationships, known_ids):
 	return errors
 
 
-def _parent(index):
-	""" Returns the parent of a hierarchical index (the index without its last `|` level) or None if it has a single level. """
-
-	return index.rsplit('|', 1)[0] if '|' in index else None
-
-
-def _descends(concept, ancestor):
-	""" Returns True if concept is ancestor or one of its descendants in the `|` hierarchy. """
-
-	return concept == ancestor or concept.startswith(ancestor + '|')
-
-
 def _check_loaded(ontologies):
 	""" Returns an error for every enabled ontology (a dict of name: AgenticGraph or None) that has not been loaded. """
 
@@ -85,8 +73,8 @@ def _check_parents(indices, kind, ontology):
 
 	errors = []
 	for index in sorted(indices):
-		if _parent(index) is not None and _parent(index) not in indices:
-			errors.append('%s "%s" has no parent "%s" in %s.' % (kind, index, _parent(index), ontology))
+		if parent_of(index) is not None and parent_of(index) not in indices:
+			errors.append('%s "%s" has no parent "%s" in %s.' % (kind, index, parent_of(index), ontology))
 
 	return errors
 
@@ -112,10 +100,10 @@ def _check_known_instances(known_ids, concepts):
 
 	errors = []
 	for index in sorted(known_ids.nodes):
-		if _parent(index) is None:
+		if parent_of(index) is None:
 			errors.append('Known id "%s" is not under any concept in entities.' % index)
-		elif _parent(index) not in concepts:
-			errors.append('Known id "%s" is under "%s", which is not in entities.' % (index, _parent(index)))
+		elif parent_of(index) not in concepts:
+			errors.append('Known id "%s" is under "%s", which is not in entities.' % (index, parent_of(index)))
 
 	return errors
 
@@ -142,7 +130,7 @@ def _check_known_edge(src, dst, key, relation, relations):
 	errors = []
 	for end, instance in (('src', src), ('dst', dst)):
 		expected = relations[relation].get(end, None)
-		if _parent(instance) is not None and isinstance(expected, str) and not _descends(_parent(instance), expected):
+		if parent_of(instance) is not None and isinstance(expected, str) and not descends_from(parent_of(instance), expected):
 			errors.append('Known edge "%s": its %s "%s" is not a "%s" as required by "%s".' % (key, end, instance, expected, relation))
 
 	return errors

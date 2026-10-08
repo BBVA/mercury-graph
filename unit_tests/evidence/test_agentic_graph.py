@@ -47,7 +47,7 @@ def test_agentic_graph_metadata_and_requests():
 
 	assert graph.meta['state'] == 0
 	assert graph.meta['description'] == 'First line.\nSecond line.'
-	assert [capability['function']['name'] for capability in graph.meta['capabilities']] == [children_name, node_name]
+	assert [capability['function']['name'] for capability in graph.meta['capabilities']] == [children_name, node_name, 'search_ontology']
 	assert graph.dry_run({'anything': True}) == {'status': 0, 'description': 'Valid request.'}
 	assert graph.get_children_idx() is None
 	assert graph.child('ontology') is None
@@ -360,6 +360,150 @@ def test_children_by_idx_declares_an_optional_depth(tmp_path):
 
 	assert capability['parameters']['properties']['depth']['type'] == 'integer'
 	assert capability['parameters']['required'] == ['index']
+
+
+def _csv_graph(directory, name, nodes, edges = None, **extra_args):
+	""" Returns a ready AgenticGraph loaded from tab separated .csv files written in directory from lists of dictionaries. """
+	for kind, rows in (('nodes', nodes), ('edges', edges)):
+		if rows is not None:
+			path = directory / ('%s_%s.csv' % (name, kind))
+			pd.DataFrame(rows).to_csv(path, index = False, sep = '\t')
+			extra_args['initial_%s' % kind] = {'type': 'csv', 'path': str(path)}
+	graph = AgenticGraph(schema = name, extra_args = extra_args)
+	graph.pilot(graph.states.READY.value)
+
+	return graph
+
+
+def _relationships_graph(directory, **extra_args):
+	""" Returns a ready relationships ontology: 'knows' connects persons and 'employs' has person as its dst. """
+	rows = [
+		('employs', 'organization', 'person', 'An organization employs a person.'),
+		('knows', 'person', 'person', 'A person knows another person.'),
+		('studies_at', 'person|student', 'organization|school', 'A student studies at a school.'),
+		('teaches_at', 'person|teacher', 'organization|school', 'A teacher teaches at a school.'),
+		('works_on', 'person', 'project', 'A person works on a project.'),
+		('works_on|leads', 'person', 'project', 'A person leads a project.')
+	]
+	nodes = [{'id': i, 'src': src, 'dst': dst, 'definition': d} for i, src, dst, d in rows]
+
+	return _csv_graph(directory, 'relationships', nodes, **extra_args)
+
+
+def _known_ids_graph(directory, **extra_args):
+	""" Returns a ready known_ids ontology with a few instances, one of them (the award) without edges. """
+	nodes = [{'id': i} for i in (
+		'person|student|Noah Kim', 'person|student|Priya Shah', 'person|teacher|Elena Ruiz', 'organization|school|Riverside High School',
+		'project|Helios Solar Car', 'award|Science Prize'
+	)]
+	edges = [
+		{'src': 'person|student|Noah Kim', 'dst': 'project|Helios Solar Car', 'relation': 'works_on|leads', 'id': 'noah_helios'},
+		{'src': 'person|student|Priya Shah', 'dst': 'project|Helios Solar Car', 'relation': 'works_on', 'id': 'priya_helios'},
+		{'src': 'person|student|Noah Kim', 'dst': 'organization|school|Riverside High School', 'relation': 'studies_at', 'id': 'noah_rhs'},
+		{'src': 'person|teacher|Elena Ruiz', 'dst': 'organization|school|Riverside High School', 'relation': 'teaches_at', 'id': 'elena_rhs'}
+	]
+
+	return _csv_graph(directory, 'known_ids', nodes, edges, **extra_args)
+
+
+def _capability_names(graph):
+	""" Returns the names of the capabilities of graph without the suffix with its name. """
+	return [c['function']['name'][:-len(graph.name) - 1] for c in graph.meta['capabilities']]
+
+
+def test_capabilities_depend_on_the_content_of_the_graph(tmp_path):
+	""" edges is only available with edges and relations_for only when nodes declare src and dst. Before loading, only the
+	capabilities that do not depend on the content are available.
+	"""
+	assert _capability_names(AgenticGraph(schema = 'known_ids', extra_args = {})) == ['children_by_idx', 'node_by_idx', 'search']
+	assert _capability_names(_school_graph(tmp_path)) == ['children_by_idx', 'node_by_idx', 'search']
+	assert _capability_names(_relationships_graph(tmp_path)) == ['children_by_idx', 'node_by_idx', 'search', 'relations_for']
+	assert _capability_names(_known_ids_graph(tmp_path)) == ['children_by_idx', 'node_by_idx', 'search', 'edges']
+
+
+def test_search_finds_nodes_by_id_and_then_by_definition(tmp_path):
+	""" The search ignores case, lists matches in the id before matches in the definition and never returns folders. """
+	graph = _school_graph(tmp_path)
+
+	assert _call(graph, 'search', text = 'NOAH') == [{'id': 'person|student|Noah'}]
+	assert _call(graph, 'search', text = 'student') == [{'id': 'person|student|Noah'}]
+	assert _call(graph, 'search', text = 'room') == [
+		{'id': 'place|room', 'definition': 'A room inside a building.'},
+		{'id': 'place|room|laboratory', 'definition': 'A room for scientific work.'}
+	]
+	assert _call(graph, 'search', text = 'teaches') == [{'id': 'person|teacher', 'definition': 'A person who teaches.'}]
+	assert _call(graph, 'search', text = 'missing') == []
+	assert _call(graph, 'search', text = ' ') == []
+
+
+def test_search_is_limited(tmp_path):
+	""" The search returns at most limit results (and never more than max_results), ending with a truncated marker if cut. """
+	graph = _school_graph(tmp_path, max_results = 3)
+
+	answer = _call(graph, 'search', text = 'p', limit = 2)
+
+	assert [entry['id'] for entry in answer[:-1]] == ['person', 'person|student|Noah']
+	assert answer[-1]['truncated'] is True
+	assert len(_call(graph, 'search', text = 'p', limit = 10)) == 3 + 1
+
+
+def test_edges_returns_the_edges_from_and_to_a_node(tmp_path):
+	""" Edges going out of and coming into a node are returned, sorted by id, with their relation. """
+	graph = _known_ids_graph(tmp_path)
+
+	assert _call(graph, 'edges', index = 'person|student|Noah Kim') == [
+		{'id': 'noah_helios', 'src': 'person|student|Noah Kim', 'dst': 'project|Helios Solar Car', 'relation': 'works_on|leads'},
+		{'id': 'noah_rhs', 'src': 'person|student|Noah Kim', 'dst': 'organization|school|Riverside High School', 'relation': 'studies_at'}
+	]
+	assert [e['id'] for e in _call(graph, 'edges', index = 'project|Helios Solar Car')] == ['noah_helios', 'priya_helios']
+	assert _call(graph, 'edges', index = 'award|Science Prize') == []
+	assert _call(graph, 'edges', index = 'person|student') is None
+	assert _call(graph, 'edges', index = 'missing') is None
+
+
+def test_edges_can_be_filtered_by_a_relation_and_its_descendants(tmp_path):
+	""" A relation filter includes the relations under it in the hierarchy (works_on includes works_on|leads). """
+	graph = _known_ids_graph(tmp_path)
+
+	assert [e['id'] for e in _call(graph, 'edges', index = 'project|Helios Solar Car', relation = 'works_on')] == ['noah_helios', 'priya_helios']
+	assert [e['id'] for e in _call(graph, 'edges', index = 'project|Helios Solar Car', relation = 'works_on|leads')] == ['noah_helios']
+	assert _call(graph, 'edges', index = 'project|Helios Solar Car', relation = 'works') == []
+
+
+def test_edges_are_limited(tmp_path):
+	""" Edges are limited to max_results, ending with a truncated marker if cut. """
+	graph = _known_ids_graph(tmp_path, max_results = 1)
+
+	answer = _call(graph, 'edges', index = 'person|student|Noah Kim')
+
+	assert [e['id'] for e in answer[:-1]] == ['noah_helios']
+	assert answer[-1]['truncated'] is True
+
+
+def test_relations_for_includes_inherited_relations(tmp_path):
+	""" A concept takes part in the relations declared for it or for any of its ancestors, as src, dst or both. """
+	graph = _relationships_graph(tmp_path)
+
+	answer = _call(graph, 'relations_for', concept = 'person|student')
+
+	assert [(e['id'], e['as']) for e in answer] == [
+		('employs', 'dst'), ('knows', 'both'), ('studies_at', 'src'), ('works_on', 'src'), ('works_on|leads', 'src')
+	]
+	assert answer[2] == {
+		'id': 'studies_at', 'src': 'person|student', 'dst': 'organization|school', 'as': 'src', 'definition': 'A student studies at a school.'
+	}
+
+
+def test_relations_for_without_inheritance(tmp_path):
+	""" Without inheritance, only the relations declared exactly for the concept are returned. A more general concept does not take
+	part in the relations of its descendants.
+	"""
+	graph = _relationships_graph(tmp_path)
+
+	assert [e['id'] for e in _call(graph, 'relations_for', concept = 'person|student', inherited = False)] == ['studies_at']
+	assert [e['id'] for e in _call(graph, 'relations_for', concept = 'person|student', inherited = 'false')] == ['studies_at']
+	assert [e['id'] for e in _call(graph, 'relations_for', concept = 'person')] == ['employs', 'knows', 'works_on', 'works_on|leads']
+	assert _call(graph, 'relations_for', concept = 'vehicle') == []
 
 
 def test_agentic_graph_handles_initialization_errors(tmp_path):
