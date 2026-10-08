@@ -60,7 +60,28 @@ def test_agentic_graph_metadata_and_requests():
 
 	assert len(logger) == 4
 	assert logger[-2]['error'] == 'AgenticGraph does not have a function named "unknown".'
-	assert logger[-1]['error'] == 'AgenticGraph function "children_by_idx_ontology" requires an "index" argument.'
+	assert logger[-1]['error'] == 'AgenticGraph function "children_by_idx_ontology" requires the argument "index".'
+
+
+def test_agentic_graph_run_passes_every_argument(tmp_path):
+	""" Verifies that a capability receives all its arguments and that required arguments come from its definition. """
+	logger = []
+	graph = AgenticGraph(schema = 'ontology', extra_args = {}, logger = logger)
+	graph.pilot(graph.states.READY.value)
+	received = []
+	graph.call['children_by_idx_ontology'] = lambda arguments: received.append(arguments) or []
+
+	graph._run({'name': 'children_by_idx_ontology', 'arguments': {'index': 'person', 'depth': 2}})
+
+	assert received == [{'index': 'person', 'depth': 2}]
+
+	graph._meta_['capabilities'][0]['function']['parameters']['required'] = ['index', 'depth']
+
+	with pytest.raises(AgenticRunInvalidRequest):
+		graph._run({'name': 'children_by_idx_ontology', 'arguments': {'index': 'person'}})
+
+	assert logger[-1]['error'] == 'AgenticGraph function "children_by_idx_ontology" requires the argument "depth".'
+	assert len(received) == 1
 
 
 def test_agentic_graph_allows_schema_discovery_without_configuration():

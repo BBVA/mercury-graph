@@ -146,21 +146,33 @@ class AgenticGraph(Agentic):
 			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
 
-		call = self.call.get(request['name'], None)
+		name = request['name']
+		call = self.call.get(name, None)
 
 		if call is None:
-			self.log_error('AgenticGraph does not have a function named "%s".' % request['name'])
+			self.log_error('AgenticGraph does not have a function named "%s".' % name)
 			raise AgenticRunInvalidRequest
 
-		index = request['arguments'].get('index', None)
+		args = request['arguments']
+		missing = self._missing_arguments(name, args)
 
-		if index is None:
-			self.log_error('AgenticGraph function "%s" requires an "index" argument.' % request['name'])
+		if len(missing) > 0:
+			self.log_error('AgenticGraph function "%s" requires the argument "%s".' % (name, missing[0]))
 			raise AgenticRunInvalidRequest
 
-		ret = {'finish_reason': 'stop', 'message': call(index)}
+		return {'finish_reason': 'stop', 'message': call(args)}
 
-		return ret
+
+	def _missing_arguments(self, name, arguments):
+		""" Returns the required arguments of the capability called name (as declared in its definition) that are missing or None. """
+
+		for capability in self._meta_['capabilities']:
+			if capability['function']['name'] == name:
+				required = capability['function']['parameters'].get('required', [])
+
+				return [argument for argument in required if arguments.get(argument, None) is None]
+
+		return []
 
 
 	def _meta(self):
@@ -309,6 +321,18 @@ class AgenticGraph(Agentic):
 		return self._node_properties(index)
 
 
+	def _children_by_idx(self, arguments):
+		""" Runs the children_by_idx capability with the arguments of a request. """
+
+		return self.get_children_idx(arguments['index'])
+
+
+	def _node_by_idx(self, arguments):
+		""" Runs the node_by_idx capability with the arguments of a request. """
+
+		return self.child(arguments['index'])
+
+
 	def _is_ready(self, function):
 		""" Returns True if the AgenticGraph is ready, logging an error naming the calling function if it is not. """
 
@@ -416,7 +440,7 @@ class AgenticGraph(Agentic):
 		name_children_idx = 'children_by_idx_%s' % self.name
 		name_node_by_idx  = 'node_by_idx_%s' % self.name
 
-		self.call = {name_children_idx: self.get_children_idx, name_node_by_idx: self.child}
+		self.call = {name_children_idx: self._children_by_idx, name_node_by_idx: self._node_by_idx}
 
 		return [
 			{
