@@ -9,6 +9,22 @@ from .agentic import Agentic, AgenticRunInvalidRequest
 from mercury.graph.core import Graph
 
 
+MAX_RESULTS = 50		# Default maximum number of entries in the answer of a capability (configurable as "max_results").
+TRUNCATED	= {'truncated': True, 'hint': 'There are more results. Ask for a more specific id or a smaller depth.'}
+
+_MISSING	= object()	# Returned by AgenticGraph._subtree() for an id that is not in the navigation tree.
+
+
+def _positive_int(value, default):
+	""" Returns value as an integer if it is (or is text for) a number greater than zero and default otherwise. """
+
+	try:
+		return int(value) if int(value) > 0 else default
+
+	except (TypeError, ValueError):
+		return default
+
+
 class GraphState(Enum):
 	""" The `GraphState` is an enumeration that defines all possible states of an AgenticGraph. """
 
@@ -322,15 +338,85 @@ class AgenticGraph(Agentic):
 
 
 	def _children_by_idx(self, arguments):
-		""" Runs the children_by_idx capability with the arguments of a request. """
+		""" Runs the children_by_idx capability: the children of an id with their definitions, down to "depth" levels. Returns None if
+		the id does not exist and ends with TRUNCATED when there are more than max_results entries.
+		"""
 
-		return self.get_children_idx(arguments['index'])
+		index = arguments['index']
+
+		if not self._is_ready('children_by_idx') or self._subtree(index) is _MISSING:
+			return None
+
+		budget	= {'left': self.conf.get('max_results', MAX_RESULTS), 'truncated': False}
+		entries = self._entries(index, _positive_int(arguments.get('depth', 1), 1), budget)
+
+		return entries + [TRUNCATED] if budget['truncated'] else entries
+
+
+	def _entries(self, index, depth, budget):
+		""" Returns the entries of the children of an id, expanded down to depth levels, spending one unit of budget per entry. All
+		the siblings are listed before expanding any of them.
+		"""
+
+		entries = []
+		for child in self.get_children_idx(index) or []:
+			if budget['left'] == 0:
+				budget['truncated'] = True
+				break
+
+			budget['left'] -= 1
+			entries.append(self._described(child))
+
+		for entry in entries:
+			self._expand(entry, depth - 1, budget)
+
+		return entries
+
+
+	def _expand(self, entry, depth, budget):
+		""" Adds to an entry its children down to depth levels, or marks it with "more" if it has children that are not included. """
+
+		if type(self._subtree(entry['id'])) is not dict:
+			return
+
+		children = self._entries(entry['id'], depth, budget) if depth > 0 else []
+
+		if len(children) > 0:
+			entry['children'] = children
+		else:
+			entry['more'] = True
 
 
 	def _node_by_idx(self, arguments):
-		""" Runs the node_by_idx capability with the arguments of a request. """
+		""" Runs the node_by_idx capability: the properties of a node and its ancestors, or None if it is not a node. """
 
-		return self.child(arguments['index'])
+		index		= arguments['index']
+		properties	= self.child(index)
+
+		if properties is None:
+			return None
+
+		return {'id': index, 'properties': properties, 'ancestors': self._ancestors(index)}
+
+
+	def _ancestors(self, index):
+		""" Returns the entries of the ancestors of an id, from its parent to the root. """
+
+		levels = index.split('|')
+
+		return [self._described('|'.join(levels[:n])) for n in range(len(levels) - 1, 0, -1)]
+
+
+	def _described(self, index):
+		""" Returns the entry of an id: the id and, if it is a node with a definition, the definition. """
+
+		entry		= {'id': index}
+		definition	= (self._node_properties(index) or {}).get('definition', None)
+
+		if isinstance(definition, str):
+			entry['definition'] = definition
+
+		return entry
 
 
 	def _is_ready(self, function):
@@ -345,7 +431,7 @@ class AgenticGraph(Agentic):
 
 
 	def _subtree(self, index):
-		""" Returns the subtree of self._indices under an id (None for a leaf) or None if the id is not in the tree. """
+		""" Returns the subtree of self._indices under an id (None for a leaf) or _MISSING if the id is not in the tree. """
 
 		if index is None or index == '':
 			return self._indices
@@ -353,7 +439,7 @@ class AgenticGraph(Agentic):
 		subtree = self._indices
 		for level in index.split('|'):
 			if type(subtree) is not dict or level not in subtree:
-				return None
+				return _MISSING
 
 			subtree = subtree[level]
 
@@ -447,13 +533,17 @@ class AgenticGraph(Agentic):
 				'type': 'function',
 				'function': {
 					'name': name_children_idx,
-					'description': 'Get indices of the children of an index.',
+					'description': 'Get the children of an id with their definitions, down to depth levels.',
 					'parameters': {
 						'type': 'object',
 						'properties': {
 							'index': {
 								'type': 'string',
-								'description': 'Index whose children indices are required.'
+								'description': 'Id whose children are required. An empty string is the root.'
+							},
+							'depth': {
+								'type': 'integer',
+								'description': 'Number of levels to go down. Defaults to 1.'
 							}
 						},
 						'required': ['index']
@@ -461,7 +551,7 @@ class AgenticGraph(Agentic):
 					'returns': {
 						'type': 'array',
 						'items': {
-							'type': 'string'
+							'type': 'object'
 						}
 					}
 				}
@@ -470,19 +560,19 @@ class AgenticGraph(Agentic):
 				'type': 'function',
 				'function': {
 					'name': name_node_by_idx,
-					'description': 'Get the properties of a node by its index.',
+					'description': 'Get the properties of a node by its id and its ancestors with their definitions.',
 					'parameters': {
 						'type': 'object',
 						'properties': {
 							'index': {
 								'type': 'string',
-								'description': 'Index of the node.'
+								'description': 'Id of the node.'
 							}
 						},
 						'required': ['index']
 					},
 					'returns': {
-						'type': 'dict'
+						'type': 'object'
 					}
 				}
 			}
