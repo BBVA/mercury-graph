@@ -103,7 +103,7 @@ explain the result.
   inspected and traversed creating unique ids of every node in the tree (from an entire corpus to a cell of a table inside a
   sub-sub-section of a document).
 - **[`AgenticGraph`](evidence.md#mercury.graph.evidence.AgenticGraph)** makes mercury.graph MultiGraph available through the Agentic
-  interface to contain ontologies for the EvidenceGraph, storage of known entities and relations or any other graph.
+  interface to contain [ontologies](evidence_ontologies.md) for the EvidenceGraph, storage of known entities and relations or any other graph.
 - **[`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer)** converts source fragments into structured entities and relations with
   traceable ids for the EvidenceGraph.
 - **[`EvidenceGraph`](evidence.md#mercury.graph.evidence.EvidenceGraph)** maintains the aggregated evidence graph, including entity

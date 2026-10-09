@@ -40,6 +40,7 @@ nav:
   - mercury.graph.evidence_intro: reference/evidence_intro.md
   - mercury.graph.evidence: reference/evidence.md
   - mercury.graph.evidence_source: reference/evidence_source.md
+  - mercury.graph.evidence_ontologies: reference/evidence_ontologies.md
   - mercury.graph.evidence_how: reference/evidence_how.md
   - mercury.graph.evidence_formats: reference/evidence_formats.md
   - mercury.graph.evidence_cli: reference/evidence_cli.md
