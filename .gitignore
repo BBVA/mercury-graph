@@ -7,4 +7,3 @@ __pycache__/
 build/
 *.egg-info/
 .DS_Store
-site/
