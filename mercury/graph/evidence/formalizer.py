@@ -19,6 +19,71 @@ class FormalizerState(Enum):
 	READY				=  100	# The formalizer is ready to be queried.
 
 
+def validate_ontology(ontology):
+	""" Checks that an ontology (entities as nodes and relationships as edges between them) is coherent.
+
+	The checks are:
+
+	- Every entity has its parent (the id without its last `|` level) defined.
+	- Every relationship has its parent defined (e.g., `works_on` for `works_on|leads`).
+	- The `src` and `dst` of a relationship are those of its parent or descendants of them (e.g., `works_on|leads` can go from
+	`person|student` if `works_on` goes from `person`).
+
+	That ids are unique and that the `src` and `dst` of every relationship are entities of the ontology is already checked when it is
+	loaded (see
+	[`graph_from_config()`][mercury.graph.evidence.agentic_graph.graph_from_config]).
+
+	Args:
+		ontology (AgenticGraph): the ontology. It must be loaded (piloted) before being validated, otherwise that is the only problem
+			reported.
+
+	Returns:
+		(list): A list of strings, one for each problem found. It is empty if the ontology is valid.
+	"""
+
+	errors = _check_loaded({ontology.name: ontology})
+	if len(errors) > 0:
+		return errors
+
+	ntx		  = ontology._graph.networkx
+	relations = _relation_ends(ntx)
+
+	errors += _check_parents(set(ntx.nodes), 'Entity', ontology.name)
+	errors += _check_parents(set(relations), 'Relationship', ontology.name)
+	errors += _check_relation_inheritance(relations)
+
+	return errors
+
+
+def _relation_ends(ntx):
+	""" Returns a dictionary of relationship id: (src, dst) of the ontology ntx. """
+
+	return {key: (src, dst) for src, dst, key in ntx.edges(keys = True)}
+
+
+def _check_relation_inheritance(relations):
+	""" Returns an error for every src or dst of a relationship that is not that of its parent or a descendant of it. """
+
+	errors = []
+	for index, ends in sorted(relations.items()):
+		parent = parent_of(index)
+		if parent in relations:
+			errors += _check_inherited_ends(index, ends, parent, relations[parent])
+
+	return errors
+
+
+def _check_inherited_ends(index, ends, parent, parent_ends):
+	""" Returns an error for each end of a relationship that does not descend from the same end of its parent. """
+
+	errors = []
+	for end, concept, expected in zip(('src', 'dst'), ends, parent_ends):
+		if not descends_from(concept, expected):
+			errors.append('Relationship "%s" has %s "%s", which is not a "%s" as required by its parent "%s".' % (index, end, concept, expected, parent))
+
+	return errors
+
+
 def validate_ontologies(entities, relationships, known_ids):
 	""" Checks that the three ontologies used by a Formalizer are coherent with each other.
 

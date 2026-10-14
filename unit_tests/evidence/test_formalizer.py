@@ -466,6 +466,115 @@ def test_validate_ontologies_requires_loaded_ontologies(tmp_path):
 	assert _mentions(errors, 'known_ids')
 
 
+def _multigraph(directory, entities, relations = ()):
+	"""Return an ontology with entity ids as nodes and (id, src, dst) tuples as edges, all of them with a definition."""
+	nodes = pd.DataFrame({'id': list(entities), 'definition': ['Definition of %s.' % i for i in entities]})
+	edges = pd.DataFrame(list(relations), columns = ['id', 'src', 'dst'])
+	edges['definition'] = ['Definition of %s.' % i for i in edges['id']]
+	return _ontology(directory, 'ontology', nodes, edges if len(relations) > 0 else None)
+
+
+def _validate_one(ontology):
+	"""Run validate_ontology() on an ontology."""
+	from mercury.graph.evidence.formalizer import validate_ontology
+
+	return validate_ontology(ontology)
+
+
+def test_validate_ontology_accepts_a_valid_ontology(tmp_path):
+	"""A coherent ontology has no errors, including a child relationship between descendants of the types of its parent."""
+	relations = SCHOOL_RELATIONS + (('works_on|leads_research', 'person|teacher', 'project'),)
+
+	assert _validate_one(_multigraph(tmp_path, SCHOOL_ENTITIES, relations)) == []
+
+
+def test_validate_ontology_accepts_the_template_ontology():
+	"""The entities and relationships created by `mge` for a new endpoint are a valid ontology."""
+	extra_args = {'initial_nodes': {'type': 'csv', 'path': str(TEMPLATE_ONTOLOGIES / 'entities_concepts.csv')},
+				  'initial_edges': {'type': 'csv', 'path': str(TEMPLATE_ONTOLOGIES / 'relationships_concepts.csv')}}
+	ontology = AgenticGraph(schema = 'ontology', extra_args = extra_args)
+	ontology.pilot(100)
+
+	assert _validate_one(ontology) == []
+
+
+def test_validate_ontology_requires_entity_parents(tmp_path):
+	"""An entity whose parent is not defined is an error, also when only an intermediate level is missing."""
+	errors = _validate_one(_multigraph(tmp_path, ('person|teacher', 'place', 'place|room|laboratory')))
+
+	assert len(errors) == 2
+	assert _mentions(errors, 'person|teacher', 'person')
+	assert _mentions(errors, 'place|room|laboratory', 'place|room')
+
+
+def test_an_ontology_with_repeated_relationship_ids_does_not_load(tmp_path):
+	"""Two relationships with the same id and different types are rejected when the ontology is loaded."""
+	nodes = pd.DataFrame({'id': list(SCHOOL_ENTITIES), 'definition': 'A definition.'})
+	edges = pd.DataFrame([('belongs_to', 'person', 'organization'), ('belongs_to', 'organization|school', 'organization')],
+						 columns = ['id', 'src', 'dst'])
+	nodes.to_csv(tmp_path / 'nodes.csv', sep = '\t', index = False)
+	edges.to_csv(tmp_path / 'edges.csv', sep = '\t', index = False)
+	logger = []
+	ontology = AgenticGraph(schema = 'ontology', logger = logger, extra_args = {
+		'initial_nodes': {'type': 'csv', 'path': str(tmp_path / 'nodes.csv')},
+		'initial_edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}})
+
+	ontology.pilot(ontology.states.READY.value)
+
+	assert ontology.meta['state'] == ontology.states.ERR_GRAPH_INIT.value
+	assert 'Edges have repeated ids: "belongs_to".' in logger[-1]['error']
+
+
+def test_validate_ontology_requires_relationship_parents(tmp_path):
+	"""A relationship whose parent is not defined is an error."""
+	errors = _validate_one(_multigraph(tmp_path, SCHOOL_ENTITIES, (('works_on|leads', 'person', 'project'),)))
+
+	assert len(errors) == 1
+	assert _mentions(errors, 'works_on|leads', 'works_on')
+
+
+def test_validate_ontology_requires_child_relationships_between_descendants(tmp_path):
+	"""The src and dst of a child relationship are those of its parent or descendants of them."""
+	relations = (('works_on', 'person', 'project'), ('works_on|leads', 'organization', 'person|student'))
+
+	errors = _validate_one(_multigraph(tmp_path, SCHOOL_ENTITIES, relations))
+
+	assert len(errors) == 2
+	assert _mentions(errors, 'works_on|leads', 'src', 'organization', 'person')
+	assert _mentions(errors, 'works_on|leads', 'dst', 'person|student', 'project')
+
+
+def test_validate_ontology_does_not_accept_a_prefix_as_a_parent_type(tmp_path):
+	"""person_group is not a descendant of person, even if its id starts with it."""
+	entities = SCHOOL_ENTITIES + ('person_group',)
+	relations = (('works_on', 'person', 'project'), ('works_on|leads', 'person_group', 'project'))
+
+	errors = _validate_one(_multigraph(tmp_path, entities, relations))
+
+	assert len(errors) == 1
+	assert _mentions(errors, 'works_on|leads', 'person_group')
+
+
+def test_validate_ontology_reports_every_error_at_once(tmp_path):
+	"""Problems of different kinds are all reported."""
+	entities = ('person', 'place|room', 'project')
+	relations = (('works_on|leads', 'person', 'project'), ('knows', 'person', 'person'), ('knows|admires', 'project', 'person'))
+
+	errors = _validate_one(_multigraph(tmp_path, entities, relations))
+
+	assert len(errors) == 3
+	assert _mentions(errors, 'place|room')
+	assert _mentions(errors, 'works_on|leads')
+	assert _mentions(errors, 'knows|admires')
+
+
+def test_validate_ontology_requires_a_loaded_ontology():
+	"""An ontology that has not been loaded is the only problem reported."""
+	errors = _validate_one(AgenticGraph(schema = 'ontology', extra_args = {}))
+
+	assert errors == ['Ontology "ontology" is not loaded.']
+
+
 def test_formalizer_pilot_fails_with_invalid_ontologies(monkeypatch, tmp_path):
 	"""The Formalizer does not become ready with incoherent ontologies and logs every problem."""
 	set_gliner_extractor(monkeypatch, DummyModel)
