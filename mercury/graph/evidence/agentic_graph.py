@@ -204,21 +204,25 @@ class MultiGraph(Graph):
 		return l
 
 
-def graph_from_config(conf):
-	""" Returns a MultiGraph built from the "initial_nodes" and "initial_edges" of a configuration (empty if there are none).
+def graph_from_files(nodes = None, edges = None, file_format = None):
+	""" Returns a MultiGraph built from a file of nodes and a file of edges (empty if there are none).
+
+	Every id must be unique, and every src and dst of the edges must be one of the nodes. Edges cannot be loaded without nodes.
 
 	Args:
-		conf (dict): a configuration with the optional keys "file_format", "initial_nodes" and "initial_edges". Each of the latter two is
-			a dictionary with a "type" ("csv" or "pickle") and a "path".
+		nodes (dict): the optional file of nodes, a dictionary with a "type" ("csv" or "pickle") and a "path".
+		edges (dict): the optional file of edges, like nodes.
+		file_format (dict): the optional names of the columns ("src", "dst" and "id"), "directed" and the separator ("sep") of the .csv
+			files. Every key left out takes its default value.
 
 	Returns:
 		(MultiGraph): the graph.
 	"""
 
-	keys = _file_format(conf)
+	keys = {**DEFAULT_FILE_FORMAT, **(file_format or {})}
 
-	nodes = _read_table(conf.get('initial_nodes', None), keys['sep'])
-	edges = _read_table(conf.get('initial_edges', None), keys['sep'])
+	nodes = _read_table(nodes, keys['sep'])
+	edges = _read_table(edges, keys['sep'])
 
 	if nodes is not None:
 		_check_unique_ids(nodes, keys, 'Nodes')
@@ -230,12 +234,6 @@ def graph_from_config(conf):
 		_check_unique_ids(edges, keys, 'Edges')
 
 	return MultiGraph(data = edges, keys = keys, nodes = nodes)
-
-
-def _file_format(conf):
-	""" Returns the "file_format" of a configuration with every missing key set to its default value. """
-
-	return {**DEFAULT_FILE_FORMAT, **conf.get('file_format', {})}
 
 
 def _read_table(spec, sep):
@@ -273,7 +271,7 @@ def _check_edge_ends(nodes, edges, keys):
 	"""
 
 	if nodes is None:
-		raise ValueError('Edges cannot be loaded without a file of nodes ("initial_nodes").')
+		raise ValueError('Edges cannot be loaded without a file of nodes.')
 
 	undeclared = _undeclared_ends(set(nodes[keys['id']]), edges, keys)
 
@@ -307,9 +305,10 @@ class AgenticGraph(Agentic):
 	A graph is a persisted storage of anything: the storage of nodes is a key/value store with any properties. On top of that, nodes
 	can be connected by edges that also have properties. AgenticGraph objects are typically persisted (that is part of their configuration
 	to store such things as hierarchical ontologies for both entities and relationships). They can read from .csv files that
-	contain ontologies, for initialization, but do not write to .csv files to keep project management simple. Once the graph is
-	initialized, it stores itself as a pickle file. When initializing the object, if the pickle file exists, it will be loaded rather
-	than initializing the graph from .csv files.
+	contain ontologies (the keys "nodes" and "edges" of its configuration), for initialization, but do not write to .csv files to keep
+	project management simple. Once the graph is initialized, it stores itself as a pickle file. When initializing the object, if the
+	pickle file exists, it will be loaded rather than initializing the graph from .csv files, and a message is logged for every .csv file
+	modified after the pickle was saved.
 
 	## IDs and hierarchical structure
 
@@ -462,7 +461,7 @@ class AgenticGraph(Agentic):
 				try:
 					self._fname = self.conf.get('persistence', None)
 					if self._fname is None:
-						self._graph = graph_from_config(self.conf)
+						self._graph = self._graph_from_files()
 					else:
 						self._fname = self._fname['path']
 						parent_dir	= os.path.dirname(self._fname)
@@ -474,8 +473,9 @@ class AgenticGraph(Agentic):
 							with open(self._fname, 'rb') as f:
 								ntx = pickle.load(f)			# A NetworkX graph object saved by this class.
 							self._graph = MultiGraph(data = ntx)
+							self._warn_about_newer_files()
 						else:
-							self._graph = graph_from_config(self.conf)
+							self._graph = self._graph_from_files()
 
 				except Exception as e:
 					self.log_error('Graph could not be created and initialized for AgenticGraph "%s": %s' % (self.name, e))
@@ -773,6 +773,22 @@ class AgenticGraph(Agentic):
 					tree[ix] = {}
 
 				tree = tree[ix]
+
+
+	def _graph_from_files(self):
+		""" Returns the graph built from the files of nodes and edges in the configuration. """
+
+		return graph_from_files(self.conf.get('nodes', None), self.conf.get('edges', None), self.conf.get('file_format', None))
+
+
+	def _warn_about_newer_files(self):
+		""" Logs a message for every file of nodes or edges modified after the pickle was saved, since loading the pickle ignores it. """
+
+		for kind in ('nodes', 'edges'):
+			spec = self.conf.get(kind, None)
+			if spec is not None and os.path.isfile(spec['path']) and os.path.getmtime(spec['path']) > os.path.getmtime(self._fname):
+				self.log_message('"%s" changed after "%s" was saved, so its changes are not loaded. Delete "%s" to load them.' %
+								 (spec['path'], self._fname, self._fname))
 
 
 	def _build_indices(self):

@@ -1,4 +1,4 @@
-import pickle
+import os, pickle
 
 import pandas as pd
 import pytest
@@ -6,7 +6,7 @@ import networkx as nx
 
 from mercury.graph.evidence import AgenticGraph, MultiGraph
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest
-from mercury.graph.evidence.agentic_graph import graph_from_config
+from mercury.graph.evidence.agentic_graph import graph_from_files
 
 
 def test_multi_graph_builds_directed_multigraph():
@@ -40,117 +40,117 @@ def test_multi_graph_rejects_undirected_graphs():
 
 
 def _files(directory, nodes, edges = None, sep = '\t'):
-	""" Writes nodes and edges (lists of dicts) as .csv files in directory and returns their "initial_nodes" and "initial_edges". """
+	""" Writes nodes and edges (lists of dicts) as .csv files in directory and returns them as the arguments of graph_from_files(). """
 	conf = {}
 	for kind, rows in (('nodes', nodes), ('edges', edges)):
 		if rows is not None:
 			path = directory / ('%s.csv' % kind)
 			pd.DataFrame(rows).to_csv(path, index = False, sep = sep)
-			conf['initial_%s' % kind] = {'type': 'csv', 'path': str(path)}
+			conf[kind] = {'type': 'csv', 'path': str(path)}
 
 	return conf
 
 
-def test_graph_from_config_loads_nodes_and_edges(tmp_path):
+def test_graph_from_files_loads_nodes_and_edges(tmp_path):
 	""" Nodes and edges keep their attributes and the id of an edge becomes its key. """
 	conf = _files(tmp_path, [{'id': 'a', 'kind': 'person'}, {'id': 'b', 'kind': 'company'}], [{'src': 'a', 'dst': 'b', 'id': 'e1', 'relation': 'owns'}])
 
-	ntx = graph_from_config(conf).networkx
+	ntx = graph_from_files(**conf).networkx
 
 	assert dict(ntx.nodes(data = True)) == {'a': {'kind': 'person'}, 'b': {'kind': 'company'}}
 	assert list(ntx.edges(keys = True, data = True)) == [('a', 'b', 'e1', {'relation': 'owns'})]
 
 
-def test_graph_from_config_uses_the_file_format(tmp_path):
+def test_graph_from_files_uses_the_file_format(tmp_path):
 	""" The column names and the separator come from "file_format". """
 	conf = _files(tmp_path, [{'name': 'a'}, {'name': 'b'}], [{'from': 'a', 'to': 'b', 'name': 'e1'}], sep = ';')
 	conf['file_format'] = {'src': 'from', 'dst': 'to', 'id': 'name', 'directed': True, 'sep': ';'}
 
-	assert list(graph_from_config(conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
+	assert list(graph_from_files(**conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
 
 
-def test_graph_from_config_completes_a_partial_file_format(tmp_path):
+def test_graph_from_files_completes_a_partial_file_format(tmp_path):
 	""" The keys missing in "file_format" take their default values, including the tab separator. """
 	conf = _files(tmp_path, [{'id': 'a'}, {'id': 'b'}], [{'from': 'a', 'to': 'b', 'id': 'e1'}])
 	conf['file_format'] = {'src': 'from', 'dst': 'to'}
 
-	assert list(graph_from_config(conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
+	assert list(graph_from_files(**conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
 
 
-def test_graph_from_config_requires_nodes_for_edges(tmp_path):
+def test_graph_from_files_requires_nodes_for_edges(tmp_path):
 	""" Edges cannot be loaded without a file of nodes. """
 	conf = _files(tmp_path, None, [{'src': 'a', 'dst': 'b', 'id': 'e1'}])
 
-	with pytest.raises(ValueError, match = 'initial_nodes'):
-		graph_from_config(conf)
+	with pytest.raises(ValueError, match = 'file of nodes'):
+		graph_from_files(**conf)
 
 
-def test_graph_from_config_requires_declared_edge_ends(tmp_path):
+def test_graph_from_files_requires_declared_edge_ends(tmp_path):
 	""" Every src and dst of an edge must be a declared node, and every missing one is reported at once. """
 	conf = _files(tmp_path, [{'id': 'a'}, {'id': 'b'}], [{'src': 'a', 'dst': 'c', 'id': 'e1'}, {'src': 'd', 'dst': 'b', 'id': 'e2'}])
 
 	with pytest.raises(ValueError) as error:
-		graph_from_config(conf)
+		graph_from_files(**conf)
 
 	assert '"c" (dst of "e1")' in str(error.value)
 	assert '"d" (src of "e2")' in str(error.value)
 
 
-def test_graph_from_config_requires_unique_node_ids(tmp_path):
+def test_graph_from_files_requires_unique_node_ids(tmp_path):
 	""" Two nodes with the same id are an error, and every repeated id is reported at once. """
 	conf = _files(tmp_path, [{'id': 'a', 'kind': 'x'}, {'id': 'a', 'kind': 'y'}, {'id': 'b'}, {'id': 'b'}, {'id': 'c'}])
 
 	with pytest.raises(ValueError) as error:
-		graph_from_config(conf)
+		graph_from_files(**conf)
 
 	assert 'Nodes have repeated ids: "a", "b".' in str(error.value)
 
 
-def test_graph_from_config_requires_unique_edge_ids(tmp_path):
+def test_graph_from_files_requires_unique_edge_ids(tmp_path):
 	""" Two edges with the same id are an error, whether they have the same ends or not. """
 	edges = [{'src': 'a', 'dst': 'b', 'id': 'e1'}, {'src': 'a', 'dst': 'b', 'id': 'e1'},
 			 {'src': 'a', 'dst': 'b', 'id': 'e2'}, {'src': 'b', 'dst': 'a', 'id': 'e2'}]
 	conf = _files(tmp_path, [{'id': 'a'}, {'id': 'b'}], edges)
 
 	with pytest.raises(ValueError) as error:
-		graph_from_config(conf)
+		graph_from_files(**conf)
 
 	assert 'Edges have repeated ids: "e1", "e2".' in str(error.value)
 
 
-def test_graph_from_config_accepts_nodes_without_edges(tmp_path):
+def test_graph_from_files_accepts_nodes_without_edges(tmp_path):
 	""" A graph can have nodes and no edges. """
-	ntx = graph_from_config(_files(tmp_path, [{'id': 'a'}, {'id': 'b'}])).networkx
+	ntx = graph_from_files(**_files(tmp_path, [{'id': 'a'}, {'id': 'b'}])).networkx
 
 	assert set(ntx.nodes) == {'a', 'b'}
 	assert ntx.number_of_edges() == 0
 
 
-def test_graph_from_config_without_files_is_empty():
-	""" Without "initial_nodes" and "initial_edges" the graph is empty. """
-	ntx = graph_from_config({}).networkx
+def test_graph_from_files_without_files_is_empty():
+	""" Without nodes and edges the graph is empty. """
+	ntx = graph_from_files().networkx
 
 	assert ntx.number_of_nodes() == 0
 	assert ntx.number_of_edges() == 0
 
 
-def test_graph_from_config_reads_pickles(tmp_path):
+def test_graph_from_files_reads_pickles(tmp_path):
 	""" Nodes and edges can also be pandas pickles. """
 	pd.DataFrame([{'id': 'a'}, {'id': 'b'}]).to_pickle(tmp_path / 'nodes.pickle')
 	pd.DataFrame([{'src': 'a', 'dst': 'b', 'id': 'e1'}]).to_pickle(tmp_path / 'edges.pickle')
-	conf = {'initial_nodes': {'type': 'pickle', 'path': str(tmp_path / 'nodes.pickle')},
-			'initial_edges': {'type': 'pickle', 'path': str(tmp_path / 'edges.pickle')}}
+	conf = {'nodes': {'type': 'pickle', 'path': str(tmp_path / 'nodes.pickle')},
+			'edges': {'type': 'pickle', 'path': str(tmp_path / 'edges.pickle')}}
 
-	ntx = graph_from_config(conf).networkx
+	ntx = graph_from_files(**conf).networkx
 
 	assert set(ntx.nodes) == {'a', 'b'}
 	assert list(ntx.edges(keys = True)) == [('a', 'b', 'e1')]
 
 
-def test_graph_from_config_rejects_unknown_file_types():
+def test_graph_from_files_rejects_unknown_file_types():
 	""" A file type other than "csv" or "pickle" is an error. """
 	with pytest.raises(ValueError):
-		graph_from_config({'initial_nodes': {'type': 'parquet', 'path': 'nodes.parquet'}})
+		graph_from_files(nodes = {'type': 'parquet', 'path': 'nodes.parquet'})
 
 
 def test_agentic_graph_metadata_and_requests():
@@ -243,8 +243,8 @@ def test_agentic_graph_loads_files_and_persists_graph(tmp_path):
 	edges.to_pickle(edges_path)
 	config = {
 		'file_format': {'src': 'source', 'dst': 'target', 'id': 'id', 'directed': True, 'sep': ';'},
-		'initial_nodes': {'type': 'csv', 'path': str(nodes_path)},
-		'initial_edges': {'type': 'pickle', 'path': str(edges_path)},
+		'nodes': {'type': 'csv', 'path': str(nodes_path)},
+		'edges': {'type': 'pickle', 'path': str(edges_path)},
 		'persistence': {'path': str(persistence_path)}
 	}
 	graph = AgenticGraph(schema = 'ontology', extra_args = config)
@@ -275,6 +275,51 @@ def test_agentic_graph_loads_files_and_persists_graph(tmp_path):
 	reloaded.close(False)
 
 
+def _persisted_graph(directory, logger):
+	""" Returns the configuration of a graph whose pickle has been saved after loading its .csv files, and the paths of these files. """
+	conf = _files(directory, [{'id': 'a'}, {'id': 'b'}], [{'src': 'a', 'dst': 'b', 'id': 'e1'}])
+	conf['persistence'] = {'path': str(directory / 'graph.pickle')}
+	graph = AgenticGraph(schema = 'ontology', extra_args = conf, logger = logger)
+	graph.pilot(graph.states.READY.value)
+	graph.close(True)
+
+	return conf, conf['nodes']['path'], conf['edges']['path']
+
+
+def _messages(logger):
+	""" Returns the text of the 'message' events in logger. """
+	return [event['message'] for event in logger if event['type'] == 'message']
+
+
+def test_agentic_graph_warns_when_a_file_changed_after_its_pickle(tmp_path):
+	""" Loading from the pickle ignores the .csv files, so a file modified after the pickle was saved is reported. """
+	logger = []
+	conf, nodes_path, edges_path = _persisted_graph(tmp_path, logger)
+	later = os.path.getmtime(conf['persistence']['path']) + 10
+	os.utime(nodes_path, (later, later))
+
+	graph = AgenticGraph(schema = 'ontology', extra_args = conf, logger = logger)
+	graph.pilot(graph.states.READY.value)
+
+	assert graph.meta['state'] == graph.states.READY.value
+	assert len(_messages(logger)) == 1
+	assert nodes_path in _messages(logger)[0] and 'Delete' in _messages(logger)[0]
+
+
+def test_agentic_graph_does_not_warn_when_the_files_did_not_change(tmp_path):
+	""" Without changes after the pickle was saved, loading it logs no warning. """
+	logger = []
+	conf, nodes_path, edges_path = _persisted_graph(tmp_path, logger)
+	earlier = os.path.getmtime(conf['persistence']['path']) - 10
+	os.utime(nodes_path, (earlier, earlier))
+	os.utime(edges_path, (earlier, earlier))
+
+	graph = AgenticGraph(schema = 'ontology', extra_args = conf, logger = logger)
+	graph.pilot(graph.states.READY.value)
+
+	assert _messages(logger) == []
+
+
 def test_agentic_graph_loads_pickle_nodes_and_csv_edges(tmp_path):
 	""" Verifies the remaining supported initial data file formats. """
 	nodes = pd.DataFrame([{'id': 'root|child', 'label': 'Child'}])
@@ -287,8 +332,8 @@ def test_agentic_graph_loads_pickle_nodes_and_csv_edges(tmp_path):
 		schema = 'formats',
 		extra_args = {
 			'file_format': {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': ','},
-			'initial_nodes': {'type': 'pickle', 'path': str(nodes_path)},
-			'initial_edges': {'type': 'csv', 'path': str(edges_path)}
+			'nodes': {'type': 'pickle', 'path': str(nodes_path)},
+			'edges': {'type': 'csv', 'path': str(edges_path)}
 		}
 	)
 
@@ -303,7 +348,7 @@ def test_agentic_graph_index_tree_does_not_depend_on_node_order(tmp_path):
 	for n, order in enumerate([['person', 'person|teacher'], ['person|teacher', 'person']]):
 		nodes_path = tmp_path / ('nodes_%d.csv' % n)
 		pd.DataFrame([{'id': i, 'definition': i} for i in order]).to_csv(nodes_path, index = False, sep = '\t')
-		graph = AgenticGraph(schema = 'entities', extra_args = {'initial_nodes': {'type': 'csv', 'path': str(nodes_path)}})
+		graph = AgenticGraph(schema = 'entities', extra_args = {'nodes': {'type': 'csv', 'path': str(nodes_path)}})
 
 		graph.pilot(graph.states.READY.value)
 		assert graph.get_children_idx('person') == ['person|teacher']
@@ -317,7 +362,7 @@ def test_agentic_graph_ids_do_not_include_the_ontology_name(tmp_path):
 	""" Verifies that ids are used exactly as in the .csv files, without the name of the ontology in front. """
 	nodes_path = tmp_path / 'nodes.csv'
 	pd.DataFrame([{'id': 'person', 'definition': 'A human being.'}, {'id': 'person|teacher', 'definition': 'A teacher.'}]).to_csv(nodes_path, index = False, sep = '\t')
-	graph = AgenticGraph(schema = 'entities', extra_args = {'initial_nodes': {'type': 'csv', 'path': str(nodes_path)}})
+	graph = AgenticGraph(schema = 'entities', extra_args = {'nodes': {'type': 'csv', 'path': str(nodes_path)}})
 
 	graph.pilot(graph.states.READY.value)
 
@@ -338,8 +383,8 @@ def test_agentic_graph_edges_are_not_in_the_navigation_tree(tmp_path):
 	pd.DataFrame([{'id': 'person|Noah'}, {'id': 'project|Helios'}]).to_csv(nodes_path, index = False, sep = '\t')
 	pd.DataFrame([{'src': 'person|Noah', 'dst': 'project|Helios', 'relation': 'works_on', 'id': 'noah_helios'}]).to_csv(edges_path, index = False, sep = '\t')
 	graph = AgenticGraph(schema = 'known_ids', extra_args = {
-		'initial_nodes': {'type': 'csv', 'path': str(nodes_path)},
-		'initial_edges': {'type': 'csv', 'path': str(edges_path)}
+		'nodes': {'type': 'csv', 'path': str(nodes_path)},
+		'edges': {'type': 'csv', 'path': str(edges_path)}
 	})
 
 	graph.pilot(graph.states.READY.value)
@@ -363,7 +408,7 @@ def _school_graph(directory, name = 'entities', max_results = None):
 	]
 	path = directory / ('%s.csv' % name)
 	pd.DataFrame([{'id': i, 'definition': d} for i, d in nodes]).to_csv(path, index = False, sep = '\t')
-	extra_args = {'initial_nodes': {'type': 'csv', 'path': str(path)}}
+	extra_args = {'nodes': {'type': 'csv', 'path': str(path)}}
 	if max_results is not None:
 		extra_args['max_results'] = max_results
 	graph = AgenticGraph(schema = name, extra_args = extra_args)
@@ -483,7 +528,7 @@ def _csv_graph(directory, name, nodes, edges = None, **extra_args):
 		if rows is not None:
 			path = directory / ('%s_%s.csv' % (name, kind))
 			pd.DataFrame(rows).to_csv(path, index = False, sep = '\t')
-			extra_args['initial_%s' % kind] = {'type': 'csv', 'path': str(path)}
+			extra_args[kind] = {'type': 'csv', 'path': str(path)}
 	graph = AgenticGraph(schema = name, extra_args = extra_args)
 	graph.pilot(graph.states.READY.value)
 
@@ -635,7 +680,7 @@ def test_agentic_graph_handles_initialization_errors(tmp_path):
 	logger = []
 	graph = AgenticGraph(
 		schema = 'broken',
-		extra_args = {'initial_nodes': {'type': 'csv', 'path': str(tmp_path / 'missing.csv')}},
+		extra_args = {'nodes': {'type': 'csv', 'path': str(tmp_path / 'missing.csv')}},
 		logger = logger
 	)
 

@@ -29,10 +29,10 @@
 
 			// This optional dataframe (default is an empty graph) is only loaded when the file in "persistence" does not exist.
 			// It can be either a csv or a pickle of a pandas dataframe.
-			"initial_nodes" : {"type" : "csv", "$path" : "ontology_source/entities_concepts.csv"},
+			"nodes" : {"type" : "csv", "$path" : "ontology_source/entities_concepts.csv"},
 
-			// This is where the AgenticGraph will persist itself. The "initial_nodes" and "initial_edges" are only used when the graph
-			// is first created for the first time. It is a pickle of a NetworkX graph.
+			// This is where the AgenticGraph will persist itself. When this file exists, it is loaded and "nodes" and "edges" are ignored:
+			// delete it after editing them (a message is logged when they are newer than this file). It is a pickle of a NetworkX graph.
 			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
 			"persistence" : {"type" : "pickle", "$path" : "graphs/entities.pickle"},
 
@@ -53,7 +53,7 @@
 				"It defined a relationship id as a key, src and dst define the type of entity the relationship connects as defined",
 				"in 'entities'. An attribute 'definition' explains the relationship. Hierarchy is defined by the | separator in the IDs."
 			],
-			"initial_nodes" : {"type" : "csv", "$path" : "ontology_source/relationships_concepts.csv"},
+			"nodes" : {"type" : "csv", "$path" : "ontology_source/relationships_concepts.csv"},
 			"persistence" : {"type" : "pickle", "$path" : "graphs/relationships.pickle"}
 		},
 		"tools": []
@@ -69,10 +69,10 @@
 				"Also, if teaches_at(person|teacher, organization|school) is defined in 'relationships', this holds ids for specific instances.",
 				"This does not contain any other information (that belongs in the EvidenceGraph)."
 			],
-			"initial_nodes" : {"type" : "csv", "$path" : "ontology_source/known_ids_nodes.csv"},
-			// This optional requires the entities to be defined in "initial_nodes". Both are only loaded when the file in "persistence"
+			"nodes" : {"type" : "csv", "$path" : "ontology_source/known_ids_nodes.csv"},
+			// This optional requires the entities to be defined in "nodes". Both are only loaded when the file in "persistence"
 			// does not exist. It can be either a csv or a pickle of a pandas dataframe.
-			"initial_edges" : {"type" : "csv", "$path" : "ontology_source/known_ids_edges.csv"},
+			"edges" : {"type" : "csv", "$path" : "ontology_source/known_ids_edges.csv"},
 			"persistence" : {"type" : "pickle", "$path" : "graphs/known_ids.pickle"}
 		},
 		"tools": []

@@ -25,7 +25,7 @@ def _ontology(directory, name, nodes, edges = None):
 		if data is not None:
 			path = directory / ('%s_%s.csv' % (name, kind))
 			data.to_csv(path, sep = '\t', index = False)
-			extra_args['initial_%s' % kind] = {'type': 'csv', 'path': str(path)}
+			extra_args[kind] = {'type': 'csv', 'path': str(path)}
 	graph = AgenticGraph(schema = name, extra_args = extra_args)
 	graph.pilot(graph.states.READY.value)
 	assert graph.meta['state'] == graph.states.READY.value
@@ -311,9 +311,9 @@ def test_validate_ontologies_accepts_the_template_ontologies():
 	"""The ontologies created by `mge` for a new endpoint are valid."""
 	fmt = {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}
 	conf = {
-		'entities': {'initial_nodes': 'entities_concepts.csv'},
-		'relationships': {'initial_nodes': 'relationships_concepts.csv'},
-		'known_ids': {'initial_nodes': 'known_ids_nodes.csv', 'initial_edges': 'known_ids_edges.csv'}
+		'entities': {'nodes': 'entities_concepts.csv'},
+		'relationships': {'nodes': 'relationships_concepts.csv'},
+		'known_ids': {'nodes': 'known_ids_nodes.csv', 'edges': 'known_ids_edges.csv'}
 	}
 	graphs = []
 	for name, files in conf.items():
@@ -490,8 +490,8 @@ def test_validate_ontology_accepts_a_valid_ontology(tmp_path):
 
 def test_validate_ontology_accepts_the_template_ontology():
 	"""The entities and relationships created by `mge` for a new endpoint are a valid ontology."""
-	extra_args = {'initial_nodes': {'type': 'csv', 'path': str(TEMPLATE_ONTOLOGIES / 'entities_concepts.csv')},
-				  'initial_edges': {'type': 'csv', 'path': str(TEMPLATE_ONTOLOGIES / 'relationships_concepts.csv')}}
+	extra_args = {'nodes': {'type': 'csv', 'path': str(TEMPLATE_ONTOLOGIES / 'entities_concepts.csv')},
+				  'edges': {'type': 'csv', 'path': str(TEMPLATE_ONTOLOGIES / 'relationships_concepts.csv')}}
 	ontology = AgenticGraph(schema = 'ontology', extra_args = extra_args)
 	ontology.pilot(100)
 
@@ -516,8 +516,8 @@ def test_an_ontology_with_repeated_relationship_ids_does_not_load(tmp_path):
 	edges.to_csv(tmp_path / 'edges.csv', sep = '\t', index = False)
 	logger = []
 	ontology = AgenticGraph(schema = 'ontology', logger = logger, extra_args = {
-		'initial_nodes': {'type': 'csv', 'path': str(tmp_path / 'nodes.csv')},
-		'initial_edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}})
+		'nodes': {'type': 'csv', 'path': str(tmp_path / 'nodes.csv')},
+		'edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}})
 
 	ontology.pilot(ontology.states.READY.value)
 

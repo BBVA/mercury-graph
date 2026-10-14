@@ -31,7 +31,7 @@ def validate_ontology(ontology):
 
 	That ids are unique and that the `src` and `dst` of every relationship are entities of the ontology is already checked when it is
 	loaded (see
-	[`graph_from_config()`][mercury.graph.evidence.agentic_graph.graph_from_config]).
+	[`graph_from_files()`][mercury.graph.evidence.agentic_graph.graph_from_files]).
 
 	Args:
 		ontology (AgenticGraph): the ontology. It must be loaded (piloted) before being validated, otherwise that is the only problem

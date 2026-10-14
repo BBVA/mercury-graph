@@ -116,18 +116,19 @@ Ontologies are configured in the `ontologies` section of an endpoint (`ontologie
 	"extra_args": {
 		"description": "This ontology holds all the entities that can be used in the Evidence Graph. ...",
 		"file_format": {"src": "src", "dst": "dst", "id": "id", "directed": true, "sep": "\t"},
-		"initial_nodes": {"type": "csv", "$path": "ontology_source/entities_concepts.csv"},
+		"nodes": {"type": "csv", "$path": "ontology_source/entities_concepts.csv"},
 		"persistence": {"type": "pickle", "$path": "graphs/entities.pickle"}
 	},
 	"tools": []
 }
 ```
 
-- `initial_nodes` and `initial_edges` are the tab separated files above. Any column other than `id` (or `src`, `dst` and `id` for edges)
+- `nodes` and `edges` are the tab separated files above. Any column other than `id` (or `src`, `dst` and `id` for edges)
   becomes an attribute.
 - `file_format` is optional and changes the column names and the separator. Any key left out takes its default value.
 - `persistence` is where the graph is saved, as a pickle, when the endpoint closes. **If that file exists, it is loaded and the .csv
-  files are ignored.** After editing the .csv files, delete the pickle so that the ontology is built again.
+  files are ignored.** After editing the .csv files, delete the pickle so that the ontology is built again. A message is logged
+  for every .csv file modified after the pickle was saved.
 - `description` is what agents read about the ontology.
 
 The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) connects to the three ontologies by name in its own configuration:
