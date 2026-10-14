@@ -45,18 +45,12 @@ def _as_bool(value):
 	return str(value).strip().lower() not in ('false', 'no', '0')
 
 
-def _declares(attr, end):
-	""" Returns True if the attributes of a node declare end ('src' or 'dst') as a non-empty text. """
-
-	return isinstance(attr.get(end, None), str) and attr[end] != ''
-
-
 def _role(attr, concept, inherited):
-	""" Returns the role ('src', 'dst' or 'both') of a concept in a relationship given its attributes, or None if it takes no part.
-	With inherited, a concept also takes part where one of its ancestors does.
+	""" Returns the role ('src', 'dst' or 'both') of a type of entity in a relationship given its attributes, or None if it takes no part.
+	With inherited, a type of entity also takes part where one of its ancestors does.
 	"""
 
-	roles = [end for end in ('src', 'dst') if _declares(attr, end) and (descends_from(concept, attr[end]) if inherited else concept == attr[end])]
+	roles = [end for end in ('src', 'dst') if (descends_from(concept, attr[end]) if inherited else concept == attr[end])]
 
 	if len(roles) == 0:
 		return None
@@ -116,26 +110,47 @@ CAPABILITIES = {
 		),
 		'returns': LIST
 	},
-	'edges': {
-		'description': 'Get the relationships of an instance of "{name}" given its exact id: every edge going out of or coming into it, '
-					   'with its relation and the id at the other end. Optionally, only those of one relation and the relations under '
-					   'it. Use search_entities_{name} to find the id.',
+	'children_relationships_by_idx': {
+		'description': 'List the types of relationship under an id in the ontology "{name}", with their definitions and the types of entity '
+					   'they connect (src and dst). Ids are hierarchical, with levels separated by "|" (e.g., "parent|child"). Use "" to '
+					   'list the top level and depth to see several levels at once. Entries with "more": true have children of their own.',
 		'parameters': _parameters(
 			['index'],
-			index	 = {'type': 'string', 'description': 'Exact id of the instance, with levels separated by "|" (e.g., "parent|child").'},
-			relation = {'type': 'string', 'description': 'Only return edges of this relation or of relations under it (e.g., "relation" '
-														 'also returns "relation|subtype").'}
+			index = {'type': 'string', 'description': 'Exact id, with levels separated by "|" (e.g., "parent|child"). Use "" for the top level.'},
+			depth = {'type': 'integer', 'description': 'Number of levels to go down. Defaults to 1.'}
+		),
+		'returns': LIST
+	},
+	'relationship_by_idx': {
+		'description': 'Read a type of relationship of the ontology "{name}" by its exact id: its properties (the types of entity it '
+					   'connects, src and dst, and its definition) and its ancestors. Returns null if the id is not a type of relationship; '
+					   'use search_relationships_{name} to find ids.',
+		'parameters': _parameters(
+			['index'],
+			index = {'type': 'string', 'description': 'Exact id of the type of relationship, with levels separated by "|" (e.g., '
+													  '"parent|child").'}
+		),
+		'returns': {'type': 'object'}
+	},
+	'search_relationships': {
+		'description': 'Find the types of relationship of the ontology "{name}" whose id or definition contains a text, ignoring case. Use '
+					   'it first when you do not know the exact id.',
+		'parameters': _parameters(
+			['text'],
+			text  = {'type': 'string', 'description': 'Text to find, such as a verb or a word of a definition.'},
+			limit = {'type': 'integer', 'description': 'Maximum number of results. Defaults to 20.'}
 		),
 		'returns': LIST
 	},
 	'relations_for': {
-		'description': 'Get the types of relationship that a concept can take part in according to "{name}", and whether it is their '
-					   'source (src), destination (dst) or both. Includes those of its ancestors unless inherited is false.',
+		'description': 'Get the types of relationship that a type of entity can take part in according to the ontology "{name}", and '
+					   'whether it is their source (src), destination (dst) or both. Includes those of its ancestors unless inherited is '
+					   'false.',
 		'parameters': _parameters(
 			['concept'],
-			concept	  = {'type': 'string', 'description': 'Exact id of a concept, with levels separated by "|" (e.g., "parent|child").'},
-			inherited = {'type': 'boolean', 'description': 'Include the relationships declared for the ancestors of the concept. Defaults '
-														   'to true.'}
+			concept	  = {'type': 'string', 'description': 'Exact id of a type of entity, with levels separated by "|" (e.g., "parent|child").'},
+			inherited = {'type': 'boolean', 'description': 'Include the relationships declared for the ancestors of the type of entity. '
+														   'Defaults to true.'}
 		),
 		'returns': LIST
 	}
@@ -298,6 +313,205 @@ def _no_edges(keys):
 	return pd.DataFrame({keys['src']: pd.Series(dtype = 'str'), keys['dst']: pd.Series(dtype = 'str')})
 
 
+def _tree(ids):
+	""" Returns the tree of nested dictionaries of hierarchical ids: every level is a key whose value is the dictionary of its children,
+	or None if it has none.
+	"""
+
+	tree = {}
+	for index in ids:
+		_add_to_tree(tree, index.split('|'))
+
+	return tree
+
+
+def _add_to_tree(tree, levels):
+	""" Adds the levels of an id to a tree, creating the dictionaries it needs. A parent added after its children keeps them. """
+
+	for level in levels[:-1]:
+		if tree.get(level, None) is None:
+			tree[level] = {}
+
+		tree = tree[level]
+
+	if levels[-1] not in tree:
+		tree[levels[-1]] = None
+
+
+def _limited(entries, limit):
+	""" Returns at most limit entries, followed by TRUNCATED if some were left out. """
+
+	return entries[:limit] + [TRUNCATED] if len(entries) > limit else entries
+
+
+class NavigableTree:
+	""" A tree of hierarchical ids (with levels separated by `|`) and the properties of each id, navigated by the capabilities of an
+	AgenticGraph. For internal use of AgenticGraph only, which has one for its entities (its nodes) and one for its relationships (its
+	edges).
+
+	Its public methods answer the capabilities: they take the arguments given by an agent and return the answer, limited to max_results
+	entries. Ids are levels of the tree: an id without properties (e.g., `person|student` when only `person|student|Noah` is defined) is
+	a folder.
+
+	Args:
+		properties (dict): the properties of every id, as {id: {property: value}}.
+		max_results (int): the maximum number of entries in an answer.
+		summary (tuple): the properties that come with an id when it is listed.
+	"""
+
+	def __init__(self, properties, max_results = MAX_RESULTS, summary = ('definition',)):
+		self._properties  = properties
+		self._max_results = max_results
+		self._summary	  = summary
+		self._tree		  = _tree(properties.keys())
+
+
+	def children(self, index):
+		""" Returns the ids of the children of an id (None or "" is the root), or None if it is a leaf or does not exist. """
+
+		subtree = self._subtree(index)
+
+		if type(subtree) is not dict:
+			return None
+
+		prefix = '' if index is None or index == '' else index + '|'
+
+		return [prefix + key for key in subtree.keys()]
+
+
+	def properties(self, index):
+		""" Returns a copy of the properties of an id, or None if it has none (a folder or an id that does not exist). """
+
+		return dict(self._properties[index]) if index in self._properties else None
+
+
+	def ids(self):
+		""" Returns every id that has properties, sorted. """
+
+		return sorted(self._properties.keys())
+
+
+	def children_by_idx(self, arguments):
+		""" Answers arguments "index" and "depth": the children of an id with their summary, down to depth levels. Returns None if the id
+		does not exist and ends with TRUNCATED when there are more than max_results entries.
+		"""
+
+		index = arguments['index']
+
+		if self._subtree(index) is _MISSING:
+			return None
+
+		budget	= {'left': self._max_results, 'truncated': False}
+		entries = self._entries(index, _positive_int(arguments.get('depth', 1), 1), budget)
+
+		return entries + [TRUNCATED] if budget['truncated'] else entries
+
+
+	def by_idx(self, arguments):
+		""" Answers argument "index": the properties of an id and its ancestors, or None if it has no properties. """
+
+		index		= arguments['index']
+		properties	= self.properties(index)
+
+		if properties is None:
+			return None
+
+		return {'id': index, 'properties': properties, 'ancestors': self._ancestors(index)}
+
+
+	def search(self, arguments):
+		""" Answers arguments "text" and "limit": the ids that contain a text followed by those whose definition contains it. """
+
+		text = str(arguments['text']).strip().lower()
+
+		if text == '':
+			return []
+
+		limit = min(_positive_int(arguments.get('limit', 20), 20), self._max_results)
+
+		return _limited([self.described(index) for index in self._matching(text)], limit)
+
+
+	def described(self, index):
+		""" Returns the entry of an id: the id and the properties of its summary that it has as text. """
+
+		properties = self._properties.get(index, {})
+
+		return dict({'id': index}, **{key: properties[key] for key in self._summary if isinstance(properties.get(key, None), str)})
+
+
+	def _entries(self, index, depth, budget):
+		""" Returns the entries of the children of an id, expanded down to depth levels, spending one unit of budget per entry. All
+		the siblings are listed before expanding any of them.
+		"""
+
+		entries = []
+		for child in self.children(index) or []:
+			if budget['left'] == 0:
+				budget['truncated'] = True
+				break
+
+			budget['left'] -= 1
+			entries.append(self.described(child))
+
+		for entry in entries:
+			self._expand(entry, depth - 1, budget)
+
+		return entries
+
+
+	def _expand(self, entry, depth, budget):
+		""" Adds to an entry its children down to depth levels, or marks it with "more" if it has children that are not included. """
+
+		if type(self._subtree(entry['id'])) is not dict:
+			return
+
+		children = self._entries(entry['id'], depth, budget) if depth > 0 else []
+
+		if len(children) > 0:
+			entry['children'] = children
+		else:
+			entry['more'] = True
+
+
+	def _ancestors(self, index):
+		""" Returns the entries of the ancestors of an id, from its parent to the root. """
+
+		levels = index.split('|')
+
+		return [self.described('|'.join(levels[:n])) for n in range(len(levels) - 1, 0, -1)]
+
+
+	def _matching(self, text):
+		""" Returns the ids that contain text followed by those whose definition contains it, each group sorted. """
+
+		in_id, in_definition = [], []
+		for index, properties in self._properties.items():
+			definition = properties.get('definition', None)
+			if text in index.lower():
+				in_id.append(index)
+			elif isinstance(definition, str) and text in definition.lower():
+				in_definition.append(index)
+
+		return sorted(in_id) + sorted(in_definition)
+
+
+	def _subtree(self, index):
+		""" Returns the subtree under an id (None for a leaf) or _MISSING if the id is not in the tree. """
+
+		if index is None or index == '':
+			return self._tree
+
+		subtree = self._tree
+		for level in index.split('|'):
+			if type(subtree) is not dict or level not in subtree:
+				return _MISSING
+
+			subtree = subtree[level]
+
+		return subtree
+
+
 class AgenticGraph(Agentic):
 	""" AgenticGraph is the class that exposes a `mercury.graph.Graph` using the Agentic interface.
 
@@ -323,8 +537,8 @@ class AgenticGraph(Agentic):
 
 	There a three components:
 
-	* The Ontologies are just graphs with IDs and definitions for concepts. Typically entities and
-	relationships live in different graphs (relationships may not be used, all that is configurable).
+	* The Ontology is a graph with IDs and definitions: its nodes are the types of entities and its edges the types of relationships
+	between them.
 	* The Formalizer takes concepts defined in the Ontology (E.g., person, product, country, etc.) also possibly relationships
 	(E.g., is_owned_by, is_located_in, etc.) and finds instances of those concepts in natural language text.
 	* The EvidenceGraph creates an aggregated graph of all that information handling contradictions, reinforcements and confidence.
@@ -338,11 +552,15 @@ class AgenticGraph(Agentic):
 	- `children_entities_by_idx_<name>`: the types of entity (nodes) under an id with their definitions, down to a given depth.
 	- `entity_by_idx_<name>`: the properties of a type of entity and its ancestors with their definitions.
 	- `search_entities_<name>`: the types of entity whose id or definition contains a text.
-	- `edges_<name>`: the edges from or to a node, optionally of a relation and its descendants. Only if the graph has edges.
-	- `relations_for_<name>`: the relationships a concept takes part in, including those of its ancestors. Only if its nodes declare
-	a `src` and a `dst`, like the relationships ontology.
 
-	Edges are not part of the hierarchy of ids. Every answer is limited to `max_results` entries (50 by default, configurable in
+	Only if the graph has edges:
+
+	- `children_relationships_by_idx_<name>`: the types of relationship (edges) under an id with their definitions, src and dst.
+	- `relationship_by_idx_<name>`: the properties of a type of relationship (src, dst and definition) and its ancestors.
+	- `search_relationships_<name>`: the types of relationship whose id or definition contains a text.
+	- `relations_for_<name>`: the relationships a type of entity takes part in, including those of its ancestors.
+
+	Entities and relationships are navigated in two separate trees (see `NavigableTree`). Every answer is limited to `max_results` entries (50 by default, configurable in
 	`extra_args`) and ends with a truncated marker when it has been cut.
 
 	## Known Limitations
@@ -508,14 +726,7 @@ class AgenticGraph(Agentic):
 		if not self._is_ready('get_children_idx'):
 			return None
 
-		subtree = self._subtree(index)
-
-		if type(subtree) is not dict:
-			return None
-
-		prefix = '' if index is None or index == '' else index + '|'
-
-		return [prefix + key for key in subtree.keys()]
+		return self._entities.children(index)
 
 
 	def child(self, index):
@@ -530,176 +741,86 @@ class AgenticGraph(Agentic):
 		if not self._is_ready('child') or index is None or index == '':
 			return None
 
-		return self._node_properties(index)
+		return self._entities.properties(index)
 
 
 	def _children_entities_by_idx(self, arguments):
-		""" Runs the children_entities_by_idx capability: the children of an id with their definitions, down to "depth" levels. Returns None if
-		the id does not exist and ends with TRUNCATED when there are more than max_results entries.
-		"""
+		""" Runs the children_entities_by_idx capability (see `NavigableTree.children_by_idx()`). """
 
-		index = arguments['index']
-
-		if not self._is_ready('children_entities_by_idx') or self._subtree(index) is _MISSING:
+		if not self._is_ready('children_entities_by_idx'):
 			return None
 
-		budget	= {'left': self.conf.get('max_results', MAX_RESULTS), 'truncated': False}
-		entries = self._entries(index, _positive_int(arguments.get('depth', 1), 1), budget)
-
-		return entries + [TRUNCATED] if budget['truncated'] else entries
-
-
-	def _entries(self, index, depth, budget):
-		""" Returns the entries of the children of an id, expanded down to depth levels, spending one unit of budget per entry. All
-		the siblings are listed before expanding any of them.
-		"""
-
-		entries = []
-		for child in self.get_children_idx(index) or []:
-			if budget['left'] == 0:
-				budget['truncated'] = True
-				break
-
-			budget['left'] -= 1
-			entries.append(self._described(child))
-
-		for entry in entries:
-			self._expand(entry, depth - 1, budget)
-
-		return entries
-
-
-	def _expand(self, entry, depth, budget):
-		""" Adds to an entry its children down to depth levels, or marks it with "more" if it has children that are not included. """
-
-		if type(self._subtree(entry['id'])) is not dict:
-			return
-
-		children = self._entries(entry['id'], depth, budget) if depth > 0 else []
-
-		if len(children) > 0:
-			entry['children'] = children
-		else:
-			entry['more'] = True
+		return self._entities.children_by_idx(arguments)
 
 
 	def _entity_by_idx(self, arguments):
-		""" Runs the entity_by_idx capability: the properties of a node and its ancestors, or None if it is not a node. """
+		""" Runs the entity_by_idx capability (see `NavigableTree.by_idx()`). """
 
-		index		= arguments['index']
-		properties	= self.child(index)
-
-		if properties is None:
+		if not self._is_ready('entity_by_idx'):
 			return None
 
-		return {'id': index, 'properties': properties, 'ancestors': self._ancestors(index)}
-
-
-	def _ancestors(self, index):
-		""" Returns the entries of the ancestors of an id, from its parent to the root. """
-
-		levels = index.split('|')
-
-		return [self._described('|'.join(levels[:n])) for n in range(len(levels) - 1, 0, -1)]
-
-
-	def _described(self, index):
-		""" Returns the entry of an id: the id and, if it is a node with a definition, the definition. """
-
-		entry		= {'id': index}
-		definition	= (self._node_properties(index) or {}).get('definition', None)
-
-		if isinstance(definition, str):
-			entry['definition'] = definition
-
-		return entry
+		return self._entities.by_idx(arguments)
 
 
 	def _search_entities(self, arguments):
-		""" Runs the search_entities capability: the nodes whose id contains a text followed by those whose definition contains it. """
-
-		text = str(arguments['text']).strip().lower()
+		""" Runs the search_entities capability (see `NavigableTree.search()`). """
 
 		if not self._is_ready('search_entities'):
 			return None
 
-		if text == '':
-			return []
-
-		limit = min(_positive_int(arguments.get('limit', 20), 20), self.conf.get('max_results', MAX_RESULTS))
-
-		return self._limited([self._described(index) for index in self._matching_nodes(text)], limit)
+		return self._entities.search(arguments)
 
 
-	def _matching_nodes(self, text):
-		""" Returns the ids of the nodes whose id contains text followed by those whose definition contains it, each group sorted. """
+	def _children_relationships_by_idx(self, arguments):
+		""" Runs the children_relationships_by_idx capability (see `NavigableTree.children_by_idx()`). """
 
-		in_id, in_definition = [], []
-		for index, definition in self._graph.networkx.nodes(data = 'definition'):
-			if text in index.lower():
-				in_id.append(index)
-			elif isinstance(definition, str) and text in definition.lower():
-				in_definition.append(index)
-
-		return sorted(in_id) + sorted(in_definition)
-
-
-	def _edges(self, arguments):
-		""" Runs the edges capability: the edges from or to a node, or only those of a relation and its descendants. Returns None if the
-		node does not exist.
-		"""
-
-		index	 = arguments['index']
-		relation = arguments.get('relation', None) or None
-
-		if not self._is_ready('edges') or index not in self._graph.networkx.nodes:
+		if not self._is_ready('children_relationships_by_idx'):
 			return None
 
-		edges = [edge for edge in self._node_edges(index) if relation is None or descends_from(str(edge.get('relation', '')), relation)]
-
-		return self._limited(edges, self.conf.get('max_results', MAX_RESULTS))
+		return self._relationships.children_by_idx(arguments)
 
 
-	def _node_edges(self, index):
-		""" Returns the entries of the edges going out of or coming into a node, sorted by edge id. """
+	def _relationship_by_idx(self, arguments):
+		""" Runs the relationship_by_idx capability (see `NavigableTree.by_idx()`). """
 
-		ntx	  = self._graph.networkx
-		edges = {}
-		for src, dst, key, attr in list(ntx.out_edges(index, keys = True, data = True)) + list(ntx.in_edges(index, keys = True, data = True)):
-			edges[(src, dst, key)] = dict({'id': key, 'src': src, 'dst': dst}, **attr)
+		if not self._is_ready('relationship_by_idx'):
+			return None
 
-		return sorted(edges.values(), key = lambda edge: str(edge['id']))
+		return self._relationships.by_idx(arguments)
+
+
+	def _search_relationships(self, arguments):
+		""" Runs the search_relationships capability (see `NavigableTree.search()`). """
+
+		if not self._is_ready('search_relationships'):
+			return None
+
+		return self._relationships.search(arguments)
 
 
 	def _relations_for(self, arguments):
-		""" Runs the relations_for capability: the relationships a concept takes part in (by inheritance by default), sorted by id. """
-
-		concept	  = arguments['concept']
-		inherited = _as_bool(arguments.get('inherited', True))
+		""" Runs the relations_for capability: the relationships a type of entity takes part in (by inheritance by default), sorted by id. """
 
 		if not self._is_ready('relations_for'):
 			return None
 
-		entries = [self._relation_entry(index, attr, concept, inherited) for index, attr in sorted(self._graph.networkx.nodes(data = True))]
+		concept	  = arguments['concept']
+		inherited = _as_bool(arguments.get('inherited', True))
+		entries	  = [self._relation_entry(index, concept, inherited) for index in self._relationships.ids()]
 
-		return self._limited([entry for entry in entries if entry is not None], self.conf.get('max_results', MAX_RESULTS))
+		return _limited([entry for entry in entries if entry is not None], self.conf.get('max_results', MAX_RESULTS))
 
 
-	def _relation_entry(self, index, attr, concept, inherited):
-		""" Returns the entry of a relationship with the role of a concept in it, or None if the concept takes no part in it. """
+	def _relation_entry(self, index, concept, inherited):
+		""" Returns the entry of a relationship with the role of a type of entity in it, or None if it takes no part in it. """
 
+		attr = self._relationships.properties(index)
 		role = _role(attr, concept, inherited)
 
 		if role is None:
 			return None
 
-		return dict({'id': index, 'src': attr['src'], 'dst': attr['dst'], 'as': role}, **self._described(index))
-
-
-	def _limited(self, entries, limit):
-		""" Returns at most limit entries, followed by TRUNCATED if some were left out. """
-
-		return entries[:limit] + [TRUNCATED] if len(entries) > limit else entries
+		return dict({'id': index, 'src': attr['src'], 'dst': attr['dst'], 'as': role}, **self._relationships.described(index))
 
 
 	def _is_ready(self, function):
@@ -711,30 +832,6 @@ class AgenticGraph(Agentic):
 			return False
 
 		return True
-
-
-	def _subtree(self, index):
-		""" Returns the subtree of self._indices under an id (None for a leaf) or _MISSING if the id is not in the tree. """
-
-		if index is None or index == '':
-			return self._indices
-
-		subtree = self._indices
-		for level in index.split('|'):
-			if type(subtree) is not dict or level not in subtree:
-				return _MISSING
-
-			subtree = subtree[level]
-
-		return subtree
-
-
-	def _node_properties(self, index):
-		""" Returns a copy of the properties of a node or None if it does not exist. """
-
-		nodes = self._graph.networkx.nodes
-
-		return dict(nodes[index]) if index in nodes else None
 
 
 	def close(self, endpoint_locked):
@@ -749,31 +846,6 @@ class AgenticGraph(Agentic):
 				pickle.dump(ntx, f)
 
 		self._graph = None
-
-
-	def _add_index_to_tree(self, index):
-		""" Adds an index to the hierarchical tree structure. It traverses the tree rooted at self._indices and adds dictionaries
-		as required.
-
-		Args:
-			index (str): The index to add, represented as a string with components separated by '|'.
-		"""
-
-		ii = index.split('|')
-		last = len(ii) - 1
-
-		tree = self._indices
-
-		for i, ix in enumerate(ii):
-			if i == last:
-				if ix not in tree:			# A parent added after its children must keep them.
-					tree[ix] = None
-
-			else:
-				if ix not in tree or tree[ix] is None:
-					tree[ix] = {}
-
-				tree = tree[ix]
 
 
 	def _graph_from_files(self):
@@ -793,24 +865,23 @@ class AgenticGraph(Agentic):
 
 
 	def _build_indices(self):
-		""" Builds the indices for the AgenticGraph for the first time after it is loaded.
-
-		This builds a hierarchical tree structure of dictionaries, rooted at self._indices, with the ids of the nodes. Edges are not part
-		of the tree.
+		""" Builds the two navigable trees of the AgenticGraph after it is loaded: one with the ids of its nodes (the entities) and one
+		with the ids of its edges (the relationships), whose properties include their src and dst.
 		"""
 
-		self._indices = {}
+		ntx			= self._graph.networkx
+		max_results = self.conf.get('max_results', MAX_RESULTS)
+		relations	= {key: dict(attr, src = src, dst = dst) for src, dst, key, attr in ntx.edges(keys = True, data = True)}
 
-		for id, _ in self._graph.networkx.nodes.data('id'):
-			self._add_index_to_tree(id)
+		self._entities		= NavigableTree(dict(ntx.nodes(data = True)), max_results)
+		self._relationships = NavigableTree(dict(sorted(relations.items())), max_results, ('definition', 'src', 'dst'))
 
 
 	def _capabilities(self):
 		""" Returns the capabilities of the AgenticGraph and sets self.call to run them.
 
-		Some capabilities depend on the content of the graph: `edges` requires edges and `relations_for` requires nodes that declare a
-		`src` and a `dst`. Before the graph is loaded, only the capabilities that do not depend on the content are returned, and they are
-		set again once the graph is loaded.
+		The capabilities of relationships require edges. Before the graph is loaded, only those of entities are returned, and the
+		capabilities are set again once the graph is loaded.
 
 		Returns:
 			(list): A list of capabilities, each represented as a dictionary with the following keys:
@@ -830,10 +901,8 @@ class AgenticGraph(Agentic):
 					 'search_entities': self._search_entities}
 
 		if self._has_edges():
-			available['edges'] = self._edges
-
-		if self._declares_relations():
-			available['relations_for'] = self._relations_for
+			available.update({'children_relationships_by_idx': self._children_relationships_by_idx, 'relationship_by_idx':
+							  self._relationship_by_idx, 'search_relationships': self._search_relationships, 'relations_for': self._relations_for})
 
 		self.call = {'%s_%s' % (name, self.name): run for name, run in available.items()}
 
@@ -844,12 +913,3 @@ class AgenticGraph(Agentic):
 		""" Returns True if the graph is loaded and has edges. """
 
 		return self._graph is not None and self._graph.networkx.number_of_edges() > 0
-
-
-	def _declares_relations(self):
-		""" Returns True if the graph is loaded and any of its nodes declares a src and a dst (like the relationships ontology). """
-
-		if self._graph is None:
-			return False
-
-		return any(_declares(attr, 'src') and _declares(attr, 'dst') for _, attr in self._graph.networkx.nodes(data = True))

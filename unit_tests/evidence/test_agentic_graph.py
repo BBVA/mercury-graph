@@ -256,10 +256,6 @@ def test_agentic_graph_loads_files_and_persists_graph(tmp_path):
 	assert graph.get_children_idx('animal|mammal') is None
 	assert graph.child('animal|mammal') == {'label': 'Mammal'}
 	assert graph._graph.networkx.edges['animal|mammal', 'animal|bird', 'related'] == {'weight': 2}
-	graph._graph.networkx.remove_node('animal|bird')
-	assert graph.child('animal|bird') is None
-	graph._graph.networkx.add_node('animal|bird', label = 'Bird')
-	graph._graph.networkx.add_edge('animal|mammal', 'animal|bird', key = 'related', weight = 2)
 
 	graph.close(True)
 	assert persistence_path.is_file()
@@ -353,7 +349,7 @@ def test_agentic_graph_index_tree_does_not_depend_on_node_order(tmp_path):
 		graph.pilot(graph.states.READY.value)
 		assert graph.get_children_idx('person') == ['person|teacher']
 		assert graph.child('person') == {'definition': 'person'}
-		trees.append(graph._indices)
+		trees.append(graph._entities._tree)
 
 	assert trees[0] == trees[1]
 
@@ -535,35 +531,30 @@ def _csv_graph(directory, name, nodes, edges = None, **extra_args):
 	return graph
 
 
-def _relationships_graph(directory, **extra_args):
-	""" Returns a ready relationships ontology: 'knows' connects persons and 'employs' has person as its dst. """
-	rows = [
-		('employs', 'organization', 'person', 'An organization employs a person.'),
-		('knows', 'person', 'person', 'A person knows another person.'),
-		('studies_at', 'person|student', 'organization|school', 'A student studies at a school.'),
-		('teaches_at', 'person|teacher', 'organization|school', 'A teacher teaches at a school.'),
-		('works_on', 'person', 'project', 'A person works on a project.'),
-		('works_on|leads', 'person', 'project', 'A person leads a project.')
-	]
-	nodes = [{'id': i, 'src': src, 'dst': dst, 'definition': d} for i, src, dst, d in rows]
+ENTITIES = (
+	('organization', 'A group of people.'),
+	('organization|school', 'A place where people learn.'),
+	('person', 'A human being.'),
+	('person|student', 'A person who studies.'),
+	('person|teacher', 'A person who teaches.'),
+	('project', 'A piece of work.')
+)
+RELATIONSHIPS = (
+	('works_on', 'person', 'project', 'A person works on a project.'),
+	('works_on|leads', 'person', 'project', 'A person leads a project.'),
+	('teaches_at', 'person|teacher', 'organization|school', 'A teacher teaches at a school.'),
+	('studies_at', 'person|student', 'organization|school', 'A student studies at a school.'),
+	('knows', 'person', 'person', 'A person knows another person.'),
+	('employs', 'organization', 'person', 'An organization employs a person.')
+)
 
-	return _csv_graph(directory, 'relationships', nodes, **extra_args)
 
+def _ontology_graph(directory, **extra_args):
+	""" Returns a ready ontology with ENTITIES as nodes and RELATIONSHIPS as edges. """
+	nodes = [{'id': i, 'definition': d} for i, d in ENTITIES]
+	edges = [{'id': i, 'src': src, 'dst': dst, 'definition': d} for i, src, dst, d in RELATIONSHIPS]
 
-def _known_ids_graph(directory, **extra_args):
-	""" Returns a ready known_ids ontology with a few instances, one of them (the award) without edges. """
-	nodes = [{'id': i} for i in (
-		'person|student|Noah Kim', 'person|student|Priya Shah', 'person|teacher|Elena Ruiz', 'organization|school|Riverside High School',
-		'project|Helios Solar Car', 'award|Science Prize'
-	)]
-	edges = [
-		{'src': 'person|student|Noah Kim', 'dst': 'project|Helios Solar Car', 'relation': 'works_on|leads', 'id': 'noah_helios'},
-		{'src': 'person|student|Priya Shah', 'dst': 'project|Helios Solar Car', 'relation': 'works_on', 'id': 'priya_helios'},
-		{'src': 'person|student|Noah Kim', 'dst': 'organization|school|Riverside High School', 'relation': 'studies_at', 'id': 'noah_rhs'},
-		{'src': 'person|teacher|Elena Ruiz', 'dst': 'organization|school|Riverside High School', 'relation': 'teaches_at', 'id': 'elena_rhs'}
-	]
-
-	return _csv_graph(directory, 'known_ids', nodes, edges, **extra_args)
+	return _csv_graph(directory, 'ontology', nodes, edges, **extra_args)
 
 
 def _capability_names(graph):
@@ -572,13 +563,13 @@ def _capability_names(graph):
 
 
 def test_capabilities_depend_on_the_content_of_the_graph(tmp_path):
-	""" edges is only available with edges and relations_for only when nodes declare src and dst. Before loading, only the
-	capabilities that do not depend on the content are available.
-	"""
-	assert _capability_names(AgenticGraph(schema = 'known_ids', extra_args = {})) == ['children_entities_by_idx', 'entity_by_idx', 'search_entities']
-	assert _capability_names(_school_graph(tmp_path)) == ['children_entities_by_idx', 'entity_by_idx', 'search_entities']
-	assert _capability_names(_relationships_graph(tmp_path)) == ['children_entities_by_idx', 'entity_by_idx', 'search_entities', 'relations_for']
-	assert _capability_names(_known_ids_graph(tmp_path)) == ['children_entities_by_idx', 'entity_by_idx', 'search_entities', 'edges']
+	""" The capabilities of relationships are only available when the graph has edges. Before loading, only those of entities are. """
+	entities	  = ['children_entities_by_idx', 'entity_by_idx', 'search_entities']
+	relationships = ['children_relationships_by_idx', 'relationship_by_idx', 'search_relationships', 'relations_for']
+
+	assert _capability_names(AgenticGraph(schema = 'ontology', extra_args = {})) == entities
+	assert _capability_names(_school_graph(tmp_path)) == entities
+	assert _capability_names(_ontology_graph(tmp_path)) == entities + relationships
 
 
 def test_search_entities_finds_nodes_by_id_and_then_by_definition(tmp_path):
@@ -607,42 +598,57 @@ def test_search_entities_is_limited(tmp_path):
 	assert len(_call(graph, 'search_entities', text = 'p', limit = 10)) == 3 + 1
 
 
-def test_edges_returns_the_edges_from_and_to_a_node(tmp_path):
-	""" Edges going out of and coming into a node are returned, sorted by id, with their relation. """
-	graph = _known_ids_graph(tmp_path)
+def test_children_relationships_by_idx_returns_relationships_with_their_ends(tmp_path):
+	""" Relationships are listed by id with their definition and the types of entity they connect; "more" marks those with children. """
+	graph = _ontology_graph(tmp_path)
 
-	assert _call(graph, 'edges', index = 'person|student|Noah Kim') == [
-		{'id': 'noah_helios', 'src': 'person|student|Noah Kim', 'dst': 'project|Helios Solar Car', 'relation': 'works_on|leads'},
-		{'id': 'noah_rhs', 'src': 'person|student|Noah Kim', 'dst': 'organization|school|Riverside High School', 'relation': 'studies_at'}
+	answer = _call(graph, 'children_relationships_by_idx', index = '')
+
+	assert [entry['id'] for entry in answer] == ['employs', 'knows', 'studies_at', 'teaches_at', 'works_on']
+	assert answer[-1] == {'id': 'works_on', 'definition': 'A person works on a project.', 'src': 'person', 'dst': 'project', 'more': True}
+	assert _call(graph, 'children_relationships_by_idx', index = 'works_on') == [
+		{'id': 'works_on|leads', 'definition': 'A person leads a project.', 'src': 'person', 'dst': 'project'}
 	]
-	assert [e['id'] for e in _call(graph, 'edges', index = 'project|Helios Solar Car')] == ['noah_helios', 'priya_helios']
-	assert _call(graph, 'edges', index = 'award|Science Prize') == []
-	assert _call(graph, 'edges', index = 'person|student') is None
-	assert _call(graph, 'edges', index = 'missing') is None
+	assert _call(graph, 'children_relationships_by_idx', index = '', depth = 2)[-1]['children'][0]['id'] == 'works_on|leads'
+	assert _call(graph, 'children_relationships_by_idx', index = 'missing') is None
 
 
-def test_edges_can_be_filtered_by_a_relation_and_its_descendants(tmp_path):
-	""" A relation filter includes the relations under it in the hierarchy (works_on includes works_on|leads). """
-	graph = _known_ids_graph(tmp_path)
+def test_children_relationships_by_idx_truncates_long_answers(tmp_path):
+	""" Relationships are limited to max_results entries, like entities. """
+	graph = _ontology_graph(tmp_path, max_results = 2)
 
-	assert [e['id'] for e in _call(graph, 'edges', index = 'project|Helios Solar Car', relation = 'works_on')] == ['noah_helios', 'priya_helios']
-	assert [e['id'] for e in _call(graph, 'edges', index = 'project|Helios Solar Car', relation = 'works_on|leads')] == ['noah_helios']
-	assert _call(graph, 'edges', index = 'project|Helios Solar Car', relation = 'works') == []
+	answer = _call(graph, 'children_relationships_by_idx', index = '')
 
-
-def test_edges_are_limited(tmp_path):
-	""" Edges are limited to max_results, ending with a truncated marker if cut. """
-	graph = _known_ids_graph(tmp_path, max_results = 1)
-
-	answer = _call(graph, 'edges', index = 'person|student|Noah Kim')
-
-	assert [e['id'] for e in answer[:-1]] == ['noah_helios']
+	assert [entry['id'] for entry in answer[:-1]] == ['employs', 'knows']
 	assert answer[-1]['truncated'] is True
 
 
+def test_relationship_by_idx_returns_properties_and_ancestors(tmp_path):
+	""" A relationship comes with its src, dst and definition, and its ancestors with theirs. """
+	graph = _ontology_graph(tmp_path)
+
+	assert _call(graph, 'relationship_by_idx', index = 'works_on|leads') == {
+		'id': 'works_on|leads',
+		'properties': {'src': 'person', 'dst': 'project', 'definition': 'A person leads a project.'},
+		'ancestors': [{'id': 'works_on', 'definition': 'A person works on a project.', 'src': 'person', 'dst': 'project'}]
+	}
+	assert _call(graph, 'relationship_by_idx', index = 'person') is None
+	assert _call(graph, 'relationship_by_idx', index = 'missing') is None
+
+
+def test_search_relationships_finds_them_by_id_and_then_by_definition(tmp_path):
+	""" The search of relationships works like that of entities, on the ids and definitions of the relationships. """
+	graph = _ontology_graph(tmp_path)
+
+	assert [entry['id'] for entry in _call(graph, 'search_relationships', text = 'WORKS')] == ['works_on', 'works_on|leads']
+	assert [entry['id'] for entry in _call(graph, 'search_relationships', text = 'school')] == ['studies_at', 'teaches_at']
+	assert _call(graph, 'search_relationships', text = 'person|student') == []
+	assert [entry['id'] for entry in _call(graph, 'search_relationships', text = 'a', limit = 2)[:-1]] == ['studies_at', 'teaches_at']
+
+
 def test_relations_for_includes_inherited_relations(tmp_path):
-	""" A concept takes part in the relations declared for it or for any of its ancestors, as src, dst or both. """
-	graph = _relationships_graph(tmp_path)
+	""" A type of entity takes part in the relationships declared for it or for any of its ancestors, as src, dst or both. """
+	graph = _ontology_graph(tmp_path)
 
 	answer = _call(graph, 'relations_for', concept = 'person|student')
 
@@ -655,15 +661,38 @@ def test_relations_for_includes_inherited_relations(tmp_path):
 
 
 def test_relations_for_without_inheritance(tmp_path):
-	""" Without inheritance, only the relations declared exactly for the concept are returned. A more general concept does not take
-	part in the relations of its descendants.
+	""" Without inheritance, only the relationships declared exactly for the type of entity are returned. A more general type does not
+	take part in the relationships of its descendants.
 	"""
-	graph = _relationships_graph(tmp_path)
+	graph = _ontology_graph(tmp_path)
 
 	assert [e['id'] for e in _call(graph, 'relations_for', concept = 'person|student', inherited = False)] == ['studies_at']
 	assert [e['id'] for e in _call(graph, 'relations_for', concept = 'person|student', inherited = 'false')] == ['studies_at']
 	assert [e['id'] for e in _call(graph, 'relations_for', concept = 'person')] == ['employs', 'knows', 'works_on', 'works_on|leads']
 	assert _call(graph, 'relations_for', concept = 'vehicle') == []
+
+
+def test_relations_for_is_limited(tmp_path):
+	""" The relationships of a type of entity are limited to max_results, ending with a truncated marker if cut. """
+	graph = _ontology_graph(tmp_path, max_results = 1)
+
+	answer = _call(graph, 'relations_for', concept = 'person')
+
+	assert [e['id'] for e in answer[:-1]] == ['employs']
+	assert answer[-1]['truncated'] is True
+
+
+def test_capabilities_are_not_ready_before_loading():
+	""" Before the graph is loaded, every capability returns None and logs why. """
+	logger = []
+	graph = AgenticGraph(schema = 'ontology', extra_args = {}, logger = logger)
+	runners = (graph._children_entities_by_idx, graph._entity_by_idx, graph._search_entities, graph._children_relationships_by_idx,
+			   graph._relationship_by_idx, graph._search_relationships, graph._relations_for)
+
+	for runner in runners:
+		assert runner({'index': '', 'text': 'x', 'concept': 'x'}) is None
+
+	assert len(logger) == len(runners)
 
 
 def test_capability_definitions_are_not_shared(tmp_path):
