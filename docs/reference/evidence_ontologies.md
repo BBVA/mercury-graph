@@ -160,17 +160,6 @@ The initial graph is configured in the [`EvidenceGraph`](evidence.md#mercury.gra
 The names of the keys tell the difference: `nodes` and `edges` define the ontology, while `initial_nodes` and `initial_edges` are only
 the starting point of a graph that grows. Both are only read when their pickle does not exist.
 
-### Updating an existing endpoint
-
-Endpoints created before the ontology became a single graph have three ontologies (`entities`, `relationships` and `known_ids`) in
-their configuration. To update one, compare its `.jsonc` files with those of a new endpoint (`mge new`) and:
-
-- replace the three ontologies with the `ontology` block above, and use `"ontology": "ontology"` in the Formalizer,
-- move the files of `known_ids` to `initial_graph/` and configure them as the initial graph of the EvidenceGraph,
-- delete `graphs/entities.pickle`, `graphs/relationships.pickle` and `graphs/known_ids.pickle`, which are no longer used, and
-  `graphs/e_graph.pickle`, so that the EvidenceGraph starts from its initial graph.
-
-
 ## Validation
 
 The ontology and the initial graph are checked at three moments. If anything is wrong, every problem is logged and the object does not
