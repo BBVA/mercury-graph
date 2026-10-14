@@ -10,10 +10,8 @@ class Downstream:
 	"""Provides the Formalizer attributes used by EvidenceGraph connections."""
 
 	def __init__(self):
-		"""Creates distinct ontology placeholders for connection assertions."""
-		self._entities = object()
-		self._relation = object()
-		self._known_id = object()
+		"""Creates an ontology placeholder for connection assertions."""
+		self._ontology = object()
 
 
 def _agentics(sources = 'source'):
@@ -83,7 +81,7 @@ def test_evidence_graph_pilots_empty_and_connected_graphs():
 
 	assert graph.meta['state'] == graph.states.READY.value
 	assert graph._formalizer is formalizer
-	assert graph._entities is formalizer._entities
+	assert graph._ontology is formalizer._ontology
 	assert graph._id_nodes is tools['%s/formalizer_nodes' % graph.id]
 	assert graph._id_edges is tools['%s/agent_edges' % graph.id]
 	assert graph._is_same is tools['%s/formalizer_same' % graph.id]
@@ -119,7 +117,7 @@ def test_evidence_graph_persists_and_reloads_graph(tmp_path):
 	assert path.is_file()
 	with open(path, 'rb') as f:
 		assert pickle.load(f).number_of_nodes() == 0
-	assert graph._graph is graph._formalizer is graph._entities is graph._relation is graph._known_id is None
+	assert graph._graph is graph._formalizer is graph._ontology is None
 
 	reloaded, reloaded_formalizer, _ = _connected_graph(schema = 'persisted', persistence = path, sources = ['first', 'second'])
 	reloaded.pilot(reloaded.states.READY.value)

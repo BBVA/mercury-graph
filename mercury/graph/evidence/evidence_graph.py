@@ -146,9 +146,7 @@ class EvidenceGraph(Agentic):
 
 		self._formalizer = None
 
-		self._entities = None
-		self._relation = None
-		self._known_id = None
+		self._ontology = None
 
 		self._id_nodes = None
 		self._id_edges = None
@@ -340,9 +338,7 @@ class EvidenceGraph(Agentic):
 
 		self._formalizer = self.tools[key]
 
-		self._entities = self._formalizer._entities
-		self._relation = self._formalizer._relation
-		self._known_id = self._formalizer._known_id
+		self._ontology = self._formalizer._ontology
 
 		ag = Agent(schema = None, extra_args = None)
 		class_name_agent = ag.id
@@ -410,9 +406,7 @@ class EvidenceGraph(Agentic):
 		self._graph	= None
 
 		self._formalizer = None
-		self._entities = None
-		self._relation = None
-		self._known_id = None
+		self._ontology = None
 
 		self._id_nodes = None
 		self._id_edges = None

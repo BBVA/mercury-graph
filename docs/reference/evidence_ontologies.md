@@ -142,14 +142,12 @@ Only `entities` is required. Setting `relationships` or `known_ids` to `null` di
 
 ## Validation
 
-When the [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) is piloted, it checks that its three ontologies are coherent:
-every concept and relationship has its parent defined, relationships only connect existing concepts, and every known instance and
-edge is of an existing type. An edge must also connect instances of the types declared by its relationship or of their descendants:
-`person|student|Noah Kim` can be the `src` of `works_on|leads`, declared from `person`, but not of `teaches_at`, declared from
-`person|teacher`.
+When an ontology is loaded, its ids must be unique and every relationship must connect entities declared in it. When the
+[`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) is piloted, it also checks that every entity and relationship has its
+parent defined, and that the `src` and `dst` of a relationship are those of its parent or descendants of them.
 
-If anything is wrong, every problem is logged and the Formalizer does not become ready. See
-[`validate_ontologies()`](#mercury.graph.evidence.formalizer.validate_ontologies) for the details.
+If anything is wrong, every problem is logged and the ontology or the Formalizer does not become ready. See
+[`validate_ontology()`](#mercury.graph.evidence.formalizer.validate_ontology) for the details.
 
 
 ## How agents explore an ontology
@@ -178,4 +176,6 @@ in size and says when it has been cut. The exact capabilities are listed in the
 
 ## Reference
 
-::: mercury.graph.evidence.formalizer.validate_ontologies
+::: mercury.graph.evidence.agentic_graph.graph_from_files
+
+::: mercury.graph.evidence.formalizer.validate_ontology

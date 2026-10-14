@@ -11,7 +11,7 @@
 
 	// You can have more than one Formalizer in an Endpoint, but an EvidenceGraph only uses one. Multiple formalizers could be used
 	// by Agents or more than one EvidenceGraph. You can also share one Formalizer in different Agents or EvidenceGraphs but make sure
-	// the ontologies remain consistent. The Formalizer itself has no state other than this configuration.
+	// the ontology remains consistent. The Formalizer itself has no state other than this configuration.
 	"GLiNER2": {
 		"name": "GLiNER2",
 
@@ -39,14 +39,12 @@
 				"compile": null
 			},
 
-			// This dictionary allows using different names or disabling (making null) relations or known_ids. If you disable a key,
-			// the Formalizer will expose limited capabilities.
-			// The names (values) must match the "tools" the Formalizer expects the Endpoint to provide.
-			"ontologies": {"entities": "entities", "relationships": "relationships", "known_ids": "known_ids"}
+			// The AgenticGraph the Formalizer uses as its ontology (mandatory). The key is the role and the value is the "name" of that
+			// AgenticGraph in ontologies.jsonc (both happen to be "ontology" in this template). It must also be in "tools".
+			"ontology": "ontology"
 		},
 
-		// "tools" is an argument for the Endpoint to serve these tools to the Formalizer. This must include the same names in the
-		// values of the "ontologies" dictionary (which is this case are identical to the keys).
-		"tools": ["entities", "relationships", "known_ids"]
+		// "tools" is an argument for the Endpoint to serve these tools to the Formalizer. This must include the name in "ontology".
+		"tools": ["ontology"]
 	}
 }

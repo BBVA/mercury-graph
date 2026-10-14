@@ -41,14 +41,13 @@ def validate_ontology(ontology):
 		(list): A list of strings, one for each problem found. It is empty if the ontology is valid.
 	"""
 
-	errors = _check_loaded({ontology.name: ontology})
-	if len(errors) > 0:
-		return errors
+	if ontology._graph is None:
+		return ['Ontology "%s" is not loaded.' % ontology.name]
 
 	ntx		  = ontology._graph.networkx
 	relations = _relation_ends(ntx)
 
-	errors += _check_parents(set(ntx.nodes), 'Entity', ontology.name)
+	errors  = _check_parents(set(ntx.nodes), 'Entity', ontology.name)
 	errors += _check_parents(set(relations), 'Relationship', ontology.name)
 	errors += _check_relation_inheritance(relations)
 
@@ -84,55 +83,6 @@ def _check_inherited_ends(index, ends, parent, parent_ends):
 	return errors
 
 
-def validate_ontologies(entities, relationships, known_ids):
-	""" Checks that the three ontologies used by a Formalizer are coherent with each other.
-
-	The checks are:
-
-	- Every concept in `entities` and every relationship in `relationships` has its parent (the id without its last `|` level) defined
-	in the same ontology.
-	- Every relationship declares a `src` and a `dst` that are concepts in `entities`.
-	- Every instance in `known_ids` is a name under a concept in `entities` (e.g., `person|student|Noah Kim` under `person|student`).
-	- Every edge in `known_ids` has a `relation` defined in `relationships`, and the concepts of the instances it connects are the
-	`src` and `dst` of that relation or descendants of them (e.g., a `person|student` can be the `src` of a relation from `person`).
-
-	The ontologies must be loaded (piloted) before being validated. If any of them is not, that is the only problem reported.
-
-	Args:
-		entities (AgenticGraph): the entities ontology.
-		relationships (AgenticGraph): the relationships ontology or None if it is disabled.
-		known_ids (AgenticGraph): the known_ids ontology or None if it is disabled.
-
-	Returns:
-		(list): A list of strings, one for each problem found. It is empty if the ontologies are valid.
-	"""
-
-	ontologies = {'entities': entities, 'relationships': relationships, 'known_ids': known_ids}
-
-	errors = _check_loaded(ontologies)
-	if len(errors) > 0:
-		return errors
-
-	concepts  = set(entities._graph.networkx.nodes)
-	relations = {} if relationships is None else dict(relationships._graph.networkx.nodes(data = True))
-
-	errors += _check_parents(concepts, 'Entity', 'entities')
-	errors += _check_parents(relations, 'Relationship', 'relationships')
-	errors += _check_relationship_ends(relations, concepts)
-
-	if known_ids is not None:
-		errors += _check_known_instances(known_ids._graph.networkx, concepts)
-		errors += _check_known_edges(known_ids._graph.networkx, relations)
-
-	return errors
-
-
-def _check_loaded(ontologies):
-	""" Returns an error for every enabled ontology (a dict of name: AgenticGraph or None) that has not been loaded. """
-
-	return ['Ontology "%s" is not loaded.' % name for name, ontology in ontologies.items() if ontology is not None and ontology._graph is None]
-
-
 def _check_parents(indices, kind, ontology):
 	""" Returns an error for every index whose parent is not in indices. kind and ontology name them in the messages. """
 
@@ -140,63 +90,6 @@ def _check_parents(indices, kind, ontology):
 	for index in sorted(indices):
 		if parent_of(index) is not None and parent_of(index) not in indices:
 			errors.append('%s "%s" has no parent "%s" in %s.' % (kind, index, parent_of(index), ontology))
-
-	return errors
-
-
-def _check_relationship_ends(relations, concepts):
-	""" Returns an error for every relationship that does not declare its src or dst, or declares one that is not a concept. """
-
-	errors = []
-	for index, attr in sorted(relations.items()):
-		missing = [end for end in ('src', 'dst') if not isinstance(attr.get(end, None), str)]
-		if len(missing) > 0:
-			errors.append('Relationship "%s" does not declare its %s.' % (index, ' and '.join(missing)))
-
-		for end in ('src', 'dst'):
-			if end not in missing and attr[end] not in concepts:
-				errors.append('Relationship "%s" has %s "%s", which is not in entities.' % (index, end, attr[end]))
-
-	return errors
-
-
-def _check_known_instances(known_ids, concepts):
-	""" Returns an error for every instance in known_ids (a NetworkX graph) that is not under a concept. """
-
-	errors = []
-	for index in sorted(known_ids.nodes):
-		if parent_of(index) is None:
-			errors.append('Known id "%s" is not under any concept in entities.' % index)
-		elif parent_of(index) not in concepts:
-			errors.append('Known id "%s" is under "%s", which is not in entities.' % (index, parent_of(index)))
-
-	return errors
-
-
-def _check_known_edges(known_ids, relations):
-	""" Returns the errors of every edge in known_ids (a NetworkX graph), sorted by edge key. """
-
-	errors = []
-	for src, dst, key, relation in sorted(known_ids.edges(keys = True, data = 'relation'), key = lambda edge: str(edge[2])):
-		errors += _check_known_edge(src, dst, key, relation, relations)
-
-	return errors
-
-
-def _check_known_edge(src, dst, key, relation, relations):
-	""" Returns the errors of one edge: a missing or unknown relation, or instances of types the relation does not connect. """
-
-	if not isinstance(relation, str):
-		return ['Known edge "%s" has no relation.' % key]
-
-	if relation not in relations:
-		return ['Known edge "%s" has relation "%s", which is not in relationships.' % (key, relation)]
-
-	errors = []
-	for end, instance in (('src', src), ('dst', dst)):
-		expected = relations[relation].get(end, None)
-		if parent_of(instance) is not None and isinstance(expected, str) and not descends_from(parent_of(instance), expected):
-			errors.append('Known edge "%s": its %s "%s" is not a "%s" as required by "%s".' % (key, end, instance, expected, relation))
 
 	return errors
 
@@ -251,7 +144,7 @@ class Formalizer(Agentic):
 	## Ontology validation
 
 	While piloting, the Formalizer checks that its ontologies are coherent with each other using
-	[`validate_ontologies()`][mercury.graph.evidence.formalizer.validate_ontologies]. If any problem is found, every problem is logged
+	[`validate_ontology()`][mercury.graph.evidence.formalizer.validate_ontology]. If any problem is found, every problem is logged
 	and the Formalizer stops in the `ERR_ONTOLOGY_INIT` state.
 
 	## Capabilities exposed by the Formalizer
@@ -295,9 +188,7 @@ class Formalizer(Agentic):
 		self.conf = extra_args
 		self.name = schema
 
-		self._entities = None
-		self._relation = None
-		self._known_id = None
+		self._ontology = None
 		self._model	   = None
 
 		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
@@ -431,71 +322,24 @@ class Formalizer(Agentic):
 					break
 
 			if self._meta_['state'] == self.states.MODEL_LOADED_OK.value:
+				self._ontology = self._find_ontology()
 
-				graph = AgenticGraph(schema = None, extra_args = None)
-
-				ontologies	  = self.conf.get('ontologies', None)
-				endpoint_name = self.id.split('/')[0]
-				graph_class	  = graph.id
-
-				def find_tool(name):
-					if ontologies is not None:
-						if name not in ontologies:
-							self.log_error('Ontologies is malformed in the configuration of %s (missing %s)' % (self.id, name))
-							self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
-
-							return None
-
-						name = ontologies[name]
-
-					if name is None:
-						return None		# The option is just disabled via configuration
-
-					key = '%s/%s_%s' % (endpoint_name, graph_class, name)
-
-					if key not in self.tools:
-						self.log_error('Tool with key "%s" not found while piloting Formalizer %s.' % (key, self.id))
-						self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
-
-						return None
-
-					return self.tools[key]
-
-				self._meta_['state'] = self.states.ONTOLOGY_LOADED_OK.value
-
-				self._entities = find_tool('entities')
-				self._relation = find_tool('relationships')
-				self._known_id = find_tool('known_ids')
-
-				if self._meta_['state'] < 0:
-					break
-
-				if self._entities is None:
-					self.log_error('Configuration error: "entities" is mandatory while piloting Formalizer %s.' % self.id)
+				if self._ontology is None:
 					self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
-
 					break
 
-				errors = validate_ontologies(self._entities, self._relation, self._known_id)
+				errors = validate_ontology(self._ontology)
 
 				if len(errors) > 0:
 					self._handle_ontology_errors(errors)
 					break
 
+				self._meta_['state'] = self.states.ONTOLOGY_LOADED_OK.value
+
 				if just_once:
 					break
 
 			if self._meta_['state'] == self.states.ONTOLOGY_LOADED_OK.value:
-
-				def remove_capability(name):
-					self._meta_['capabilities'] = [c for c in self._meta_['capabilities'] if c['function']['name'] != name]
-
-				if self._relation is None:
-					remove_capability('hint_edges_%s' % self.name)
-
-				if self._known_id is None:
-					remove_capability('is_a_%s' % self.name)
-
 				self._meta_['state'] = self.states.READY.value
 
 				if just_once:
@@ -526,7 +370,7 @@ class Formalizer(Agentic):
 
 			return None
 
-		ntx = self._entities._graph.networkx
+		ntx = self._ontology._graph.networkx
 		schema = {}
 		concepts = arguments.get('concepts', None)
 		if concepts is None:
@@ -569,26 +413,13 @@ class Formalizer(Agentic):
 
 			return None
 
-		ntx = self._relation._graph.networkx
+		ntx = self._ontology._graph.networkx
 
 		format = {}
 		concepts = arguments.get('concepts', None)
-		if concepts is None:
-			for id, _ in ntx.nodes.data('id'):
-				node = dict(ntx.nodes(data = True))[id]
-				src = node.get('src', None)
-				dst = node.get('dst', None)
-				key = node.get('definition', None)
-				format[key] = [src, dst]
-
-		else:
-			for id, _ in ntx.nodes.data('id'):
-				if id in concepts:
-					node = dict(ntx.nodes(data = True))[id]
-					src = node.get('src', None)
-					dst = node.get('dst', None)
-					key = node.get('definition', None)
-					format[key] = [src, dst]
+		for src, dst, id, definition in ntx.edges(keys = True, data = 'definition'):
+			if concepts is None or id in concepts:
+				format[definition] = [src, dst]
 
 		result = self._model.extract_json(text, format)
 
@@ -623,17 +454,35 @@ class Formalizer(Agentic):
 		"""
 
 		# There is no state to persist, just freeing resources.
-		self._entities = None
-		self._relation = None
-		self._known_id = None
+		self._ontology = None
 		self._model	   = None
 
 
+	def _find_ontology(self):
+		""" Returns the AgenticGraph named by "ontology" in the configuration among the tools, or None (logging why) if it is not found. """
+
+		name = self.conf.get('ontology', None)
+
+		if name is None:
+			self.log_error('Configuration error: "ontology" is mandatory while piloting Formalizer %s.' % self.id)
+
+			return None
+
+		key = '%s/%s_%s' % (self.id.split('/')[0], AgenticGraph(schema = None, extra_args = None).id, name)
+
+		if key not in self.tools:
+			self.log_error('Tool with key "%s" not found while piloting Formalizer %s.' % (key, self.id))
+
+			return None
+
+		return self.tools[key]
+
+
 	def _handle_ontology_errors(self, errors):
-		""" Logs every problem found by `validate_ontologies()` and sets the `ERR_ONTOLOGY_INIT` state.
+		""" Logs every problem found by `validate_ontology()` and sets the `ERR_ONTOLOGY_INIT` state.
 
 		Args:
-			errors (list): The problems found, as returned by `validate_ontologies()`.
+			errors (list): The problems found, as returned by `validate_ontology()`.
 		"""
 
 		for error in errors:
