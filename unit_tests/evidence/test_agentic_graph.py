@@ -157,12 +157,12 @@ def test_agentic_graph_metadata_and_requests():
 	""" Verifies metadata, request dispatch, and errors before the graph is ready. """
 	logger = []
 	graph = AgenticGraph(schema = 'ontology', extra_args = {'description': ['First line.', 'Second line.']}, logger = logger)
-	children_name = 'children_by_idx_ontology'
-	node_name = 'node_by_idx_ontology'
+	children_name = 'children_entities_by_idx_ontology'
+	node_name = 'entity_by_idx_ontology'
 
 	assert graph.meta['state'] == 0
 	assert graph.meta['description'] == 'First line.\nSecond line.'
-	assert [capability['function']['name'] for capability in graph.meta['capabilities']] == [children_name, node_name, 'search_ontology']
+	assert [capability['function']['name'] for capability in graph.meta['capabilities']] == [children_name, node_name, 'search_entities_ontology']
 	assert graph.dry_run({'anything': True}) == {'status': 0, 'description': 'Valid request.'}
 	assert graph.get_children_idx() is None
 	assert graph.child('ontology') is None
@@ -175,7 +175,7 @@ def test_agentic_graph_metadata_and_requests():
 
 	assert len(logger) == 4
 	assert logger[-2]['error'] == 'AgenticGraph does not have a function named "unknown".'
-	assert logger[-1]['error'] == 'AgenticGraph function "children_by_idx_ontology" requires the argument "index".'
+	assert logger[-1]['error'] == 'AgenticGraph function "children_entities_by_idx_ontology" requires the argument "index".'
 
 
 def test_agentic_graph_run_passes_every_argument(tmp_path):
@@ -184,18 +184,18 @@ def test_agentic_graph_run_passes_every_argument(tmp_path):
 	graph = AgenticGraph(schema = 'ontology', extra_args = {}, logger = logger)
 	graph.pilot(graph.states.READY.value)
 	received = []
-	graph.call['children_by_idx_ontology'] = lambda arguments: received.append(arguments) or []
+	graph.call['children_entities_by_idx_ontology'] = lambda arguments: received.append(arguments) or []
 
-	graph._run({'name': 'children_by_idx_ontology', 'arguments': {'index': 'person', 'depth': 2}})
+	graph._run({'name': 'children_entities_by_idx_ontology', 'arguments': {'index': 'person', 'depth': 2}})
 
 	assert received == [{'index': 'person', 'depth': 2}]
 
 	graph._meta_['capabilities'][0]['function']['parameters']['required'] = ['index', 'depth']
 
 	with pytest.raises(AgenticRunInvalidRequest):
-		graph._run({'name': 'children_by_idx_ontology', 'arguments': {'index': 'person'}})
+		graph._run({'name': 'children_entities_by_idx_ontology', 'arguments': {'index': 'person'}})
 
-	assert logger[-1]['error'] == 'AgenticGraph function "children_by_idx_ontology" requires the argument "depth".'
+	assert logger[-1]['error'] == 'AgenticGraph function "children_entities_by_idx_ontology" requires the argument "depth".'
 	assert len(received) == 1
 
 
@@ -223,7 +223,7 @@ def test_agentic_graph_creates_and_queries_default_graph():
 	assert graph.get_children_idx('missing|child') is None
 	assert graph.child('') is None
 	assert graph.child('missing') is None
-	assert graph._run({'name': 'children_by_idx_empty', 'arguments': {'index': ''}}) == {'finish_reason': 'stop', 'message': []}
+	assert graph._run({'name': 'children_entities_by_idx_empty', 'arguments': {'index': ''}}) == {'finish_reason': 'stop', 'message': []}
 
 	graph.close(False)
 	assert graph._graph is None
@@ -369,7 +369,7 @@ def test_agentic_graph_ids_do_not_include_the_ontology_name(tmp_path):
 	assert graph.get_children_idx() == ['person']
 	assert graph.get_children_idx('person') == ['person|teacher']
 	assert graph.child('person|teacher') == {'definition': 'A teacher.'}
-	assert graph._run({'name': 'node_by_idx_entities', 'arguments': {'index': 'person|teacher'}})['message']['properties'] == {'definition': 'A teacher.'}
+	assert graph._run({'name': 'entity_by_idx_entities', 'arguments': {'index': 'person|teacher'}})['message']['properties'] == {'definition': 'A teacher.'}
 
 	assert graph.get_children_idx('entities') is None
 	assert graph.get_children_idx('entities|person') is None
@@ -422,68 +422,68 @@ def _call(graph, capability, **arguments):
 	return graph._run({'name': '%s_%s' % (capability, graph.name), 'arguments': arguments})['message']
 
 
-def test_children_by_idx_returns_children_with_definitions(tmp_path):
+def test_children_entities_by_idx_returns_children_with_definitions(tmp_path):
 	""" With the default depth, every child comes with its definition and "more" when it has children of its own. """
 	graph = _school_graph(tmp_path)
 
-	assert _call(graph, 'children_by_idx', index = '') == [
+	assert _call(graph, 'children_entities_by_idx', index = '') == [
 		{'id': 'person', 'definition': 'A human being.', 'more': True},
 		{'id': 'event', 'definition': 'Something that takes place.'},
 		{'id': 'place', 'definition': 'A physical location.', 'more': True}
 	]
 
 
-def test_children_by_idx_goes_down_to_depth(tmp_path):
+def test_children_entities_by_idx_goes_down_to_depth(tmp_path):
 	""" With a larger depth, children are nested and "more" only marks the nodes below the last level. """
 	graph = _school_graph(tmp_path)
 
-	assert _call(graph, 'children_by_idx', index = 'place', depth = 1) == [
+	assert _call(graph, 'children_entities_by_idx', index = 'place', depth = 1) == [
 		{'id': 'place|room', 'definition': 'A room inside a building.', 'more': True}
 	]
-	assert _call(graph, 'children_by_idx', index = 'place', depth = 2) == [
+	assert _call(graph, 'children_entities_by_idx', index = 'place', depth = 2) == [
 		{'id': 'place|room', 'definition': 'A room inside a building.', 'children': [
 			{'id': 'place|room|laboratory', 'definition': 'A room for scientific work.'}
 		]}
 	]
 
 
-def test_children_by_idx_folders_have_no_definition(tmp_path):
+def test_children_entities_by_idx_folders_have_no_definition(tmp_path):
 	""" A level that is only a folder (not a node of this graph) has no definition. """
 	graph = _school_graph(tmp_path)
 
-	assert _call(graph, 'children_by_idx', index = 'person') == [
+	assert _call(graph, 'children_entities_by_idx', index = 'person') == [
 		{'id': 'person|teacher', 'definition': 'A person who teaches.'},
 		{'id': 'person|student', 'more': True}
 	]
-	assert _call(graph, 'children_by_idx', index = 'person|student') == [{'id': 'person|student|Noah'}]
+	assert _call(graph, 'children_entities_by_idx', index = 'person|student') == [{'id': 'person|student|Noah'}]
 
 
-def test_children_by_idx_leaves_and_missing_ids(tmp_path):
+def test_children_entities_by_idx_leaves_and_missing_ids(tmp_path):
 	""" A leaf has no children and an id that does not exist returns None. The Python method keeps returning None for both. """
 	graph = _school_graph(tmp_path)
 
-	assert _call(graph, 'children_by_idx', index = 'event') == []
-	assert _call(graph, 'children_by_idx', index = 'missing') is None
+	assert _call(graph, 'children_entities_by_idx', index = 'event') == []
+	assert _call(graph, 'children_entities_by_idx', index = 'missing') is None
 	assert graph.get_children_idx('event') is None
 	assert graph.get_children_idx('missing') is None
 
 
-def test_children_by_idx_accepts_loose_depths(tmp_path):
+def test_children_entities_by_idx_accepts_loose_depths(tmp_path):
 	""" A depth given as text is accepted and a depth that is not a positive number is taken as 1. """
 	graph = _school_graph(tmp_path)
-	one_level = _call(graph, 'children_by_idx', index = 'place')
+	one_level = _call(graph, 'children_entities_by_idx', index = 'place')
 
-	assert _call(graph, 'children_by_idx', index = 'place', depth = '2') == _call(graph, 'children_by_idx', index = 'place', depth = 2)
-	assert _call(graph, 'children_by_idx', index = 'place', depth = 0) == one_level
-	assert _call(graph, 'children_by_idx', index = 'place', depth = 'deep') == one_level
+	assert _call(graph, 'children_entities_by_idx', index = 'place', depth = '2') == _call(graph, 'children_entities_by_idx', index = 'place', depth = 2)
+	assert _call(graph, 'children_entities_by_idx', index = 'place', depth = 0) == one_level
+	assert _call(graph, 'children_entities_by_idx', index = 'place', depth = 'deep') == one_level
 
 
-def test_children_by_idx_truncates_long_answers(tmp_path):
+def test_children_entities_by_idx_truncates_long_answers(tmp_path):
 	""" Answers longer than max_results entries (counting nested ones) are cut and end with a truncated marker. Siblings come
 	before the children of any of them, and a node whose children did not fit is marked with "more". """
 	graph = _school_graph(tmp_path, max_results = 4)
 
-	answer = _call(graph, 'children_by_idx', index = '', depth = 3)
+	answer = _call(graph, 'children_entities_by_idx', index = '', depth = 3)
 
 	assert [entry['id'] for entry in answer[:-1]] == ['person', 'event', 'place']
 	assert [entry['id'] for entry in answer[0]['children']] == ['person|teacher']
@@ -492,11 +492,11 @@ def test_children_by_idx_truncates_long_answers(tmp_path):
 	assert 'hint' in answer[-1]
 
 
-def test_node_by_idx_returns_properties_and_ancestors(tmp_path):
+def test_entity_by_idx_returns_properties_and_ancestors(tmp_path):
 	""" A node comes with its properties and its ancestors, from its parent to the root, with definitions when they are nodes. """
 	graph = _school_graph(tmp_path)
 
-	assert _call(graph, 'node_by_idx', index = 'place|room|laboratory') == {
+	assert _call(graph, 'entity_by_idx', index = 'place|room|laboratory') == {
 		'id': 'place|room|laboratory',
 		'properties': {'definition': 'A room for scientific work.'},
 		'ancestors': [
@@ -504,19 +504,19 @@ def test_node_by_idx_returns_properties_and_ancestors(tmp_path):
 			{'id': 'place', 'definition': 'A physical location.'}
 		]
 	}
-	assert _call(graph, 'node_by_idx', index = 'person|student|Noah')['ancestors'] == [
+	assert _call(graph, 'entity_by_idx', index = 'person|student|Noah')['ancestors'] == [
 		{'id': 'person|student'},
 		{'id': 'person', 'definition': 'A human being.'}
 	]
-	assert _call(graph, 'node_by_idx', index = 'event')['ancestors'] == []
-	assert _call(graph, 'node_by_idx', index = 'person|student') is None
-	assert _call(graph, 'node_by_idx', index = 'missing') is None
+	assert _call(graph, 'entity_by_idx', index = 'event')['ancestors'] == []
+	assert _call(graph, 'entity_by_idx', index = 'person|student') is None
+	assert _call(graph, 'entity_by_idx', index = 'missing') is None
 
 
-def test_children_by_idx_declares_an_optional_depth(tmp_path):
+def test_children_entities_by_idx_declares_an_optional_depth(tmp_path):
 	""" The capability declares depth as an optional integer parameter. """
 	graph = _school_graph(tmp_path)
-	capability = [c['function'] for c in graph.meta['capabilities'] if c['function']['name'] == 'children_by_idx_entities'][0]
+	capability = [c['function'] for c in graph.meta['capabilities'] if c['function']['name'] == 'children_entities_by_idx_entities'][0]
 
 	assert capability['parameters']['properties']['depth']['type'] == 'integer'
 	assert capability['parameters']['required'] == ['index']
@@ -575,36 +575,36 @@ def test_capabilities_depend_on_the_content_of_the_graph(tmp_path):
 	""" edges is only available with edges and relations_for only when nodes declare src and dst. Before loading, only the
 	capabilities that do not depend on the content are available.
 	"""
-	assert _capability_names(AgenticGraph(schema = 'known_ids', extra_args = {})) == ['children_by_idx', 'node_by_idx', 'search']
-	assert _capability_names(_school_graph(tmp_path)) == ['children_by_idx', 'node_by_idx', 'search']
-	assert _capability_names(_relationships_graph(tmp_path)) == ['children_by_idx', 'node_by_idx', 'search', 'relations_for']
-	assert _capability_names(_known_ids_graph(tmp_path)) == ['children_by_idx', 'node_by_idx', 'search', 'edges']
+	assert _capability_names(AgenticGraph(schema = 'known_ids', extra_args = {})) == ['children_entities_by_idx', 'entity_by_idx', 'search_entities']
+	assert _capability_names(_school_graph(tmp_path)) == ['children_entities_by_idx', 'entity_by_idx', 'search_entities']
+	assert _capability_names(_relationships_graph(tmp_path)) == ['children_entities_by_idx', 'entity_by_idx', 'search_entities', 'relations_for']
+	assert _capability_names(_known_ids_graph(tmp_path)) == ['children_entities_by_idx', 'entity_by_idx', 'search_entities', 'edges']
 
 
-def test_search_finds_nodes_by_id_and_then_by_definition(tmp_path):
+def test_search_entities_finds_nodes_by_id_and_then_by_definition(tmp_path):
 	""" The search ignores case, lists matches in the id before matches in the definition and never returns folders. """
 	graph = _school_graph(tmp_path)
 
-	assert _call(graph, 'search', text = 'NOAH') == [{'id': 'person|student|Noah'}]
-	assert _call(graph, 'search', text = 'student') == [{'id': 'person|student|Noah'}]
-	assert _call(graph, 'search', text = 'room') == [
+	assert _call(graph, 'search_entities', text = 'NOAH') == [{'id': 'person|student|Noah'}]
+	assert _call(graph, 'search_entities', text = 'student') == [{'id': 'person|student|Noah'}]
+	assert _call(graph, 'search_entities', text = 'room') == [
 		{'id': 'place|room', 'definition': 'A room inside a building.'},
 		{'id': 'place|room|laboratory', 'definition': 'A room for scientific work.'}
 	]
-	assert _call(graph, 'search', text = 'teaches') == [{'id': 'person|teacher', 'definition': 'A person who teaches.'}]
-	assert _call(graph, 'search', text = 'missing') == []
-	assert _call(graph, 'search', text = ' ') == []
+	assert _call(graph, 'search_entities', text = 'teaches') == [{'id': 'person|teacher', 'definition': 'A person who teaches.'}]
+	assert _call(graph, 'search_entities', text = 'missing') == []
+	assert _call(graph, 'search_entities', text = ' ') == []
 
 
-def test_search_is_limited(tmp_path):
+def test_search_entities_is_limited(tmp_path):
 	""" The search returns at most limit results (and never more than max_results), ending with a truncated marker if cut. """
 	graph = _school_graph(tmp_path, max_results = 3)
 
-	answer = _call(graph, 'search', text = 'p', limit = 2)
+	answer = _call(graph, 'search_entities', text = 'p', limit = 2)
 
 	assert [entry['id'] for entry in answer[:-1]] == ['person', 'person|student|Noah']
 	assert answer[-1]['truncated'] is True
-	assert len(_call(graph, 'search', text = 'p', limit = 10)) == 3 + 1
+	assert len(_call(graph, 'search_entities', text = 'p', limit = 10)) == 3 + 1
 
 
 def test_edges_returns_the_edges_from_and_to_a_node(tmp_path):

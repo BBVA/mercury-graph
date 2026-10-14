@@ -85,10 +85,10 @@ def _named(value, name):
 LIST = {'type': 'array', 'items': {'type': 'object'}}
 
 CAPABILITIES = {
-	'children_by_idx': {
-		'description': 'List what is under an id in the ontology "{name}", with definitions. Ids are hierarchical, with levels separated by '
-					   '"|" (e.g., "parent|child"). Use "" to list the top level and depth to see several levels at once. Entries with '
-					   '"more": true have children of their own.',
+	'children_entities_by_idx': {
+		'description': 'List the types of entity under an id in the ontology "{name}", with their definitions. Ids are hierarchical, with '
+					   'levels separated by "|" (e.g., "parent|child"). Use "" to list the top level and depth to see several levels at once. '
+					   'Entries with "more": true have children of their own.',
 		'parameters': _parameters(
 			['index'],
 			index = {'type': 'string', 'description': 'Exact id, with levels separated by "|" (e.g., "parent|child"). Use "" for the top level.'},
@@ -96,18 +96,19 @@ CAPABILITIES = {
 		),
 		'returns': LIST
 	},
-	'node_by_idx': {
-		'description': 'Read a node of "{name}" by its exact id: its properties and its ancestors, which tell what kind of thing it is. '
-					   'Returns null if the id is not a node; use search_{name} to find ids.',
+	'entity_by_idx': {
+		'description': 'Read a type of entity of the ontology "{name}" by its exact id: its properties, such as its definition, and its '
+					   'ancestors, which tell what kind of thing it is. Returns null if the id is not a type of entity; use '
+					   'search_entities_{name} to find ids.',
 		'parameters': _parameters(
 			['index'],
-			index = {'type': 'string', 'description': 'Exact id of the node, with levels separated by "|" (e.g., "parent|child").'}
+			index = {'type': 'string', 'description': 'Exact id of the type of entity, with levels separated by "|" (e.g., "parent|child").'}
 		),
 		'returns': {'type': 'object'}
 	},
-	'search': {
-		'description': 'Find the nodes of "{name}" whose id or definition contains a text, such as a name, ignoring case. Use it first when '
-					   'you do not know the exact id.',
+	'search_entities': {
+		'description': 'Find the types of entity of the ontology "{name}" whose id or definition contains a text, ignoring case. Use it '
+					   'first when you do not know the exact id.',
 		'parameters': _parameters(
 			['text'],
 			text  = {'type': 'string', 'description': 'Text to find, such as a name or a word of a definition.'},
@@ -118,7 +119,7 @@ CAPABILITIES = {
 	'edges': {
 		'description': 'Get the relationships of an instance of "{name}" given its exact id: every edge going out of or coming into it, '
 					   'with its relation and the id at the other end. Optionally, only those of one relation and the relations under '
-					   'it. Use search_{name} to find the id.',
+					   'it. Use search_entities_{name} to find the id.',
 		'parameters': _parameters(
 			['index'],
 			index	 = {'type': 'string', 'description': 'Exact id of the instance, with levels separated by "|" (e.g., "parent|child").'},
@@ -334,9 +335,9 @@ class AgenticGraph(Agentic):
 	storage for concepts, entity indices and relationships, and that is what is accessible via the Agentic interface. Ids are used exactly
 	as in the .csv files (e.g., `person|student`), without the name of the AgenticGraph in front, and an empty id is the root:
 
-	- `children_by_idx_<name>`: the children of an id with their definitions, down to a given depth.
-	- `node_by_idx_<name>`: the properties of a node and its ancestors with their definitions.
-	- `search_<name>`: the nodes whose id or definition contains a text.
+	- `children_entities_by_idx_<name>`: the types of entity (nodes) under an id with their definitions, down to a given depth.
+	- `entity_by_idx_<name>`: the properties of a type of entity and its ancestors with their definitions.
+	- `search_entities_<name>`: the types of entity whose id or definition contains a text.
 	- `edges_<name>`: the edges from or to a node, optionally of a relation and its descendants. Only if the graph has edges.
 	- `relations_for_<name>`: the relationships a concept takes part in, including those of its ancestors. Only if its nodes declare
 	a `src` and a `dst`, like the relationships ontology.
@@ -532,14 +533,14 @@ class AgenticGraph(Agentic):
 		return self._node_properties(index)
 
 
-	def _children_by_idx(self, arguments):
-		""" Runs the children_by_idx capability: the children of an id with their definitions, down to "depth" levels. Returns None if
+	def _children_entities_by_idx(self, arguments):
+		""" Runs the children_entities_by_idx capability: the children of an id with their definitions, down to "depth" levels. Returns None if
 		the id does not exist and ends with TRUNCATED when there are more than max_results entries.
 		"""
 
 		index = arguments['index']
 
-		if not self._is_ready('children_by_idx') or self._subtree(index) is _MISSING:
+		if not self._is_ready('children_entities_by_idx') or self._subtree(index) is _MISSING:
 			return None
 
 		budget	= {'left': self.conf.get('max_results', MAX_RESULTS), 'truncated': False}
@@ -582,8 +583,8 @@ class AgenticGraph(Agentic):
 			entry['more'] = True
 
 
-	def _node_by_idx(self, arguments):
-		""" Runs the node_by_idx capability: the properties of a node and its ancestors, or None if it is not a node. """
+	def _entity_by_idx(self, arguments):
+		""" Runs the entity_by_idx capability: the properties of a node and its ancestors, or None if it is not a node. """
 
 		index		= arguments['index']
 		properties	= self.child(index)
@@ -614,12 +615,12 @@ class AgenticGraph(Agentic):
 		return entry
 
 
-	def _search(self, arguments):
-		""" Runs the search capability: the nodes whose id contains a text followed by those whose definition contains it. """
+	def _search_entities(self, arguments):
+		""" Runs the search_entities capability: the nodes whose id contains a text followed by those whose definition contains it. """
 
 		text = str(arguments['text']).strip().lower()
 
-		if not self._is_ready('search'):
+		if not self._is_ready('search_entities'):
 			return None
 
 		if text == '':
@@ -825,7 +826,8 @@ class AgenticGraph(Agentic):
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
 
-		available = {'children_by_idx': self._children_by_idx, 'node_by_idx': self._node_by_idx, 'search': self._search}
+		available = {'children_entities_by_idx': self._children_entities_by_idx, 'entity_by_idx': self._entity_by_idx,
+					 'search_entities': self._search_entities}
 
 		if self._has_edges():
 			available['edges'] = self._edges
