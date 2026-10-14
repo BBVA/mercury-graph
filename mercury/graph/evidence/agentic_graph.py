@@ -202,6 +202,61 @@ class MultiGraph(Graph):
 		return l
 
 
+def graph_from_config(conf):
+	""" Returns a MultiGraph built from the "initial_nodes" and "initial_edges" of a configuration (empty if there are none).
+
+	Args:
+		conf (dict): a configuration with the optional keys "file_format", "initial_nodes" and "initial_edges". Each of the latter two is
+			a dictionary with a "type" ("csv" or "pickle") and a "path".
+
+	Returns:
+		(MultiGraph): the graph.
+	"""
+
+	keys = _file_format(conf)
+	sep	 = keys.get('sep', ',')
+
+	nodes = _read_table(conf.get('initial_nodes', None), sep)
+	edges = _read_table(conf.get('initial_edges', None), sep)
+
+	if edges is None:
+		edges = _no_edges(keys)
+
+	return MultiGraph(data = edges, keys = keys, nodes = nodes)
+
+
+def _file_format(conf):
+	""" Returns the "file_format" of a configuration or, if it has none, the default one. """
+
+	keys = conf.get('file_format', None)
+
+	if keys is None:
+		return {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}
+
+	return keys
+
+
+def _read_table(spec, sep):
+	""" Returns the pandas DataFrame described by spec (a "type" and a "path"), or None if there is no spec. """
+
+	if spec is None:
+		return None
+
+	if spec['type'] == 'csv':
+		return pd.read_csv(spec['path'], sep = sep)
+
+	if spec['type'] == 'pickle':
+		return pd.read_pickle(spec['path'])
+
+	raise ValueError('Unsupported file type "%s".' % spec['type'])
+
+
+def _no_edges(keys):
+	""" Returns an empty DataFrame of edges with just the column headers required by a graph. """
+
+	return pd.DataFrame({keys['src']: pd.Series(dtype = 'str'), keys['dst']: pd.Series(dtype = 'str')})
+
+
 class AgenticGraph(Agentic):
 	""" AgenticGraph is the class that exposes a `mercury.graph.Graph` using the Agentic interface.
 
@@ -355,34 +410,6 @@ class AgenticGraph(Agentic):
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
 
-		def new_graph():
-			""" Creates a new graph when there is no persisted graph to load, but possibly initial_nodes and/or initial_edges. """
-
-			keys = self.conf.get('file_format', None)
-			if keys is None:
-				keys = {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}
-
-			nodes = None
-			fn_nodes = self.conf.get('initial_nodes', None)
-			if fn_nodes is not None:
-				if fn_nodes['type'] == 'csv':
-					sep = ',' if keys is None or 'sep' not in keys else keys['sep']
-					nodes = pd.read_csv(fn_nodes['path'], sep = sep)
-				elif fn_nodes['type'] == 'pickle':
-					nodes = pd.read_pickle(fn_nodes['path'])
-
-			fn_edges = self.conf.get('initial_edges', None)
-			if fn_edges is not None:
-				if fn_edges['type'] == 'csv':
-					sep = ',' if keys is None or 'sep' not in keys else keys['sep']
-					edges = pd.read_csv(fn_edges['path'], sep = sep)
-				elif fn_edges['type'] == 'pickle':
-					edges = pd.read_pickle(fn_edges['path'])
-			else:
-				edges = pd.DataFrame({keys['src']: pd.Series(dtype='str'), keys['dst']: pd.Series(dtype='str')})
-
-			return MultiGraph(data = edges, keys = keys, nodes = nodes)
-
 		if self.meta['state'] < 0:
 			self.log_error('AgenticGraph is in error state %d' % self._meta_['state'])
 
@@ -393,7 +420,7 @@ class AgenticGraph(Agentic):
 				try:
 					self._fname = self.conf.get('persistence', None)
 					if self._fname is None:
-						self._graph = new_graph()
+						self._graph = graph_from_config(self.conf)
 					else:
 						self._fname = self._fname['path']
 						parent_dir	= os.path.dirname(self._fname)
@@ -406,7 +433,7 @@ class AgenticGraph(Agentic):
 								ntx = pickle.load(f)			# A NetworkX graph object saved by this class.
 							self._graph = MultiGraph(data = ntx)
 						else:
-							self._graph = new_graph()
+							self._graph = graph_from_config(self.conf)
 
 				except:
 					self.log_error('Graph could not be created and initialized for AgenticGraph "%s".' % self.name)

@@ -6,6 +6,7 @@ import networkx as nx
 
 from mercury.graph.evidence import AgenticGraph, MultiGraph
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest
+from mercury.graph.evidence.agentic_graph import graph_from_config
 
 
 def test_multi_graph_builds_directed_multigraph():
@@ -36,6 +37,55 @@ def test_multi_graph_rejects_undirected_graphs():
 
 	with pytest.raises(NotImplementedError):
 		MultiGraph(data = edges, keys = {'directed': False})
+
+
+def test_graph_from_config_loads_nodes_and_edges(tmp_path):
+	""" Nodes and edges keep their attributes and the id of an edge becomes its key. """
+	pd.DataFrame([{'id': 'a', 'kind': 'person'}, {'id': 'b', 'kind': 'company'}]).to_csv(tmp_path / 'nodes.csv', index = False, sep = '\t')
+	pd.DataFrame([{'src': 'a', 'dst': 'b', 'id': 'e1', 'relation': 'owns'}]).to_csv(tmp_path / 'edges.csv', index = False, sep = '\t')
+	conf = {'initial_nodes': {'type': 'csv', 'path': str(tmp_path / 'nodes.csv')},
+			'initial_edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}}
+
+	ntx = graph_from_config(conf).networkx
+
+	assert dict(ntx.nodes(data = True)) == {'a': {'kind': 'person'}, 'b': {'kind': 'company'}}
+	assert list(ntx.edges(keys = True, data = True)) == [('a', 'b', 'e1', {'relation': 'owns'})]
+
+
+def test_graph_from_config_uses_the_file_format(tmp_path):
+	""" The column names and the separator come from "file_format". """
+	pd.DataFrame([{'from': 'a', 'to': 'b', 'name': 'e1'}]).to_csv(tmp_path / 'edges.csv', index = False, sep = ';')
+	conf = {'file_format': {'src': 'from', 'dst': 'to', 'id': 'name', 'directed': True, 'sep': ';'},
+			'initial_edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}}
+
+	assert list(graph_from_config(conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
+
+
+def test_graph_from_config_without_files_is_empty():
+	""" Without "initial_nodes" and "initial_edges" the graph is empty. """
+	ntx = graph_from_config({}).networkx
+
+	assert ntx.number_of_nodes() == 0
+	assert ntx.number_of_edges() == 0
+
+
+def test_graph_from_config_reads_pickles(tmp_path):
+	""" Nodes and edges can also be pandas pickles. """
+	pd.DataFrame([{'id': 'a'}, {'id': 'b'}]).to_pickle(tmp_path / 'nodes.pickle')
+	pd.DataFrame([{'src': 'a', 'dst': 'b', 'id': 'e1'}]).to_pickle(tmp_path / 'edges.pickle')
+	conf = {'initial_nodes': {'type': 'pickle', 'path': str(tmp_path / 'nodes.pickle')},
+			'initial_edges': {'type': 'pickle', 'path': str(tmp_path / 'edges.pickle')}}
+
+	ntx = graph_from_config(conf).networkx
+
+	assert set(ntx.nodes) == {'a', 'b'}
+	assert list(ntx.edges(keys = True)) == [('a', 'b', 'e1')]
+
+
+def test_graph_from_config_rejects_unknown_file_types():
+	""" A file type other than "csv" or "pickle" is an error. """
+	with pytest.raises(ValueError):
+		graph_from_config({'initial_nodes': {'type': 'parquet', 'path': 'nodes.parquet'}})
 
 
 def test_agentic_graph_metadata_and_requests():
