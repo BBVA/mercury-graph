@@ -220,8 +220,14 @@ def graph_from_config(conf):
 	nodes = _read_table(conf.get('initial_nodes', None), keys['sep'])
 	edges = _read_table(conf.get('initial_edges', None), keys['sep'])
 
+	if nodes is not None:
+		_check_unique_ids(nodes, keys, 'Nodes')
+
 	if edges is None:
 		edges = _no_edges(keys)
+	else:
+		_check_edge_ends(nodes, edges, keys)
+		_check_unique_ids(edges, keys, 'Edges')
 
 	return MultiGraph(data = edges, keys = keys, nodes = nodes)
 
@@ -245,6 +251,46 @@ def _read_table(spec, sep):
 		return pd.read_pickle(spec['path'])
 
 	raise ValueError('Unsupported file type "%s".' % spec['type'])
+
+
+def _check_unique_ids(table, keys, kind):
+	""" Raises a ValueError listing every id that is repeated in table (the nodes or the edges, as named by kind).
+
+	Without this check, NetworkX would silently merge repeated nodes (and edges with the same ends), keeping the last attributes.
+	"""
+
+	ids		 = table[keys['id']]
+	repeated = ids[ids.duplicated()].unique()
+
+	if len(repeated) > 0:
+		raise ValueError('%s have repeated ids: %s.' % (kind, ', '.join('"%s"' % index for index in repeated)))
+
+
+def _check_edge_ends(nodes, edges, keys):
+	""" Raises a ValueError if there are no nodes or if any src or dst of the edges is not one of them (all are listed at once).
+
+	Without this check, NetworkX would silently create a node, without any attributes, for every undeclared src or dst.
+	"""
+
+	if nodes is None:
+		raise ValueError('Edges cannot be loaded without a file of nodes ("initial_nodes").')
+
+	undeclared = _undeclared_ends(set(nodes[keys['id']]), edges, keys)
+
+	if len(undeclared) > 0:
+		raise ValueError('Edges refer to nodes that are not declared: %s.' % ', '.join(undeclared))
+
+
+def _undeclared_ends(declared, edges, keys):
+	""" Returns a description of every src or dst of the edges that is not in declared, e.g. '"c" (dst of "e1")'. """
+
+	undeclared = []
+	for _, row in edges.iterrows():
+		for end in ('src', 'dst'):
+			if row[keys[end]] not in declared:
+				undeclared.append('"%s" (%s of "%s")' % (row[keys[end]], end, row[keys['id']]))
+
+	return undeclared
 
 
 def _no_edges(keys):
@@ -431,8 +477,8 @@ class AgenticGraph(Agentic):
 						else:
 							self._graph = graph_from_config(self.conf)
 
-				except:
-					self.log_error('Graph could not be created and initialized for AgenticGraph "%s".' % self.name)
+				except Exception as e:
+					self.log_error('Graph could not be created and initialized for AgenticGraph "%s": %s' % (self.name, e))
 					self._meta_['state'] = self.states.ERR_GRAPH_INIT.value
 					break
 

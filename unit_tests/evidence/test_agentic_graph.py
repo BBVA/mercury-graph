@@ -39,12 +39,21 @@ def test_multi_graph_rejects_undirected_graphs():
 		MultiGraph(data = edges, keys = {'directed': False})
 
 
+def _files(directory, nodes, edges = None, sep = '\t'):
+	""" Writes nodes and edges (lists of dicts) as .csv files in directory and returns their "initial_nodes" and "initial_edges". """
+	conf = {}
+	for kind, rows in (('nodes', nodes), ('edges', edges)):
+		if rows is not None:
+			path = directory / ('%s.csv' % kind)
+			pd.DataFrame(rows).to_csv(path, index = False, sep = sep)
+			conf['initial_%s' % kind] = {'type': 'csv', 'path': str(path)}
+
+	return conf
+
+
 def test_graph_from_config_loads_nodes_and_edges(tmp_path):
 	""" Nodes and edges keep their attributes and the id of an edge becomes its key. """
-	pd.DataFrame([{'id': 'a', 'kind': 'person'}, {'id': 'b', 'kind': 'company'}]).to_csv(tmp_path / 'nodes.csv', index = False, sep = '\t')
-	pd.DataFrame([{'src': 'a', 'dst': 'b', 'id': 'e1', 'relation': 'owns'}]).to_csv(tmp_path / 'edges.csv', index = False, sep = '\t')
-	conf = {'initial_nodes': {'type': 'csv', 'path': str(tmp_path / 'nodes.csv')},
-			'initial_edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}}
+	conf = _files(tmp_path, [{'id': 'a', 'kind': 'person'}, {'id': 'b', 'kind': 'company'}], [{'src': 'a', 'dst': 'b', 'id': 'e1', 'relation': 'owns'}])
 
 	ntx = graph_from_config(conf).networkx
 
@@ -54,19 +63,67 @@ def test_graph_from_config_loads_nodes_and_edges(tmp_path):
 
 def test_graph_from_config_uses_the_file_format(tmp_path):
 	""" The column names and the separator come from "file_format". """
-	pd.DataFrame([{'from': 'a', 'to': 'b', 'name': 'e1'}]).to_csv(tmp_path / 'edges.csv', index = False, sep = ';')
-	conf = {'file_format': {'src': 'from', 'dst': 'to', 'id': 'name', 'directed': True, 'sep': ';'},
-			'initial_edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}}
+	conf = _files(tmp_path, [{'name': 'a'}, {'name': 'b'}], [{'from': 'a', 'to': 'b', 'name': 'e1'}], sep = ';')
+	conf['file_format'] = {'src': 'from', 'dst': 'to', 'id': 'name', 'directed': True, 'sep': ';'}
 
 	assert list(graph_from_config(conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
 
 
 def test_graph_from_config_completes_a_partial_file_format(tmp_path):
 	""" The keys missing in "file_format" take their default values, including the tab separator. """
-	pd.DataFrame([{'from': 'a', 'to': 'b', 'id': 'e1'}]).to_csv(tmp_path / 'edges.csv', index = False, sep = '\t')
-	conf = {'file_format': {'src': 'from', 'dst': 'to'}, 'initial_edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}}
+	conf = _files(tmp_path, [{'id': 'a'}, {'id': 'b'}], [{'from': 'a', 'to': 'b', 'id': 'e1'}])
+	conf['file_format'] = {'src': 'from', 'dst': 'to'}
 
 	assert list(graph_from_config(conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
+
+
+def test_graph_from_config_requires_nodes_for_edges(tmp_path):
+	""" Edges cannot be loaded without a file of nodes. """
+	conf = _files(tmp_path, None, [{'src': 'a', 'dst': 'b', 'id': 'e1'}])
+
+	with pytest.raises(ValueError, match = 'initial_nodes'):
+		graph_from_config(conf)
+
+
+def test_graph_from_config_requires_declared_edge_ends(tmp_path):
+	""" Every src and dst of an edge must be a declared node, and every missing one is reported at once. """
+	conf = _files(tmp_path, [{'id': 'a'}, {'id': 'b'}], [{'src': 'a', 'dst': 'c', 'id': 'e1'}, {'src': 'd', 'dst': 'b', 'id': 'e2'}])
+
+	with pytest.raises(ValueError) as error:
+		graph_from_config(conf)
+
+	assert '"c" (dst of "e1")' in str(error.value)
+	assert '"d" (src of "e2")' in str(error.value)
+
+
+def test_graph_from_config_requires_unique_node_ids(tmp_path):
+	""" Two nodes with the same id are an error, and every repeated id is reported at once. """
+	conf = _files(tmp_path, [{'id': 'a', 'kind': 'x'}, {'id': 'a', 'kind': 'y'}, {'id': 'b'}, {'id': 'b'}, {'id': 'c'}])
+
+	with pytest.raises(ValueError) as error:
+		graph_from_config(conf)
+
+	assert 'Nodes have repeated ids: "a", "b".' in str(error.value)
+
+
+def test_graph_from_config_requires_unique_edge_ids(tmp_path):
+	""" Two edges with the same id are an error, whether they have the same ends or not. """
+	edges = [{'src': 'a', 'dst': 'b', 'id': 'e1'}, {'src': 'a', 'dst': 'b', 'id': 'e1'},
+			 {'src': 'a', 'dst': 'b', 'id': 'e2'}, {'src': 'b', 'dst': 'a', 'id': 'e2'}]
+	conf = _files(tmp_path, [{'id': 'a'}, {'id': 'b'}], edges)
+
+	with pytest.raises(ValueError) as error:
+		graph_from_config(conf)
+
+	assert 'Edges have repeated ids: "e1", "e2".' in str(error.value)
+
+
+def test_graph_from_config_accepts_nodes_without_edges(tmp_path):
+	""" A graph can have nodes and no edges. """
+	ntx = graph_from_config(_files(tmp_path, [{'id': 'a'}, {'id': 'b'}])).networkx
+
+	assert set(ntx.nodes) == {'a', 'b'}
+	assert ntx.number_of_edges() == 0
 
 
 def test_graph_from_config_without_files_is_empty():
@@ -584,7 +641,8 @@ def test_agentic_graph_handles_initialization_errors(tmp_path):
 
 	graph.pilot(graph.states.READY.value)
 	assert graph.meta['state'] == graph.states.ERR_GRAPH_INIT.value
-	assert logger[-1]['error'] == 'Graph could not be created and initialized for AgenticGraph "broken".'
+	assert logger[-1]['error'].startswith('Graph could not be created and initialized for AgenticGraph "broken": ')
+	assert 'missing.csv' in logger[-1]['error']
 
 	graph.pilot(graph.states.READY.value)
 	assert logger[-1]['error'] == 'AgenticGraph is in error state -1'
