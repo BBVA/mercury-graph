@@ -61,6 +61,14 @@ def test_graph_from_config_uses_the_file_format(tmp_path):
 	assert list(graph_from_config(conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
 
 
+def test_graph_from_config_completes_a_partial_file_format(tmp_path):
+	""" The keys missing in "file_format" take their default values, including the tab separator. """
+	pd.DataFrame([{'from': 'a', 'to': 'b', 'id': 'e1'}]).to_csv(tmp_path / 'edges.csv', index = False, sep = '\t')
+	conf = {'file_format': {'src': 'from', 'dst': 'to'}, 'initial_edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}}
+
+	assert list(graph_from_config(conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
+
+
 def test_graph_from_config_without_files_is_empty():
 	""" Without "initial_nodes" and "initial_edges" the graph is empty. """
 	ntx = graph_from_config({}).networkx

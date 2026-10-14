@@ -9,6 +9,8 @@ from .agentic import Agentic, AgenticRunInvalidRequest
 from mercury.graph.core import Graph
 
 
+DEFAULT_FILE_FORMAT = {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}	# Every key can be set in "file_format".
+
 MAX_RESULTS = 50		# Default maximum number of entries in the answer of a capability (configurable as "max_results").
 TRUNCATED	= {'truncated': True, 'hint': 'There are more results. Ask for something more specific (a longer id or text, or a smaller depth).'}
 
@@ -214,10 +216,9 @@ def graph_from_config(conf):
 	"""
 
 	keys = _file_format(conf)
-	sep	 = keys.get('sep', ',')
 
-	nodes = _read_table(conf.get('initial_nodes', None), sep)
-	edges = _read_table(conf.get('initial_edges', None), sep)
+	nodes = _read_table(conf.get('initial_nodes', None), keys['sep'])
+	edges = _read_table(conf.get('initial_edges', None), keys['sep'])
 
 	if edges is None:
 		edges = _no_edges(keys)
@@ -226,14 +227,9 @@ def graph_from_config(conf):
 
 
 def _file_format(conf):
-	""" Returns the "file_format" of a configuration or, if it has none, the default one. """
+	""" Returns the "file_format" of a configuration with every missing key set to its default value. """
 
-	keys = conf.get('file_format', None)
-
-	if keys is None:
-		return {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}
-
-	return keys
+	return {**DEFAULT_FILE_FORMAT, **conf.get('file_format', {})}
 
 
 def _read_table(spec, sep):

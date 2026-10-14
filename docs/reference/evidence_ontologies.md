@@ -125,7 +125,7 @@ Ontologies are configured in the `ontologies` section of an endpoint (`ontologie
 
 - `initial_nodes` and `initial_edges` are the tab separated files above. Any column other than `id` (or `src`, `dst` and `id` for edges)
   becomes an attribute.
-- `file_format` is optional and changes the column names and the separator.
+- `file_format` is optional and changes the column names and the separator. Any key left out takes its default value.
 - `persistence` is where the graph is saved, as a pickle, when the endpoint closes. **If that file exists, it is loaded and the .csv
   files are ignored.** After editing the .csv files, delete the pickle so that the ontology is built again.
 - `description` is what agents read about the ontology.
