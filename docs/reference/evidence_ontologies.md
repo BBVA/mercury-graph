@@ -3,7 +3,7 @@
 
 ## Intention
 
-An ontology defines what an EvidenceGraph can know about: the **types of things** (concepts) and the **types of relationships**
+An ontology defines what an EvidenceGraph can know about: the **types of things** (entities) and the **types of relationships**
 between them that matter for a given problem. Anything that is not described in the ontology cannot be extracted from text and does
 not become part of the graph.
 
@@ -12,16 +12,17 @@ fraud involves relatively few types of entities (persons, companies, accounts, p
 owner of the EvidenceGraph decides what is in scope and should be able to read and understand the whole ontology. The number of
 *instances* can be very large; the number of *types* should not.
 
-An EvidenceGraph uses three ontologies, each of them an [`AgenticGraph`](evidence.md#mercury.graph.evidence.AgenticGraph):
+Two pieces describe what an EvidenceGraph works with:
 
-| Ontology        | Contains                                        | Example                                  |
-|-----------------|-------------------------------------------------|------------------------------------------|
-| `entities`      | The hierarchy of concepts that can be instantiated. | `person`, `person|student`           |
-| `relationships` | The hierarchy of relationships between concepts. | `works_on`, `works_on|leads`            |
-| `known_ids`     | The indexed instances of both.                  | `person|student|Noah Kim`               |
+- **The ontology** says what *can* exist. It is a single [`AgenticGraph`](evidence.md#mercury.graph.evidence.AgenticGraph) whose
+  nodes are the types of entities (e.g., `person`, `person|student`) and whose edges are the types of relationships between them
+  (e.g., `works_on`, from `person` to `project`).
+- **The initial graph** says what is *already known* before reading any document: instances (e.g., `person|student|Noah Kim`) and the
+  relationships between them. It is the starting point of the [`EvidenceGraph`](evidence.md#mercury.graph.evidence.EvidenceGraph).
 
-The examples on this page come from the ontology created by the `mge` command line tool for a new endpoint (a small school with
-students, teachers, clubs and projects). You can find its files in `ontology_source/` inside any new endpoint.
+The examples on this page come from the endpoint created by the `mge` command line tool (a small school with students, teachers, clubs
+and projects). You can find the files of its ontology in `ontology_source/` and those of its initial graph in `initial_graph/` inside
+any new endpoint.
 
 
 ## Hierarchical IDs
@@ -38,13 +39,13 @@ A hierarchy is natural in many domains. In banking, a specific credit card is no
 credit product, which is a financial product. Using a hierarchy is optional: an ontology where every ID has a single level is valid.
 
 This is the same mechanism [`Source`](evidence.md#mercury.graph.evidence.Source) uses to index text, and it is what the agent interface
-exposes (see [How agents explore an ontology](#how-agents-explore-an-ontology)). Because `|` separates levels, it cannot be used
+exposes (see [How agents explore the ontology](#how-agents-explore-the-ontology)). Because `|` separates levels, it cannot be used
 inside a name.
 
 
-## Entities: the concepts that can be instantiated
+## Entities: the nodes of the ontology
 
-The `entities` ontology lists the concepts. Each one has an `id` and a `definition`:
+The types of entities are listed in `entities_concepts.csv`. Each one has an `id` and a `definition`:
 
 ```
 id                      definition
@@ -56,44 +57,51 @@ place|room              A room inside a building.
 place|room|laboratory   A room equipped for scientific work.
 ```
 
-The definitions are not just documentation. The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) gives every concept and
-its definition to the extraction model, so a clear definition directly improves what is found in the text.
+The definitions are not just documentation. The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) gives every type of
+entity and its definition to the extraction model, so a clear definition directly improves what is found in the text.
 
 
-## Relationships
+## Relationships: the edges of the ontology
 
-The `relationships` ontology lists the types of relationship. Besides its `id` and `definition`, each one declares the concepts it
-connects: `src` (where the relationship starts) and `dst` (where it ends). Both are IDs from `entities`:
+The types of relationships are listed in `relationships_concepts.csv`. Each one is an edge that goes from a type of entity (`src`) to
+another one (`dst`), and has an `id` and a `definition`:
 
 ```
-id               src              dst                  definition
-teaches_at       person|teacher   organization|school  A teacher teaches at a school.
-works_on         person           project              A person works on a project.
-works_on|leads   person           project              A person leads a project.
+id               src                 dst                   definition
+teaches_at       person|teacher      organization|school   A teacher teaches at a school.
+belongs_to       organization|club   organization|school   A club belongs to a school.
+works_on         person              project               A person works on a project.
+works_on|leads   person              project               A person leads a project.
 ```
 
-Relationships are hierarchical too: `works_on|leads` is a more specific way of working on a project. As with entities, the hierarchy is
-optional, but it is available so that relationships do not have to be modeled differently from entities.
+Relationships are hierarchical too: `works_on|leads` is a more specific way of working on a project. A relationship connects the same
+types as its parent or descendants of them: `works_on|leads` could go from `person|student`, but not from `organization`.
+
+**The id of a relationship is unique.** Two relationships cannot have the same id and different types: a name is one meaning. When the
+same word seems to fit two pairs of types, they usually mean different things and deserve different names. For example, a person
+*belonging to* an organization is being a member of it (`member_of`), while a club *belonging to* a school is being a part of it
+(`part_of`). When they really mean the same, declare the relationship once between the most general types and let the hierarchy do the
+rest: `part_of` from `organization` to `organization` already covers a club that is part of a school.
 
 
-## Known IDs: the indexed instances of both
+## The initial graph
 
-The `known_ids` ontology is the index of every instance that has been identified. It holds IDs only; everything that is known about an
-instance (the sources that mention it, the evidence and its confidence) lives in the
-[`EvidenceGraph`](evidence.md#mercury.graph.evidence.EvidenceGraph).
+The initial graph holds the instances known beforehand. It is not part of the ontology: it is the first version of the graph that the
+[`EvidenceGraph`](evidence.md#mercury.graph.evidence.EvidenceGraph) builds, before reading any document.
 
-**Instances of entities** are nodes. Their ID is the ID of their concept followed by a name:
+**Instances** are its nodes, listed in `initial_graph/nodes.csv`. The id of an instance is its type of entity followed by a name, so
+`person|student|Noah Kim` tells you, without looking anything up, that Noah Kim is a student and therefore a person:
 
 ```
 id
 person|student|Noah Kim
 person|teacher|Elena Ruiz
 organization|school|Riverside High School
-place|room|laboratory|science laboratory
+project|Helios Solar Car
 ```
 
-**Instances of relationships** are edges between two of those nodes. Each edge has its own `id` and a `relation` attribute with the ID
-of its type in `relationships`:
+**Relationships between instances** are its edges, listed in `initial_graph/edges.csv`. Each edge has its own `id` and a `relation`
+with the id of its type of relationship in the ontology:
 
 ```
 src                         dst                                         relation         id
@@ -101,77 +109,112 @@ person|teacher|Elena Ruiz   organization|school|Riverside High School   teaches_
 person|student|Noah Kim     project|Helios Solar Car                    works_on|leads   id_noah_leads_helios
 ```
 
-Note that this is where the hierarchy pays off: `person|student|Noah Kim` tells you, without looking anything up, that Noah Kim is a
-student and therefore a person.
+The initial graph must match the ontology. This is where the hierarchy pays off: Noah Kim can lead a project because `works_on|leads`
+goes from `person`, and a student is a person.
 
 
 ## Configuration and persistence
 
-Ontologies are configured in the `ontologies` section of an endpoint (`ontologies.jsonc` in a new endpoint). Each one is an
-`AgenticGraph` with this configuration:
+The ontology is configured in the `ontologies` section of an endpoint (`ontologies.jsonc` in a new endpoint) as an `AgenticGraph`:
 
 ```jsonc
-"entities": {
-	"name": "entities",
+"ontology": {
+	"name": "ontology",
 	"extra_args": {
-		"description": "This ontology holds all the entities that can be used in the Evidence Graph. ...",
+		"description": ["This ontology holds the types of entities and of relationships that can be used in the Evidence Graph.", "..."],
 		"file_format": {"src": "src", "dst": "dst", "id": "id", "directed": true, "sep": "\t"},
 		"nodes": {"type": "csv", "$path": "ontology_source/entities_concepts.csv"},
-		"persistence": {"type": "pickle", "$path": "graphs/entities.pickle"}
+		"edges": {"type": "csv", "$path": "ontology_source/relationships_concepts.csv"},
+		"persistence": {"type": "pickle", "$path": "graphs/ontology.pickle"},
+		"max_results": 50
 	},
 	"tools": []
 }
 ```
 
-- `nodes` and `edges` are the tab separated files above. Any column other than `id` (or `src`, `dst` and `id` for edges)
-  becomes an attribute.
+- `nodes` and `edges` are the tab separated files above. Any column other than `id` (or `src`, `dst` and `id` for edges) becomes an
+  attribute.
 - `file_format` is optional and changes the column names and the separator. Any key left out takes its default value.
 - `persistence` is where the graph is saved, as a pickle, when the endpoint closes. **If that file exists, it is loaded and the .csv
-  files are ignored.** After editing the .csv files, delete the pickle so that the ontology is built again. A message is logged
-  for every .csv file modified after the pickle was saved.
+  files are ignored.** After editing the .csv files, delete the pickle so that the ontology is built again. A message is logged for
+  every .csv file modified after the pickle was saved.
+- `max_results` limits the entries of every answer given to agents.
 - `description` is what agents read about the ontology.
 
-The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) connects to the three ontologies by name in its own configuration:
+The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) names the ontology it uses in its own configuration (in
+`formalizers.jsonc`). The key is the role and the value is the `name` of the `AgenticGraph`, which must also be one of its `tools`:
 
 ```jsonc
-"ontologies": {"entities": "entities", "relationships": "relationships", "known_ids": "known_ids"}
+"ontology": "ontology"
 ```
 
-Only `entities` is required. Setting `relationships` or `known_ids` to `null` disables the Formalizer capabilities that need them.
+The initial graph is configured in the [`EvidenceGraph`](evidence.md#mercury.graph.evidence.EvidenceGraph) (in
+`evidence_graphs.jsonc`), with the same format of files:
+
+```jsonc
+"initial_nodes": {"type": "csv", "$path": "initial_graph/nodes.csv"},
+"initial_edges": {"type": "csv", "$path": "initial_graph/edges.csv"},
+"persistence": {"type": "pickle", "$path": "graphs/e_graph.pickle"}
+```
+
+The names of the keys tell the difference: `nodes` and `edges` define the ontology, while `initial_nodes` and `initial_edges` are only
+the starting point of a graph that grows. Both are only read when their pickle does not exist.
+
+### Updating an existing endpoint
+
+Endpoints created before the ontology became a single graph have three ontologies (`entities`, `relationships` and `known_ids`) in
+their configuration. To update one, compare its `.jsonc` files with those of a new endpoint (`mge new`) and:
+
+- replace the three ontologies with the `ontology` block above, and use `"ontology": "ontology"` in the Formalizer,
+- move the files of `known_ids` to `initial_graph/` and configure them as the initial graph of the EvidenceGraph,
+- delete `graphs/entities.pickle`, `graphs/relationships.pickle` and `graphs/known_ids.pickle`, which are no longer used, and
+  `graphs/e_graph.pickle`, so that the EvidenceGraph starts from its initial graph.
 
 
 ## Validation
 
-When an ontology is loaded, its ids must be unique and every relationship must connect entities declared in it. When the
-[`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) is piloted, it also checks that every entity and relationship has its
-parent defined, and that the `src` and `dst` of a relationship are those of its parent or descendants of them.
+The ontology and the initial graph are checked at three moments. If anything is wrong, every problem is logged and the object does not
+become ready.
 
-If anything is wrong, every problem is logged and the ontology or the Formalizer does not become ready. See
-[`validate_ontology()`](#mercury.graph.evidence.formalizer.validate_ontology) for the details.
+1. **When any graph is loaded** from its files (see [`graph_from_files()`](#mercury.graph.evidence.agentic_graph.graph_from_files)):
+   ids are unique, edges cannot be loaded without a file of nodes, and the `src` and `dst` of every edge are declared nodes. A typo
+   such as `projec` as the `dst` of a relationship is reported instead of becoming a new node.
+2. **When the Formalizer is piloted** (see [`validate_ontology()`](#mercury.graph.evidence.formalizer.validate_ontology)): every type
+   of entity and relationship has its parent defined, and every relationship connects the types of its parent or descendants of them.
+   For example, `works_on|leads` from `organization` is rejected when `works_on` goes from `person`.
+3. **When the EvidenceGraph is piloted** with its initial graph (see
+   [`validate_initial_graph()`](#mercury.graph.evidence.formalizer.validate_initial_graph)): every instance is of a type of entity of
+   the ontology, and every edge has a relationship of the ontology between instances of its types or of descendants of them. For
+   example, `person|student|Noah Kim` can be the `src` of `works_on|leads`, but not of `teaches_at`, which goes from `person|teacher`.
+   An initial graph that fails is not saved, so the next start checks it again.
 
 
-## How agents explore an ontology
+## How agents explore the ontology
 
-Through the agent interface, an `AgenticGraph` is navigated by ID, in a similar way to a `Source`. Unlike in a `Source`, IDs are used
-exactly as they are written in the .csv files, without the name of the ontology in front, and an empty ID is the root. An agent can:
+Through the agent interface, the ontology is navigated by id, in a similar way to a `Source`. Unlike in a `Source`, ids are used
+exactly as they are written in the .csv files, without the name of the ontology in front, and an empty id is the root. Entities and
+relationships are navigated separately, in two trees:
 
-- List the children of an ID, with their definitions, one or several levels down. For example, the children of `person|student` in
-  `known_ids` are `person|student|Noah Kim` and `person|student|Priya Shah`.
-- Read a node with its ancestors, to know what something is (`person|student|Noah Kim` is a `person|student`, which is a `person`).
-- Search the nodes whose ID or definition contains a text, to find something by its name.
-- In `relationships`, find the relationships a concept can take part in, including those declared for its ancestors.
-- In `known_ids`, find the relationship instances (the edges) of an instance, optionally only those of a type of relationship.
+- `children_entities_by_idx_<ontology>`: the types of entities under an id, with their definitions, one or several levels down.
+- `entity_by_idx_<ontology>`: a type of entity with its definition and its ancestors, to know what something is.
+- `search_entities_<ontology>`: the types of entities whose id or definition contains a text.
+- `children_relationships_by_idx_<ontology>`, `relationship_by_idx_<ontology>` and `search_relationships_<ontology>`: the same for
+  the types of relationships, which also come with the types of entities they connect (`src` and `dst`).
+- `relations_for_<ontology>`: the types of relationships a type of entity can take part in, as `src`, `dst` or both, including those
+  declared for its ancestors. A `person|student` can take part in `studies_at` and also in `works_on`, declared for `person`.
 
-Relationship instances are not part of the hierarchy: they are only reached from the instances they connect. Every answer is limited
-in size and says when it has been cut. The exact capabilities are listed in the
+The capabilities of relationships only appear when the ontology has relationships. Entries with `"more": true` have children of their
+own, and every answer is limited to `max_results` entries and says when it has been cut. The exact capabilities are listed in the
 [`AgenticGraph`](evidence.md#mercury.graph.evidence.AgenticGraph) reference.
 
 
 ## Known limitations
 
-- There is no graph query language: agents explore an ontology through the capabilities above, one question at a time.
+- There is no graph query language: agents explore the ontology through the capabilities above, one question at a time.
+- The initial graph is loaded into the EvidenceGraph, but it cannot be explored through capabilities yet.
+- The ontology cannot be edited at runtime: it is defined by its .csv files (deleting its pickle to apply changes).
 - [`Formalizer.is_a()`](evidence.md#mercury.graph.evidence.Formalizer.is_a), which should score whether something is a type of a
-  given concept, is not implemented yet.
+  given type of entity, is not implemented yet.
 
 
 ## Reference
@@ -179,3 +222,5 @@ in size and says when it has been cut. The exact capabilities are listed in the
 ::: mercury.graph.evidence.agentic_graph.graph_from_files
 
 ::: mercury.graph.evidence.formalizer.validate_ontology
+
+::: mercury.graph.evidence.formalizer.validate_initial_graph

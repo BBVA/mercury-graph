@@ -757,8 +757,8 @@ class Endpoint(Agentic):
 		It also updates the Endpoint's meta with the capabilities.
 
 		The pilot() method calls this method when appropriate and sets the state according to the success. It is called twice: before
-		piloting the tools and again once every tool is ready, since tools may change their capabilities while being piloted (e.g., a
-		Formalizer without a relationships ontology removes `hint_edges`).
+		piloting the tools and again once every tool is ready, since tools may change their capabilities while being piloted (e.g., an
+		ontology only exposes the capabilities of relationships once it is loaded and has some).
 
 		Returns:
 			(bool): True if no errors found exposing the capabilities, False otherwise.

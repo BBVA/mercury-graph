@@ -172,7 +172,7 @@ class Formalizer(Agentic):
 	### The level of "intelligence" of the Formalizer
 
 	The Formalizer "speaks" the language of EvidenceGraph, has both an Agentic interface (to be used as a tool by an Agent or just exposed
-	in an Endpoint) and direct access (via the parent) to its ontologies and from the EvidenceGraph. It also abstracts the functionality
+	in an Endpoint) and direct access (via the parent) to its ontology and from the EvidenceGraph. It also abstracts the functionality
 	of some "smart" model that does the heavy lifting.
 
 	It is smart enough to suggest potential nodes and edges or score how strongly the definition of one node matches another (making both
@@ -206,7 +206,7 @@ class Formalizer(Agentic):
 
 	## Ontology validation
 
-	While piloting, the Formalizer checks that its ontologies are coherent with each other using
+	While piloting, the Formalizer checks that its ontology is coherent using
 	[`validate_ontology()`][mercury.graph.evidence.formalizer.validate_ontology]. If any problem is found, every problem is logged
 	and the Formalizer stops in the `ERR_ONTOLOGY_INIT` state.
 
@@ -549,7 +549,7 @@ class Formalizer(Agentic):
 		"""
 
 		for error in errors:
-			self.log_error('Invalid ontologies in Formalizer %s: %s' % (self.id, error))
+			self.log_error('Invalid ontology in Formalizer %s: %s' % (self.id, error))
 
 		self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
 

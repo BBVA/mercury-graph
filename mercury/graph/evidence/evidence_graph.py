@@ -14,7 +14,7 @@ class EvidenceGraph(Agentic):
 
 	This is the core of the architecture.
 
-	It is essentially a multigraph, whose nodes and edges are strictly connected by their ids to ontologies and hold
+	It is essentially a multigraph, whose nodes and edges are strictly connected by their ids to the ontology and hold
 	information about all the sources that contain every mention to the entities and relationships represented in it
 	and evidence metrics associated with each piece of information.
 
@@ -39,16 +39,24 @@ class EvidenceGraph(Agentic):
 
 	The graph is persisted to disk using a pickle file and a configuration mechanism identical to that of `AgenticGraph`.
 
-	## Connection to ontologies is via the Formalizer
+	## Connection to the ontology is via the Formalizer
 
 	An `EvidenceGraph` is connected to exactly one `Formalizer`. The tasks themselves the Formalizer does (`id_nodes` identifying nodes,
 	`id_edges` identifying edges and `is_same` determining identity and category membership) are treated as separate functionality to
 	make it possible to have them handled by an Agent or an agent that supervises another Agentic, etc.
 
-	The `Formalizer` must have its three ontology `AgenticGraph` objects (entities, relationships, known_ids) defined. Currently,
-	these ontology objects are only initialized from their initial .csv files and nothing modifies them at runtime. In the future, the
-	`EvidenceGraph` will modify them (e.g., adding new instances to `known_ids`) as it integrates new evidence into the graph. It is
-	highly recommended not to share these `AgenticGraph` ontology objects with other `EvidenceGraph` instances.
+	The `Formalizer` has one ontology: an `AgenticGraph` whose nodes are the types of entities and whose edges are the types of
+	relationships (see [Ontologies in EvidenceGraph](evidence_ontologies.md)). The `EvidenceGraph` reads it through the Formalizer.
+	Currently, the ontology is only initialized from its .csv files and nothing modifies it at runtime.
+
+	## Initial graph
+
+	The graph can start from an initial graph: the instances known beforehand and the relationships between them, given as
+	`"initial_nodes"` and `"initial_edges"` files in the configuration. They are only loaded when there is no persisted graph. Once the
+	Formalizer is connected, the initial graph is checked against its ontology with
+	[`validate_initial_graph()`][mercury.graph.evidence.formalizer.validate_initial_graph]. If any problem is found, every problem is
+	logged, the EvidenceGraph stops in the `ERR_BUILDING` state and the graph is discarded, so that it is not persisted and is checked
+	again on the next start.
 
 	## Extraction of candidate entities and relationships
 
@@ -108,7 +116,7 @@ class EvidenceGraph(Agentic):
 
 	To answer questions about the content of the EvidenceGraph, we use a specialized Agent. The Agent has access to: the EvidenceGraph,
 	the Formalizer and the Sources that the EvidenceGraph has. The Agent can use the Formalizer to identify the entities and relationships
-	in the query and relate them to the ontologies defined in the EvidenceGraph, possibly including user confirmation.
+	in the query and relate them to the ontology of the EvidenceGraph, possibly including user confirmation.
 
 	Finding the best way to query the EvidenceGraph through the Agent is an ongoing research topic.
 
@@ -308,7 +316,7 @@ class EvidenceGraph(Agentic):
 	def _connect_downstream(self):
 		""" Connects the EvidenceGraph to downstream components or systems.
 
-		This parses the configuration and locates every necessary downstream Agentic: the Formalizer, its ontologies, Agentics with
+		This parses the configuration and locates every necessary downstream Agentic: the Formalizer, its ontology, Agentics with
 		capabilities to do entity extraction, etc. and the Sources.
 
 		Returns:
