@@ -1,12 +1,9 @@
 import os, pickle
 
-import pandas as pd
-import networkx as nx
-
 from .agentic import Agentic, AgenticRunInvalidRequest
 from .source import Source
-from .agentic_graph import GraphState, MultiGraph
-from .formalizer import Formalizer
+from .agentic_graph import GraphState, MultiGraph, graph_from_files
+from .formalizer import Formalizer, validate_initial_graph
 from .agent import Agent
 
 
@@ -144,6 +141,8 @@ class EvidenceGraph(Agentic):
 
 		self._graph	= None
 
+		self._from_initial_graph = False
+
 		self._formalizer = None
 
 		self._ontology = None
@@ -219,19 +218,6 @@ class EvidenceGraph(Agentic):
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
 
-		def new_graph():
-			""" Creates an empty new graph when there is no persisted graph to load. The pandas dataframes are empty with just
-			column headers as required by a nx.digraph. The class `MultiGraph` overrides the behavior and converts it into a multigraph.
-			"""
-
-			keys = {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}
-
-			nodes = pd.DataFrame({keys['id']: pd.Series(dtype='str')})
-
-			edges = pd.DataFrame({keys['src']: pd.Series(dtype='str'), keys['dst']: pd.Series(dtype='str')})
-
-			return MultiGraph(data = edges, keys = keys, nodes = nodes)
-
 		if self.meta['state'] < 0:
 			self.log_error('EvidenceGraph is in error state %d' % self._meta_['state'])
 
@@ -240,9 +226,10 @@ class EvidenceGraph(Agentic):
 		while self._meta_['state'] < intent:
 			if self._meta_['state'] == self.states.INITIAL.value:
 				try:
+					self._from_initial_graph = False
 					self._fname = self.conf.get('persistence', None)
 					if self._fname is None:
-						self._graph = new_graph()
+						self._graph = self._graph_from_initial_files()
 					else:
 						self._fname = self._fname['path']
 						parent_dir	= os.path.dirname(self._fname)
@@ -255,10 +242,10 @@ class EvidenceGraph(Agentic):
 								ntx = pickle.load(f)			# A NetworkX graph object saved by this class.
 							self._graph = MultiGraph(data = ntx)
 						else:
-							self._graph = new_graph()
+							self._graph = self._graph_from_initial_files()
 
-				except:
-					self.log_error('Graph could not be created and initialized for EvidenceGraph "%s".' % self.name)
+				except Exception as e:
+					self.log_error('Graph could not be created and initialized for EvidenceGraph "%s": %s' % (self.name, e))
 					self._meta_['state'] = self.states.ERR_GRAPH_INIT.value
 					break
 
@@ -268,13 +255,43 @@ class EvidenceGraph(Agentic):
 					break
 
 			if self._meta_['state'] == self.states.GRAPH_LOADED_OK.value:
-				if self._connect_downstream():
-					self._meta_['state'] = self.states.READY.value
-
-				else:
+				if not self._connect_downstream():
 					self._meta_['state'] = self.states.ERR_BUILDING.value
 
+				elif not self._initial_graph_is_valid():
+					self._graph = None			# Not to be persisted: the next start would load it from the pickle without validating it.
+					self._meta_['state'] = self.states.ERR_BUILDING.value
+
+				else:
+					self._meta_['state'] = self.states.READY.value
+
 				break
+
+
+	def _graph_from_initial_files(self):
+		""" Returns the graph built from the initial graph in the configuration ("initial_nodes" and "initial_edges"), or an empty graph if
+		there is none. It is only used when there is no persisted graph.
+		"""
+
+		self._from_initial_graph = self.conf.get('initial_nodes', None) is not None
+
+		return graph_from_files(self.conf.get('initial_nodes', None), self.conf.get('initial_edges', None), self.conf.get('file_format', None))
+
+
+	def _initial_graph_is_valid(self):
+		""" Returns True unless the graph has just been built from the initial graph and it does not match the ontology, in which case
+		every problem is logged.
+		"""
+
+		if not self._from_initial_graph:
+			return True
+
+		errors = validate_initial_graph(self._graph.networkx, self._ontology)
+
+		for error in errors:
+			self.log_error('Invalid initial graph in EvidenceGraph %s: %s' % (self.id, error))
+
+		return len(errors) == 0
 
 
 	def crawl(self, index):

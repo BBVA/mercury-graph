@@ -4,6 +4,7 @@ import types
 
 from pathlib import Path
 
+import networkx as nx
 import pandas as pd
 import pytest
 
@@ -288,6 +289,24 @@ def test_the_template_ontology_is_configured_and_valid(tmp_path):
 	assert _validate_one(ontology) == []
 
 
+def test_the_template_initial_graph_is_configured_and_valid(tmp_path):
+	"""The EvidenceGraph of the endpoint created by `mge` starts from an initial graph that matches the template ontology."""
+	from mercury.graph.evidence.agentic_graph import graph_from_files
+	from mercury.graph.evidence.formalizer import validate_initial_graph
+
+	shutil.copytree(TEMPLATE_ONTOLOGIES.parent, tmp_path / 'endpoint')
+	conf  = Endpoint(str(tmp_path / 'endpoint'), auto_pilot = False).conf
+	files = lambda extra_args, kind: {'type': 'csv', 'path': str(tmp_path / 'endpoint' / extra_args[kind]['$path'])}
+	ontology_args, e_graph_args = conf['ontologies']['ontology']['extra_args'], conf['evidence_graphs']['e_graph']['extra_args']
+	ontology = AgenticGraph(schema = 'ontology', extra_args = {kind: files(ontology_args, kind) for kind in ('nodes', 'edges')})
+	ontology.pilot(100)
+
+	initial = graph_from_files(files(e_graph_args, 'initial_nodes'), files(e_graph_args, 'initial_edges'))
+
+	assert initial.networkx.number_of_nodes() > 0 and initial.networkx.number_of_edges() > 0
+	assert validate_initial_graph(initial.networkx, ontology) == []
+
+
 def test_validate_ontology_requires_entity_parents(tmp_path):
 	"""An entity whose parent is not defined is an error, also when only an intermediate level is missing."""
 	errors = _validate_one(_multigraph(tmp_path, ('person|teacher', 'place', 'place|room|laboratory')))
@@ -363,6 +382,74 @@ def test_validate_ontology_requires_a_loaded_ontology():
 	errors = _validate_one(AgenticGraph(schema = 'ontology', extra_args = {}))
 
 	assert errors == ['Ontology "ontology" is not loaded.']
+
+
+def _instances(nodes, edges = ()):
+	"""Return a NetworkX graph of instance ids and (src, dst, relation, id) edges, like an initial graph. None leaves the relation out."""
+	ntx = nx.MultiDiGraph()
+	ntx.add_nodes_from(nodes)
+	for src, dst, relation, key in edges:
+		ntx.add_edge(src, dst, key = key, **({} if relation is None else {'relation': relation}))
+	return ntx
+
+
+def _validate_instances(directory, nodes, edges = ()):
+	"""Run validate_initial_graph() on the given instances against an ontology of SCHOOL_ENTITIES and SCHOOL_RELATIONS."""
+	from mercury.graph.evidence.formalizer import validate_initial_graph
+
+	return validate_initial_graph(_instances(nodes, edges), _multigraph(directory, SCHOOL_ENTITIES, SCHOOL_RELATIONS))
+
+
+def test_validate_initial_graph_accepts_instances_of_descendants(tmp_path):
+	"""Instances of the declared types or of their descendants are valid (a student can lead a project declared from person)."""
+	nodes = ['person|teacher|Elena', 'person|student|Noah', 'organization|school|Riverside', 'project|Helios']
+	edges = [('person|teacher|Elena', 'organization|school|Riverside', 'teaches_at', 'elena_rhs'),
+			 ('person|student|Noah', 'project|Helios', 'works_on|leads', 'noah_helios')]
+
+	assert _validate_instances(tmp_path, nodes, edges) == []
+
+
+def test_validate_initial_graph_requires_instances_of_existing_types(tmp_path):
+	"""An instance without a type or of a type that is not in the ontology is an error."""
+	errors = _validate_instances(tmp_path, ['Noah', 'vehicle|Car', 'person|Ada'])
+
+	assert len(errors) == 2
+	assert _mentions(errors, 'Noah')
+	assert _mentions(errors, 'vehicle|Car', 'vehicle')
+
+
+def test_validate_initial_graph_requires_edges_of_existing_relationships(tmp_path):
+	"""An edge without a relation or with a relation that is not in the ontology is an error."""
+	nodes = ['person|Ada', 'project|Helios']
+	edges = [('person|Ada', 'project|Helios', None, 'no_relation'), ('person|Ada', 'project|Helios', 'drives', 'unknown')]
+
+	errors = _validate_instances(tmp_path, nodes, edges)
+
+	assert len(errors) == 2
+	assert _mentions(errors, 'no_relation', 'has no relation')
+	assert _mentions(errors, 'unknown', 'drives')
+
+
+def test_validate_initial_graph_requires_edges_between_compatible_types(tmp_path):
+	"""The instances of an edge must be of the types of its relation or of their descendants (person_group is not a person)."""
+	nodes = ['person|student|Noah', 'organization|school|Riverside', 'person_group|Club', 'project|Helios']
+	edges = [('person|student|Noah', 'organization|school|Riverside', 'teaches_at', 'noah_teaches'),
+			 ('person_group|Club', 'project|Helios', 'works_on', 'club_works')]
+	entities = _multigraph(tmp_path, SCHOOL_ENTITIES + ('person_group',), SCHOOL_RELATIONS)
+
+	from mercury.graph.evidence.formalizer import validate_initial_graph
+	errors = validate_initial_graph(_instances(nodes, edges), entities)
+
+	assert len(errors) == 2
+	assert _mentions(errors, 'noah_teaches', 'src', 'person|teacher')
+	assert _mentions(errors, 'club_works', 'src', 'person_group|Club')
+
+
+def test_validate_initial_graph_reports_every_error_at_once(tmp_path):
+	"""Problems with instances and with edges are all reported."""
+	errors = _validate_instances(tmp_path, ['vehicle|Car', 'person|Ada', 'project|Helios'], [('person|Ada', 'project|Helios', 'drives', 'x')])
+
+	assert len(errors) == 2
 
 
 def test_formalizer_pilot_fails_with_an_invalid_ontology(monkeypatch, tmp_path):

@@ -16,8 +16,16 @@
 			// The description will be exposed in the EvidenceGraph's Agentic API. It can be a string or a list of strings.
 			"description": "This evidence graph is a demo for development.",
 
-			// This is where the AgenticGraph will persist itself. The "initial_nodes" and "initial_edges" are only used when the graph
-			// is first created for the first time. It is a pickle of a NetworkX graph.
+			// The optional initial graph: the instances known beforehand (nodes) and the relationships between them (edges). The type of
+			// an instance is its id without the last level (e.g., person|student|Noah Kim is a person|student) and every edge has a
+			// "relation". Both are only loaded when the file in "persistence" does not exist, and they must match the ontology of the
+			// Formalizer (otherwise every problem is logged and the EvidenceGraph does not become ready). The src and dst of every edge must
+			// be a node. They can be either a csv or a pickle of a pandas dataframe, and "file_format" can be set as in an ontology.
+			"initial_nodes" : {"type" : "csv", "$path" : "initial_graph/nodes.csv"},
+			"initial_edges" : {"type" : "csv", "$path" : "initial_graph/edges.csv"},
+
+			// This is where the EvidenceGraph will persist itself. When this file exists, it is loaded and the initial graph is ignored.
+			// It is a pickle of a NetworkX graph.
 			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
 			"persistence" : {"type" : "pickle", "$path" : "graphs/e_graph.pickle"},
 

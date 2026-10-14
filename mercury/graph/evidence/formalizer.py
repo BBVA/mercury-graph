@@ -54,6 +54,69 @@ def validate_ontology(ontology):
 	return errors
 
 
+def validate_initial_graph(ntx, ontology):
+	""" Checks that an initial graph of instances (such as the one an EvidenceGraph starts from) matches an ontology.
+
+	The checks are:
+
+	- Every instance is a name under a type of entity of the ontology (e.g., `person|student|Noah Kim` under `person|student`).
+	- Every edge has a `relation` that is a relationship of the ontology, and the types of the instances it connects are the `src` and
+	`dst` of that relationship or descendants of them (e.g., a `person|student` can be the `src` of a relationship from `person`).
+
+	Args:
+		ntx (networkx.MultiDiGraph): the initial graph, with the instances as nodes and their relationships as edges.
+		ontology (AgenticGraph): the ontology. It must be loaded.
+
+	Returns:
+		(list): A list of strings, one for each problem found. It is empty if the initial graph is valid.
+	"""
+
+	types	  = set(ontology._graph.networkx.nodes)
+	relations = _relation_ends(ontology._graph.networkx)
+
+	return _check_instances(ntx, types) + _check_instance_edges(ntx, relations)
+
+
+def _check_instances(ntx, types):
+	""" Returns an error for every instance in ntx that is not under a type of entity in types. """
+
+	errors = []
+	for index in sorted(ntx.nodes):
+		if parent_of(index) is None:
+			errors.append('Instance "%s" has no type: its id must start with a type of entity of the ontology.' % index)
+		elif parent_of(index) not in types:
+			errors.append('Instance "%s" is of type "%s", which is not in the ontology.' % (index, parent_of(index)))
+
+	return errors
+
+
+def _check_instance_edges(ntx, relations):
+	""" Returns the errors of every edge in ntx, sorted by edge id. """
+
+	errors = []
+	for src, dst, key, relation in sorted(ntx.edges(keys = True, data = 'relation'), key = lambda edge: str(edge[2])):
+		errors += _check_instance_edge(src, dst, key, relation, relations)
+
+	return errors
+
+
+def _check_instance_edge(src, dst, key, relation, relations):
+	""" Returns the errors of one edge: a missing or unknown relation, or instances of types the relation does not connect. """
+
+	if not isinstance(relation, str):
+		return ['Edge "%s" has no relation.' % key]
+
+	if relation not in relations:
+		return ['Edge "%s" has relation "%s", which is not in the ontology.' % (key, relation)]
+
+	errors = []
+	for end, instance, expected in zip(('src', 'dst'), (src, dst), relations[relation]):
+		if parent_of(instance) is not None and not descends_from(parent_of(instance), expected):
+			errors.append('Edge "%s": its %s "%s" is not a "%s" as required by "%s".' % (key, end, instance, expected, relation))
+
+	return errors
+
+
 def _relation_ends(ntx):
 	""" Returns a dictionary of relationship id: (src, dst) of the ontology ntx. """
 
