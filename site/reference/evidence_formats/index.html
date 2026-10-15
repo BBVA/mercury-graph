@@ -318,6 +318,8 @@
       
         
       
+        
+      
     
     
     
@@ -485,6 +487,34 @@
     
   
     mercury.graph.evidence_source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence_ontologies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    mercury.graph.evidence_ontologies
   
 
     
@@ -1679,11 +1709,11 @@ to a precise place while still providing something that works well enough to be 
 	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;&lt;(?:nowiki|pre|code)(?:</span><span class="se">\\</span><span class="s1">s[^&gt;]*)?&gt;([</span><span class="se">\\</span><span class="s1">s</span><span class="se">\\</span><span class="s1">S]*?)&lt;/(?:nowiki|pre|code)</span><span class="se">\\</span><span class="s1">s*&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;`</span><span class="se">\\</span><span class="s1">1`&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">flags</span><span class="p">)</span>
 	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;&lt;[^&gt;]+&gt;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
 	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">[</span><span class="se">\\</span><span class="s1">[(?:File|Image|Category):[^</span><span class="se">\\</span><span class="s1">]]+</span><span class="se">\\</span><span class="s1">]</span><span class="se">\\</span><span class="s1">]&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">flags</span><span class="p">)</span>
-	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">[</span><span class="se">\\</span><span class="s1">[([^</span><span class="se">\\</span><span class="s1">]|]+)</span><span class="se">\\</span><span class="s1">|([^</span><span class="se">\\</span><span class="s1">]]+)</span><span class="se">\\</span><span class="s1">]</span><span class="se">\\</span><span class="s1">]&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">2&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
-	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">[</span><span class="se">\\</span><span class="s1">[([^</span><span class="se">\\</span><span class="s1">]]+)</span><span class="se">\\</span><span class="s1">]</span><span class="se">\\</span><span class="s1">]&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">1&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
-	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">[(https?://[^</span><span class="se">\\</span><span class="s1">s</span><span class="se">\\</span><span class="s1">]]+)</span><span class="se">\\</span><span class="s1">s+([^</span><span class="se">\\</span><span class="s1">]]+)</span><span class="se">\\</span><span class="s1">]&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;[</span><span class="se">\\</span><span class="s1">2](</span><span class="se">\\</span><span class="s1">1)&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
-	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&#39;&#39;&#39;(.*?)&#39;&#39;&#39;&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;**</span><span class="se">\\</span><span class="s1">1**&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
-	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&#39;&#39;(.*?)&#39;&#39;&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;*</span><span class="se">\\</span><span class="s1">1*&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">[</span><span class="se">\\</span><span class="s1">[([^</span><span class="se">\\</span><span class="s1">]|]+)</span><span class="se">\\</span><span class="s1">|([^</span><span class="se">\\</span><span class="s1">]]+)</span><span class="se">\\</span><span class="s1">]</span><span class="se">\\</span><span class="s1">]&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;\2&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">[</span><span class="se">\\</span><span class="s1">[([^</span><span class="se">\\</span><span class="s1">]]+)</span><span class="se">\\</span><span class="s1">]</span><span class="se">\\</span><span class="s1">]&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;\1&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">[(https?://[^</span><span class="se">\\</span><span class="s1">s</span><span class="se">\\</span><span class="s1">]]+)</span><span class="se">\\</span><span class="s1">s+([^</span><span class="se">\\</span><span class="s1">]]+)</span><span class="se">\\</span><span class="s1">]&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;[\2](\1)&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&#39;&#39;&#39;(.*?)&#39;&#39;&#39;&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;**\1**&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+	<span class="n">text</span> <span class="o">=</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&#39;&#39;(.*?)&#39;&#39;&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;*\1*&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
 
 	<span class="k">return</span> <span class="n">regex</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">&#39;[ </span><span class="se">\\</span><span class="s1">t]+&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
