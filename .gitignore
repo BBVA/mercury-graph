@@ -1,4 +1,9 @@
 .vscode
 AGENTS.md
+.agents
 sandbox/
 staging/
+__pycache__/
+build/
+*.egg-info/
+.DS_Store

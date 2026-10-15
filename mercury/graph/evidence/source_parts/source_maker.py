@@ -143,6 +143,8 @@ class SourceMaker(SourceNode):
 
 			if os.path.isdir(self._dst):
 				self._children = self._recurse_tree(abort_if_before = src_time)
+			else:
+				self._children = None
 
 			if type(self._children) is not dict:	# The destination files are not up to date and need to be created again.
 				if not self._create_markdown_from_xml():

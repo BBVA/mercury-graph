@@ -211,11 +211,11 @@ class WikiMarkdownWriter:
 		text = regex.sub('<(?:nowiki|pre|code)(?:\\s[^>]*)?>([\\s\\S]*?)</(?:nowiki|pre|code)\\s*>', '`\\1`', text, flags = flags)
 		text = regex.sub('<[^>]+>', '', text)
 		text = regex.sub('\\[\\[(?:File|Image|Category):[^\\]]+\\]\\]', '', text, flags = flags)
-		text = regex.sub('\\[\\[([^\\]|]+)\\|([^\\]]+)\\]\\]', r'\\2', text)
-		text = regex.sub('\\[\\[([^\\]]+)\\]\\]', r'\\1', text)
-		text = regex.sub('\\[(https?://[^\\s\\]]+)\\s+([^\\]]+)\\]', r'[\\2](\\1)', text)
-		text = regex.sub("'''(.*?)'''", r'**\\1**', text)
-		text = regex.sub("''(.*?)''", r'*\\1*', text)
+		text = regex.sub('\\[\\[([^\\]|]+)\\|([^\\]]+)\\]\\]', r'\2', text)
+		text = regex.sub('\\[\\[([^\\]]+)\\]\\]', r'\1', text)
+		text = regex.sub('\\[(https?://[^\\s\\]]+)\\s+([^\\]]+)\\]', r'[\2](\1)', text)
+		text = regex.sub("'''(.*?)'''", r'**\1**', text)
+		text = regex.sub("''(.*?)''", r'*\1*', text)
 
 		return regex.sub('[ \\t]+', ' ', text).strip()
 

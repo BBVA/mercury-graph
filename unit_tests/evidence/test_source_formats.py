@@ -6,6 +6,15 @@ from mercury.graph.evidence.formats import PdfToMarkdown, MDbyPDFoxide, WikiMark
 from mercury.graph.evidence.source_parts import MarkdownParser, SourceEntityType
 
 
+def test_markdown_parser_keeps_text_after_a_quote_link():
+	"""Keeps text on either side of an inline link in a block quote."""
+
+	parts = MarkdownParser(['> before [link](page.md) tail']).parse()
+
+	assert any(part['ent_type'] == SourceEntityType.TEXT.value and part['span'] == slice(2, 9) for part in parts)
+	assert any(part['ent_type'] == SourceEntityType.TEXT.value and part['span'] == slice(24, 29) for part in parts)
+
+
 def test_markdown_parser():
 	""" Builds line-based entity descriptions for the supported Markdown constructs. """
 
@@ -49,6 +58,77 @@ def test_markdown_parser_header_stack_and_block_transition():
 	assert next(part for part in parts if part['index'] == 'paragraph_1')['line'] == slice(1, 2)
 
 
+def test_markdown_parser_paragraph_text_is_one_leaf():
+	""" A paragraph written over several lines has one TEXT leaf for all its lines, and its links as separate leaves. """
+
+	content = ['Noah Kim studies at [Riverside](school.md). Priya Shah studies at Riverside High', 'School.']
+	parts = MarkdownParser(content).parse()
+	children = [part for part in parts if part['parent'] == 'paragraph_1']
+
+	assert [part['ent_type'] for part in children] == [SourceEntityType.TEXT.value, SourceEntityType.LINK.value]
+	assert children[0]['line'] == slice(0, 2) and children[0]['span'] is None
+	assert children[1]['line'] == 0 and children[1]['span'] == slice(20, 42)
+
+
+def _lines_of(parts, ent_type):
+	""" Returns the line ranges of all the parsed parts of one entity type. """
+
+	return [part['line'] for part in parts if part['ent_type'] == ent_type.value]
+
+
+@pytest.mark.parametrize('char', ['`', '~'])
+def test_markdown_parser_fence_does_not_close_with_shorter_fence(char):
+	""" A fence opened with four markers is not closed by an inner fence of three, so nothing inside becomes a heading. """
+
+	content = ['# Doc', char*4 + 'markdown', char*3, '# Not a header', char*4, 'After']
+	parts = MarkdownParser(content).parse()
+
+	assert _lines_of(parts, SourceEntityType.CODE_BLOCK) == [slice(1, 5)]
+	assert _lines_of(parts, SourceEntityType.HEADER_1) == [slice(0, 6)]
+	assert _lines_of(parts, SourceEntityType.PARAGRAPH) == [slice(5, 6)]
+
+
+def test_markdown_parser_fence_closes_with_longer_fence():
+	""" A closing fence longer than the opening one closes the block. """
+
+	parts = MarkdownParser(['```', 'code', '`````', 'After']).parse()
+
+	assert _lines_of(parts, SourceEntityType.CODE_BLOCK) == [slice(0, 3)]
+	assert _lines_of(parts, SourceEntityType.PARAGRAPH) == [slice(3, 4)]
+
+
+def test_markdown_parser_fence_does_not_close_with_other_marker():
+	""" A tilde fence does not close a backtick fence. """
+
+	parts = MarkdownParser(['```', '~~~', '# Not a header', '```', 'After']).parse()
+
+	assert _lines_of(parts, SourceEntityType.CODE_BLOCK) == [slice(0, 4)]
+	assert _lines_of(parts, SourceEntityType.HEADER_1) == []
+	assert _lines_of(parts, SourceEntityType.PARAGRAPH) == [slice(4, 5)]
+
+
+@pytest.mark.parametrize('content', [['```', 'code', '# Not a header'], ['````', '```', '# Not a header', 'more']])
+def test_markdown_parser_unclosed_fence_reaches_the_end(content):
+	""" A fence that is never closed, even if it contains shorter fences, is code until the end of the document. """
+
+	parts = MarkdownParser(content).parse()
+
+	assert _lines_of(parts, SourceEntityType.CODE_BLOCK) == [slice(0, len(content))]
+	assert _lines_of(parts, SourceEntityType.HEADER_1) == []
+
+
+def test_markdown_parser_three_backtick_fence():
+	""" A regular three backtick fence closes with three backticks and keeps one TEXT leaf per line. """
+
+	content = ['```text', 'code', '```', 'After']
+	parts = MarkdownParser(content).parse()
+	code = next(part for part in parts if part['ent_type'] == SourceEntityType.CODE_BLOCK.value)
+
+	assert code['line'] == slice(0, 3)
+	assert [part['line'] for part in parts if part['parent'] == code['index']] == [0, 1, 2]
+	assert _lines_of(parts, SourceEntityType.PARAGRAPH) == [slice(3, 4)]
+
+
 def test_wiki_markdown_writer():
 	""" Renders basic blocks and tolerates the supported wikitext constructs. """
 
@@ -71,6 +151,20 @@ def test_wiki_markdown_writer():
 	assert writer._render_line('# item').startswith('1.')
 	assert writer._render_line('; term : definition').startswith('**term:**')
 	assert writer._render_inline(inline)
+
+
+def test_wiki_markdown_writer_inline_backreferences():
+	""" Inline links and emphasis keep the captured text instead of literal backreferences. """
+
+	writer = WikiMarkdownWriter(None)
+
+	assert writer._render_inline('[[Page]]') == 'Page'
+	assert writer._render_inline('[[Page|shown text]]') == 'shown text'
+	assert writer._render_inline('[https://example.com label]') == '[label](https://example.com)'
+	assert writer._render_inline("'''bold'''") == '**bold**'
+	assert writer._render_inline("''italic''") == '*italic*'
+	assert writer._render_inline("'''Riverside Robotics Club''' is a club at [[Riverside High School]].") == \
+		'**Riverside Robotics Club** is a club at Riverside High School.'
 
 
 def test_pdf_to_markdown(tmp_path):

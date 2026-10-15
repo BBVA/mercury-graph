@@ -1,11 +1,5 @@
 from enum import Enum
 
-try:
-	from litellm import completion
-
-except ImportError:
-	completion = None
-
 from .agentic import Agentic, AgenticRunInvalidState, AgenticRunInvalidRequest, AgenticRunFailed
 
 
@@ -34,6 +28,8 @@ class Agent(Agentic):
 	its Endpoint that can use it as a tool.
 
 	2. **Downstream**: Making the Agent aware of what tools it has access to, and how they work so it can create proper arguments.
+	Besides the capabilities of its tools, the model receives the description of every object they come from (e.g., what an ontology
+	contains) in a system message placed between `you_are` and `you_must`.
 
 	## Focus and Scope
 
@@ -67,6 +63,15 @@ class Agent(Agentic):
 	To connect to any external LLM, possibly providing credentials, note that anything inside the "completion" dictionary will be
 	passed as arguments to the litellm `completion()` method in addition to `messages` and `tools` (if applicable).
 
+	### Pulling the cost map from github
+
+	By default, litellm will pull the [model cost map](https://docs.litellm.ai/docs/proxy/custom_model_cost_map) from GitHub to keep it
+	updated, if you want to disable this behavior, set:
+
+	```bash
+	export LITELLM_LOCAL_MODEL_COST_MAP="True"
+	```
+
 	## Known Limitations
 
 	- For now, calls to Agents to not use parallel execution.
@@ -89,7 +94,9 @@ class Agent(Agentic):
 
 		self.states = AgentState
 
-		self.conf = extra_args
+		self.conf		= extra_args
+		self.completion = None
+		self.your_tools = None
 
 		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
@@ -106,20 +113,12 @@ class Agent(Agentic):
 			raise AgenticRunInvalidState
 
 		if type(request) == list:
-			messages = []
-
-			if self.you_are is not None:
-				messages.append(self.you_are)
-
-			if self.you_must is not None:
-				messages.append(self.you_must)
-
 			for msg in request:
 				if 'role' not in msg or 'content' not in msg:
 					self.log_error('Invalid message format in request.')
 					raise AgenticRunInvalidRequest
 
-				messages.append(msg)
+			messages = self._instructed(request)
 
 		else:
 			if request['name'] != self.name:
@@ -134,22 +133,14 @@ class Agent(Agentic):
 					args = next(iter(args.values()))
 
 				if type(args) is str:
-					messages = []
-
-					if self.you_are is not None:
-						messages.append(self.you_are)
-
-					if self.you_must is not None:
-						messages.append(self.you_must)
-
-					messages.append({'role': 'user', 'content': args})
+					messages = self._instructed([{'role': 'user', 'content': args}])
 
 				else:
 					self.log_error('Agent _run received invalid arguments.')
 					raise AgenticRunInvalidRequest
 
 		try:
-			ret = completion(messages = messages, **self.completion)
+			ret = self.completion(messages = messages, **self.comp_args)
 
 		except Exception as e:
 			self.log_error('Agent encountered an error during completion: %s' % str(e))
@@ -214,8 +205,8 @@ class Agent(Agentic):
 
 		while self._meta_['state'] < intent:
 			if self._meta_['state'] == self.states.INITIAL.value:
-				self.completion = self.conf.get('completion', None)
-				if self.completion is None:
+				self.comp_args = self.conf.get('completion', None)
+				if self.comp_args is None:
 					self.log_error('Completion configuration is missing for Agent %s' % self.id)
 					self._meta_['state'] = self.states.ERR_SETUP.value
 
@@ -251,9 +242,15 @@ class Agent(Agentic):
 					break
 
 			if self._meta_['state'] == self.states.SETUP_OK.value:
-				if completion is None:
-					self.log_error('Error importing completion from litellm')
-					self._meta_['state'] = self.states.ERR_COMPLETION.value
+				if self.completion is None:
+					try:
+						from litellm import completion
+
+					except ImportError:
+						self.log_error('Error importing completion from litellm')
+						self._meta_['state'] = self.states.ERR_COMPLETION.value
+
+					self.completion = completion
 
 					break
 
@@ -283,12 +280,54 @@ class Agent(Agentic):
 							return
 
 				if len(tools) > 0:
-					self.completion['tools'] = tools
+					self.comp_args['tools'] = tools
+
+				self.your_tools = self._tools_message()
 
 				self._meta_['state'] = self.states.READY.value
 
 				if just_once:
 					break
+
+
+	def _instructed(self, messages):
+		""" Returns the messages preceded by the instructions of the Agent: you_are, the description of its tools and you_must. """
+
+		instructed = []
+
+		if self.you_are is not None:
+			instructed.append(self.you_are)
+
+		if self.your_tools is not None:
+			instructed.append(self.your_tools)
+
+		if self.you_must is not None:
+			instructed.append(self.you_must)
+
+		return instructed + messages
+
+
+	def _tools_message(self):
+		""" Returns a system message describing the objects the tools of the Agent come from, or None if none of them has a description.
+
+		The description of an object (e.g., what an ontology contains) is not part of its capabilities, so without this message the model
+		would only know the names and descriptions of the functions.
+		"""
+
+		lines = [self._tool_line(agentic) for agentic in self.tools.values() if agentic.meta.get('description', '')]
+
+		if len(lines) == 0:
+			return None
+
+		return {'role': 'system', 'content': '\n'.join(['Your tools come from these objects:'] + lines)}
+
+
+	def _tool_line(self, agentic):
+		""" Returns the line describing one tool: its name, the names of its capabilities and its description. """
+
+		names = ', '.join(capability['function']['name'] for capability in agentic.meta.get('capabilities', []))
+
+		return '- %s (%s): %s' % (getattr(agentic, 'name', agentic.id), names, agentic.meta['description'])
 
 
 	def _capability(self, name, description):

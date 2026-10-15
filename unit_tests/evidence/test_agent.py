@@ -1,20 +1,21 @@
-import builtins
-import importlib
+import sys
+import types
 
 import pytest
 
 from mercury.graph.evidence import Agent
-from mercury.graph.evidence import agent as agent_module
 from mercury.graph.evidence.agentic import AgenticRunFailed, AgenticRunInvalidRequest, AgenticRunInvalidState
 
 
 class Tool:
 	"""Provides the minimum Agentic interface needed by Agent tool discovery."""
 
-	def __init__(self, tool_id, meta):
-		"""Stores a tool ID and its metadata dictionary."""
+	def __init__(self, tool_id, meta, name = None):
+		"""Stores a tool ID, its metadata dictionary and, optionally, its name."""
 		self.id = tool_id
 		self.meta = meta
+		if name is not None:
+			self.name = name
 
 
 class CompletionResult:
@@ -23,6 +24,18 @@ class CompletionResult:
 	def __init__(self, choice):
 		"""Stores one completion choice."""
 		self.choices = [choice]
+
+
+def set_litellm_completion(monkeypatch, completion):
+	"""Makes Agent's deferred LiteLLM import return the supplied completion callable.
+
+	Args:
+		monkeypatch (pytest.MonkeyPatch): pytest fixture used to restore the module cache.
+		completion (callable): callable returned by importing ``litellm.completion``.
+	"""
+	module = types.ModuleType('litellm')
+	module.completion = completion
+	monkeypatch.setitem(sys.modules, 'litellm', module)
 
 
 def agent_conf(**extra):
@@ -59,14 +72,17 @@ def test_agent_metadata_and_invalid_setup():
 
 
 def test_agent_pilot_states_and_tools(monkeypatch):
-	"""Verifies incremental setup, unavailable completion, and valid tool discovery."""
-	monkeypatch.setattr(agent_module, 'completion', lambda **kwargs: None)
+	"""Verifies incremental setup, deferred completion import, and valid tool discovery."""
+	set_litellm_completion(monkeypatch, lambda **kwargs: None)
 	agent = Agent(schema = 'any', extra_args = agent_conf(you_are = ['You are', 'helpful.'], you_must = 'Answer briefly.'))
 
 	agent.pilot(agent.states.READY.value, just_once = True)
 	assert agent.meta['state'] == agent.states.SETUP_OK.value
 	assert agent.you_are == {'role': 'system', 'content': 'You are\nhelpful.'}
 	assert agent.you_must == {'role': 'developer', 'content': 'Answer briefly.'}
+	agent.pilot(agent.states.READY.value, just_once = True)
+	assert agent.completion is not None
+	assert agent.meta['state'] == agent.states.SETUP_OK.value
 	agent.pilot(agent.states.READY.value, just_once = True)
 	assert agent.meta['state'] == agent.states.COMPLETION_OK.value
 	agent.pilot(agent.states.READY.value, just_once = True)
@@ -85,12 +101,8 @@ def test_agent_pilot_states_and_tools(monkeypatch):
 	with_tool = Agent(schema = 'tools', extra_args = agent_conf())
 	with_tool.add_tool(Tool('tool_id', {'capabilities': [capability]}))
 	with_tool.pilot(with_tool.states.READY.value)
-	assert with_tool.completion['tools'] == [capability]
-
-	monkeypatch.setattr(agent_module, 'completion', None)
-	missing_completion = Agent(schema = 'missing', extra_args = agent_conf())
-	missing_completion.pilot(missing_completion.states.READY.value)
-	assert missing_completion.meta['state'] == missing_completion.states.ERR_COMPLETION.value
+	with_tool.pilot(with_tool.states.READY.value)
+	assert with_tool.comp_args['tools'] == [capability]
 
 	missing_config = Agent(schema = 'config', extra_args = agent_conf())
 	del missing_config.conf['completion']
@@ -101,10 +113,11 @@ def test_agent_pilot_states_and_tools(monkeypatch):
 @pytest.mark.parametrize('meta', [{'state': 0}, {'capabilities': [{'type': 'invalid'}]}])
 def test_agent_pilot_rejects_invalid_tools(monkeypatch, meta):
 	"""Verifies tool discovery rejects missing and malformed capabilities."""
-	monkeypatch.setattr(agent_module, 'completion', lambda **kwargs: None)
+	set_litellm_completion(monkeypatch, lambda **kwargs: None)
 	agent = Agent(schema = 'tools', extra_args = agent_conf())
 	agent.add_tool(Tool('bad_tool', meta))
 
+	agent.pilot(agent.states.READY.value)
 	agent.pilot(agent.states.READY.value)
 
 	assert agent.meta['state'] == agent.states.ERR_BUILDING_TOOLS.value
@@ -119,12 +132,13 @@ def test_agent_run_requests_and_failures(monkeypatch):
 		calls.append(kwargs)
 		return CompletionResult({'content': 'answer'})
 
-	monkeypatch.setattr(agent_module, 'completion', complete)
+	set_litellm_completion(monkeypatch, complete)
 	agent = Agent(schema = 'run', extra_args = agent_conf(you_are = 'System.', you_must = 'Developer.'))
 
 	with pytest.raises(AgenticRunInvalidState):
 		agent.run({'name': 'test_agent', 'arguments': {'messages': []}})
 
+	agent.pilot(agent.states.READY.value)
 	agent.pilot(agent.states.READY.value)
 	assert agent.run({'name': 'test_agent', 'arguments': {'messages': [{'role': 'user', 'content': 'given'}]}}) == {'content': 'answer'}
 	assert calls[-1]['messages'] == [{'role': 'user', 'content': 'given'}]
@@ -152,28 +166,87 @@ def test_agent_run_requests_and_failures(monkeypatch):
 		"""Raises the error reported by a failed completion service."""
 		raise RuntimeError('unavailable')
 
-	monkeypatch.setattr(agent_module, 'completion', fail)
+	agent.completion = fail
 	with pytest.raises(AgenticRunFailed):
 		agent.run({'name': 'test_agent', 'arguments': {'messages': []}})
 	assert agent.meta['state'] == agent.states.ERR_COMPLETION.value
 
 
-def test_agent_handles_missing_litellm_import(monkeypatch):
-	"""Verifies importing Agent tolerates an unavailable optional litellm dependency."""
-	original_import = builtins.__import__
+def _ready_agent(monkeypatch, *tools, **conf):
+	"""Returns a ready Agent with the given tools whose completion records its arguments in agent.calls."""
+	calls = []
+	set_litellm_completion(monkeypatch, lambda **kwargs: calls.append(kwargs) or CompletionResult({'content': 'answer'}))
+	agent = Agent(schema = 'described', extra_args = agent_conf(**conf))
+	for tool in tools:
+		agent.add_tool(tool)
+	agent.pilot(agent.states.READY.value)
+	agent.pilot(agent.states.READY.value)
+	agent.calls = calls
 
-	def import_without_litellm(name, *args, **kwargs):
-		"""Raises ImportError only for litellm imports."""
-		if name == 'litellm':
-			raise ImportError('litellm unavailable')
+	return agent
 
-		return original_import(name, *args, **kwargs)
 
-	monkeypatch.setattr(builtins, '__import__', import_without_litellm)
-	importlib.reload(agent_module)
-	assert agent_module.completion is None
-	monkeypatch.undo()
-	importlib.reload(agent_module)
+def _capabilities(*names):
+	"""Returns capabilities with the given function names."""
+	return [{'type': 'function', 'function': {'name': name}} for name in names]
+
+
+def test_agent_describes_the_objects_its_tools_come_from(monkeypatch):
+	"""The descriptions of the tools (and the names of their capabilities) reach the model in a system message, after you_are and
+	before you_must. Tools without a description are left out.
+	"""
+	known_ids = Tool('ep/agentic_graph_known_ids', {'description': 'Instances that have been identified.',
+													'capabilities': _capabilities('search_known_ids', 'edges_known_ids')}, name = 'known_ids')
+	silent = Tool('ep/silent', {'description': '', 'capabilities': _capabilities('quiet')})
+	agent = _ready_agent(monkeypatch, known_ids, silent, you_are = 'System.', you_must = 'Developer.')
+
+	agent.run({'name': 'test_agent', 'arguments': {'query': 'Who is Noah?'}})
+
+	assert agent.calls[-1]['messages'] == [
+		{'role': 'system', 'content': 'System.'},
+		{'role': 'system', 'content': 'Your tools come from these objects:\n'
+									  '- known_ids (search_known_ids, edges_known_ids): Instances that have been identified.'},
+		{'role': 'developer', 'content': 'Developer.'},
+		{'role': 'user', 'content': 'Who is Noah?'}
+	]
+
+
+def test_agent_without_tool_descriptions_adds_no_message(monkeypatch):
+	"""Without described tools there is no message about them, and messages given in a request are sent as they are."""
+	agent = _ready_agent(monkeypatch, Tool('ep/tool', {'capabilities': _capabilities('tool')}), you_are = 'System.')
+
+	agent.run([{'role': 'user', 'content': 'Hi.'}])
+
+	assert agent.calls[-1]['messages'] == [{'role': 'system', 'content': 'System.'}, {'role': 'user', 'content': 'Hi.'}]
+
+	described = _ready_agent(monkeypatch, Tool('ep/tool', {'description': 'A tool.', 'capabilities': _capabilities('tool')}))
+	described.run({'name': 'test_agent', 'arguments': {'messages': [{'role': 'user', 'content': 'Hi.'}]}})
+
+	assert described.calls[-1]['messages'] == [{'role': 'user', 'content': 'Hi.'}]
+
+
+def test_agent_imports_litellm_during_pilot(monkeypatch):
+	"""Verifies LiteLLM completion is imported only after Agent setup finishes."""
+	def complete(**kwargs):
+		"""Provides a completion callable for the deferred LiteLLM import."""
+		return None
+
+	set_litellm_completion(monkeypatch, complete)
+	agent = Agent(schema = 'deferred_import', extra_args = agent_conf())
+
+	assert agent.completion is None
+	agent.pilot(agent.states.READY.value, just_once = True)
+	assert agent.completion is None
+	agent.pilot(agent.states.READY.value, just_once = True)
+	assert agent.completion is complete
+	assert agent.completion() is None
+
+	monkeypatch.setitem(sys.modules, 'litellm', None)
+	missing = Agent(schema = 'missing_import', extra_args = agent_conf(), logger = [])
+	missing.pilot(missing.states.READY.value, just_once = True)
+	with pytest.raises(UnboundLocalError):
+		missing.pilot(missing.states.READY.value, just_once = True)
+	assert missing.meta['state'] == missing.states.ERR_COMPLETION.value
 
 
 # if __name__ == "__main__":

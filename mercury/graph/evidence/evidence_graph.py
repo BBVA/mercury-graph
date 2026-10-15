@@ -1,12 +1,9 @@
 import os, pickle
 
-import pandas as pd
-import networkx as nx
-
 from .agentic import Agentic, AgenticRunInvalidRequest
 from .source import Source
-from .agentic_graph import GraphState, MultiGraph
-from .formalizer import Formalizer
+from .agentic_graph import GraphState, MultiGraph, graph_from_files
+from .formalizer import Formalizer, validate_initial_graph
 from .agent import Agent
 
 
@@ -17,7 +14,7 @@ class EvidenceGraph(Agentic):
 
 	This is the core of the architecture.
 
-	It is essentially a multigraph, whose nodes and edges are strictly connected by their ids to ontologies and hold
+	It is essentially a multigraph, whose nodes and edges are strictly connected by their ids to the ontology and hold
 	information about all the sources that contain every mention to the entities and relationships represented in it
 	and evidence metrics associated with each piece of information.
 
@@ -42,15 +39,24 @@ class EvidenceGraph(Agentic):
 
 	The graph is persisted to disk using a pickle file and a configuration mechanism identical to that of `AgenticGraph`.
 
-	## Connection to ontologies is via the Formalizer
+	## Connection to the ontology is via the Formalizer
 
 	An `EvidenceGraph` is connected to exactly one `Formalizer`. The tasks themselves the Formalizer does (`id_nodes` identifying nodes,
 	`id_edges` identifying edges and `is_same` determining identity and category membership) are treated as separate functionality to
 	make it possible to have them handled by an Agent or an agent that supervises another Agentic, etc.
 
-	The `Formalizer` must have its three ontology `AgenticGraph` objects (entities, relationships, known_ids) defined. And the
-	`EvidenceGraph`	will modify these ontology objects as it integrates new evidence into the graph. It is highly recommended not to share
-	these `AgenticGraph` ontology objects with other `EvidenceGraph` instances.
+	The `Formalizer` has one ontology: an `AgenticGraph` whose nodes are the types of entities and whose edges are the types of
+	relationships (see [Ontologies in EvidenceGraph](evidence_ontologies.md)). The `EvidenceGraph` reads it through the Formalizer.
+	Currently, the ontology is only initialized from its .csv files and nothing modifies it at runtime.
+
+	## Initial graph
+
+	The graph can start from an initial graph: the instances known beforehand and the relationships between them, given as
+	`"initial_nodes"` and `"initial_edges"` files in the configuration. They are only loaded when there is no persisted graph. Once the
+	Formalizer is connected, the initial graph is checked against its ontology with
+	[`validate_initial_graph()`][mercury.graph.evidence.formalizer.validate_initial_graph]. If any problem is found, every problem is
+	logged, the EvidenceGraph stops in the `ERR_BUILDING` state and the graph is discarded, so that it is not persisted and is checked
+	again on the next start.
 
 	## Extraction of candidate entities and relationships
 
@@ -110,7 +116,7 @@ class EvidenceGraph(Agentic):
 
 	To answer questions about the content of the EvidenceGraph, we use a specialized Agent. The Agent has access to: the EvidenceGraph,
 	the Formalizer and the Sources that the EvidenceGraph has. The Agent can use the Formalizer to identify the entities and relationships
-	in the query and relate them to the ontologies defined in the EvidenceGraph, possibly including user confirmation.
+	in the query and relate them to the ontology of the EvidenceGraph, possibly including user confirmation.
 
 	Finding the best way to query the EvidenceGraph through the Agent is an ongoing research topic.
 
@@ -143,11 +149,11 @@ class EvidenceGraph(Agentic):
 
 		self._graph	= None
 
+		self._from_initial_graph = False
+
 		self._formalizer = None
 
-		self._entities = None
-		self._relation = None
-		self._known_id = None
+		self._ontology = None
 
 		self._id_nodes = None
 		self._id_edges = None
@@ -220,19 +226,6 @@ class EvidenceGraph(Agentic):
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
 
-		def new_graph():
-			""" Creates an empty new graph when there is no persisted graph to load. The pandas dataframes are empty with just
-			column headers as required by a nx.digraph. The class `MultiGraph` overrides the behavior and converts it into a multigraph.
-			"""
-
-			keys = {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}
-
-			nodes = pd.DataFrame({keys['id']: pd.Series(dtype='str')})
-
-			edges = pd.DataFrame({keys['src']: pd.Series(dtype='str'), keys['dst']: pd.Series(dtype='str')})
-
-			return MultiGraph(data = edges, keys = keys, nodes = nodes)
-
 		if self.meta['state'] < 0:
 			self.log_error('EvidenceGraph is in error state %d' % self._meta_['state'])
 
@@ -241,9 +234,10 @@ class EvidenceGraph(Agentic):
 		while self._meta_['state'] < intent:
 			if self._meta_['state'] == self.states.INITIAL.value:
 				try:
+					self._from_initial_graph = False
 					self._fname = self.conf.get('persistence', None)
 					if self._fname is None:
-						self._graph = new_graph()
+						self._graph = self._graph_from_initial_files()
 					else:
 						self._fname = self._fname['path']
 						parent_dir	= os.path.dirname(self._fname)
@@ -256,10 +250,10 @@ class EvidenceGraph(Agentic):
 								ntx = pickle.load(f)			# A NetworkX graph object saved by this class.
 							self._graph = MultiGraph(data = ntx)
 						else:
-							self._graph = new_graph()
+							self._graph = self._graph_from_initial_files()
 
-				except:
-					self.log_error('Graph could not be created and initialized for EvidenceGraph "%s".' % self.name)
+				except Exception as e:
+					self.log_error('Graph could not be created and initialized for EvidenceGraph "%s": %s' % (self.name, e))
 					self._meta_['state'] = self.states.ERR_GRAPH_INIT.value
 					break
 
@@ -269,13 +263,43 @@ class EvidenceGraph(Agentic):
 					break
 
 			if self._meta_['state'] == self.states.GRAPH_LOADED_OK.value:
-				if self._connect_downstream():
-					self._meta_['state'] = self.states.READY.value
-
-				else:
+				if not self._connect_downstream():
 					self._meta_['state'] = self.states.ERR_BUILDING.value
 
+				elif not self._initial_graph_is_valid():
+					self._graph = None			# Not to be persisted: the next start would load it from the pickle without validating it.
+					self._meta_['state'] = self.states.ERR_BUILDING.value
+
+				else:
+					self._meta_['state'] = self.states.READY.value
+
 				break
+
+
+	def _graph_from_initial_files(self):
+		""" Returns the graph built from the initial graph in the configuration ("initial_nodes" and "initial_edges"), or an empty graph if
+		there is none. It is only used when there is no persisted graph.
+		"""
+
+		self._from_initial_graph = self.conf.get('initial_nodes', None) is not None
+
+		return graph_from_files(self.conf.get('initial_nodes', None), self.conf.get('initial_edges', None), self.conf.get('file_format', None))
+
+
+	def _initial_graph_is_valid(self):
+		""" Returns True unless the graph has just been built from the initial graph and it does not match the ontology, in which case
+		every problem is logged.
+		"""
+
+		if not self._from_initial_graph:
+			return True
+
+		errors = validate_initial_graph(self._graph.networkx, self._ontology)
+
+		for error in errors:
+			self.log_error('Invalid initial graph in EvidenceGraph %s: %s' % (self.id, error))
+
+		return len(errors) == 0
 
 
 	def crawl(self, index):
@@ -292,7 +316,7 @@ class EvidenceGraph(Agentic):
 	def _connect_downstream(self):
 		""" Connects the EvidenceGraph to downstream components or systems.
 
-		This parses the configuration and locates every necessary downstream Agentic: the Formalizer, its ontologies, Agentics with
+		This parses the configuration and locates every necessary downstream Agentic: the Formalizer, its ontology, Agentics with
 		capabilities to do entity extraction, etc. and the Sources.
 
 		Returns:
@@ -339,9 +363,7 @@ class EvidenceGraph(Agentic):
 
 		self._formalizer = self.tools[key]
 
-		self._entities = self._formalizer._entities
-		self._relation = self._formalizer._relation
-		self._known_id = self._formalizer._known_id
+		self._ontology = self._formalizer._ontology
 
 		ag = Agent(schema = None, extra_args = None)
 		class_name_agent = ag.id
@@ -409,9 +431,7 @@ class EvidenceGraph(Agentic):
 		self._graph	= None
 
 		self._formalizer = None
-		self._entities = None
-		self._relation = None
-		self._known_id = None
+		self._ontology = None
 
 		self._id_nodes = None
 		self._id_edges = None

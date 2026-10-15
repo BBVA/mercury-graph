@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="240" viewBox="0 0 480 240" role="img" aria-labelledby="title desc">
+  <title id="title">Helios Solar Car</title>
+  <desc id="desc">A simple drawing of a small solar car.</desc>
+  <rect width="480" height="240" fill="#eef6ff"/>
+  <rect x="120" y="100" width="230" height="62" rx="10" fill="#276c9e"/>
+  <rect x="160" y="62" width="150" height="55" fill="#183a59"/>
+  <path d="M170 72h130M170 84h130M170 96h130M190 62v55M230 62v55M270 62v55" stroke="#8ed1ff" stroke-width="3"/>
+  <circle cx="170" cy="174" r="25" fill="#263238"/>
+  <circle cx="310" cy="174" r="25" fill="#263238"/>
+  <circle cx="170" cy="174" r="10" fill="#b9d7e8"/>
+  <circle cx="310" cy="174" r="10" fill="#b9d7e8"/>
+  <text x="240" y="215" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#183a59">Helios Solar Car</text>
+</svg>

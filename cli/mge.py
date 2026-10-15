@@ -10,6 +10,20 @@ from fastapi.responses import FileResponse, RedirectResponse
 import mercury.graph as mg
 
 
+def mge_home():
+    """ Returns the path to the mge client home directory to locate its resource files. """
+
+    path = '%s/cli/' % pathlib.Path(mg.__file__).resolve().parent.parent.parent     # mg points to <.>/mercury/graph/__init__.py
+    if os.path.exists('%s/new_endpoint_template' % path):
+        return path
+
+    path = '%s/cli/' % pathlib.Path(mg.__file__).resolve().parent                   # mg points to <.>/__init__.py
+    if os.path.exists('%s/new_endpoint_template' % path):
+        return path
+
+    return str(pathlib.Path(__file__).resolve().parent)
+
+
 class MgeFileLogger:
     """ A minimal append-only file logger for Agentic events.
 
@@ -62,7 +76,7 @@ class MgeHttpServe:
     def favicon(self):
         """ Returns the Mercury-graph favicon. """
 
-        return FileResponse('%s/favicon.ico' % pathlib.Path(__file__).resolve().parent, media_type = 'image/x-icon')
+        return FileResponse('%s/favicon.ico' % mge_home(), media_type = 'image/x-icon')
 
 
     def meta(self):
@@ -237,7 +251,7 @@ class MgeCli:
             print('Error: The name "%s" is not valid. It must be a string of letters, numbers, and underscores.' % self.name)
             sys.exit(1)
 
-        ifn = str(pathlib.Path(__file__).resolve().parent / 'new_endpoint_template')
+        ifn = '%s/new_endpoint_template' % mge_home()
         if not os.path.exists(ifn):
             print('Error: The source template directory "%s" does not exist. Try re-installing the package.' % ifn)
             sys.exit(1)

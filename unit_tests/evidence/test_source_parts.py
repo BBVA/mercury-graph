@@ -295,5 +295,22 @@ def test_source_entity(tmp_path):
 	assert entity.child('source|source.md|header|missing') is None
 
 
+def test_source_file_paragraph_text(tmp_path):
+	""" The TEXT leaf of a paragraph written over several lines returns the whole paragraph. """
+
+	path = tmp_path / 'source.md'
+	path.write_text('# Source\n\nFirst half of a\nsentence with a [link](a.md).\n')
+	maker = SourceMaker('source', 'markdown_tree', None, str(tmp_path), 10, [], None)
+	file = SourceFile('source|source.md', maker, str(path))
+
+	header = file.child(file.get_children_idx(file.index)[0])
+	paragraph = header.child([i for i in header.get_children_idx() if i.endswith('paragraph_1')][0])
+	text, link = [paragraph.child(i) for i in paragraph.get_children_idx()]
+
+	assert text.content == 'First half of a sentence with a [link](a.md).'
+	assert link.content == '[link](a.md)'
+	assert paragraph.content == ''
+
+
 # if __name__ == "__main__":
 # 	pytest.main([__file__])
