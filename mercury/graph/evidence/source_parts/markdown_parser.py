@@ -11,6 +11,9 @@ class MarkdownParser:
 	multiline entity or a character slice for a single line entity.  SourceFile owns
 	the construction of SourceEntity objects from these items.
 
+	The text of a paragraph is a single TEXT leaf spanning all its lines, so sentences
+	are never split by line breaks.  Links and images inside it are separate leaves.
+
 	Args:
 		content (list of str): Markdown lines without their newline characters.
 	"""
@@ -90,11 +93,9 @@ class MarkdownParser:
 			fence = self.FENCE.match(text)
 
 			if fence:
-				marker = fence.group(1)[0]
-
 				if in_fence is None:
-					in_fence = marker
-				elif marker == in_fence:
+					in_fence = fence.group(1)
+				elif self._closes_fence(text, in_fence):
 					in_fence = None
 
 				continue
@@ -172,10 +173,10 @@ class MarkdownParser:
 	def _fenced_code(self, line, parent):
 		""" Adds a fenced code block and line text children. """
 
-		marker = self.FENCE.match(self._content[line]).group(1)[0]
+		opening = self.FENCE.match(self._content[line]).group(1)
 		end = line + 1
 		while end < len(self._content):
-			if self.FENCE.match(self._content[end]) and self.FENCE.match(self._content[end]).group(1)[0] == marker:
+			if self._closes_fence(self._content[end], opening):
 				end += 1
 
 				break
@@ -188,6 +189,14 @@ class MarkdownParser:
 			self._add('text', part, SourceEntityType.TEXT.value, item, slice(0, len(self._content[item])), None)
 
 		return end
+
+
+	def _closes_fence(self, text, opening):
+		""" Returns whether a line closes a fence: same marker character, repeated at least as many times as the opening fence. """
+
+		fence = self.FENCE.match(text)
+
+		return bool(fence) and fence.group(1)[0] == opening[0] and len(fence.group(1)) >= len(opening)
 
 
 	def _quote(self, line, parent, headers):
@@ -263,7 +272,7 @@ class MarkdownParser:
 
 
 	def _paragraph(self, line, parent, section, headers):
-		""" Adds adjacent ordinary lines as a paragraph with inline children. """
+		""" Adds adjacent ordinary lines as a paragraph with one TEXT child for its whole text and LINK and IMAGE children. """
 
 		end = line
 		while end < len(self._content) and end not in headers and self._content[end].strip():
@@ -276,19 +285,20 @@ class MarkdownParser:
 			end += 1
 
 		part = self._add('paragraph', parent, SourceEntityType.PARAGRAPH.value, slice(line, end), None, 'Content of %s' % section)
+		self._add('text', part, SourceEntityType.TEXT.value, slice(line, end), None, None)
 
 		for item in range(line, end):
-			self._inline(part, item, 0, len(self._content[item]))
+			self._inline(part, item, 0, len(self._content[item]), text = False)
 
 		return end
 
 
-	def _inline(self, parent, line, start, stop):
-		""" Adds TEXT, LINK, and IMAGE leaves which partition a range in one line. """
+	def _inline(self, parent, line, start, stop, text = True):
+		""" Adds TEXT, LINK, and IMAGE leaves which partition a range in one line. With text = False, only LINK and IMAGE leaves. """
 
 		cursor = start
 		for match in self.LINK.finditer(self._content[line], start, stop):
-			if match.start() > cursor:
+			if text and match.start() > cursor:
 				self._add('text', parent, SourceEntityType.TEXT.value, line, slice(cursor, match.start()), None)
 
 			typ = SourceEntityType.IMAGE.value if match.group(0).startswith('!') else SourceEntityType.LINK.value
@@ -296,7 +306,7 @@ class MarkdownParser:
 			self._add(etp, parent, typ, line, slice(match.start(), match.end()), None)
 			cursor = match.end()
 
-		if cursor < stop:
+		if text and cursor < stop:
 			self._add('text', parent, SourceEntityType.TEXT.value, line, slice(cursor, stop), None)
 
 

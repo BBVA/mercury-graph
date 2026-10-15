@@ -1,3 +1,6 @@
+import sys
+import types
+
 import pytest
 
 import mercury.graph.evidence.source as source_module
@@ -59,6 +62,7 @@ def test_source_pilot_outcomes(tmp_path, monkeypatch):
 
 		def __init__(self, index, typ, src, dst, size, extensions, pdf):
 			self.state = SourceState.INITIAL.value
+			self.src = src
 
 		def build_indices(self):
 			""" Return the configured index-building result. """
@@ -72,6 +76,14 @@ def test_source_pilot_outcomes(tmp_path, monkeypatch):
 	assert just_once.meta['state'] == SourceState.MAKER_INIT_OK.value
 	just_once.pilot(100, just_once = True)
 	assert just_once.meta['state'] == SourceState.MAKER_READY_OK.value
+
+	(tmp_path / 'source').mkdir()
+	monkeypatch.chdir(tmp_path)
+	relative = _conf(tmp_path)
+	relative['src_path'] = 'source'
+	relative_source = Source(schema = 'relative', extra_args = relative)
+	relative_source.pilot(100, just_once = True)
+	assert relative_source._maker.src == str(tmp_path / 'source')
 
 	failed_indices = Source(schema = 'failed_indices', extra_args = _conf(tmp_path))
 	DummyMaker.build_result = False
@@ -137,6 +149,16 @@ def test_source_tree_delegation(tmp_path):
 
 def test_source_chroma_setup(tmp_path, monkeypatch):
 	""" Exercise Chroma client and collection setup outcomes. """
+	def set_chroma_client(client):
+		"""Makes Source's deferred Chroma import use client as PersistentClient.
+
+		Args:
+			client (callable): replacement Chroma PersistentClient constructor.
+		"""
+		module = types.ModuleType('chromadb')
+		module.PersistentClient = client
+		monkeypatch.setitem(sys.modules, 'chromadb', module)
+
 	conf = _conf(tmp_path)
 	s = Source(schema = 'chroma', extra_args = conf, logger = [])
 	assert s._setup_chroma_db() is True
@@ -144,7 +166,7 @@ def test_source_chroma_setup(tmp_path, monkeypatch):
 	s.conf['chroma_path'] = str(tmp_path / 'chroma')
 	s.conf['chroma_descriptions_collection_name'] = 'descriptions'
 	s.conf['chroma_chunks_collection_name'] = 'chunks'
-	monkeypatch.setattr(source_module.chroma, 'PersistentClient', lambda path: (_ for item in ()).throw(RuntimeError()))
+	set_chroma_client(lambda path: (_ for item in ()).throw(RuntimeError()))
 	assert s._setup_chroma_db() is False
 
 	class Client:
@@ -154,7 +176,7 @@ def test_source_chroma_setup(tmp_path, monkeypatch):
 			""" Raise an error while creating a collection. """
 			raise RuntimeError()
 
-	monkeypatch.setattr(source_module.chroma, 'PersistentClient', lambda path: Client())
+	set_chroma_client(lambda path: Client())
 	assert s._setup_chroma_db() is False
 
 	class ReadyClient:
@@ -164,7 +186,7 @@ def test_source_chroma_setup(tmp_path, monkeypatch):
 			""" Return a collection object for name. """
 			return {'name': name}
 
-	monkeypatch.setattr(source_module.chroma, 'PersistentClient', lambda path: ReadyClient())
+	set_chroma_client(lambda path: ReadyClient())
 	assert s._setup_chroma_db() is True
 	assert s._chroma_descr == {'name': 'descriptions'}
 	assert s._chroma_chunks == {'name': 'chunks'}

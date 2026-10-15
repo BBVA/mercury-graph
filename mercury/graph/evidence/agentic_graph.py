@@ -9,6 +9,154 @@ from .agentic import Agentic, AgenticRunInvalidRequest
 from mercury.graph.core import Graph
 
 
+DEFAULT_FILE_FORMAT = {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}	# Every key can be set in "file_format".
+
+MAX_RESULTS = 50		# Default maximum number of entries in the answer of a capability (configurable as "max_results").
+TRUNCATED	= {'truncated': True, 'hint': 'There are more results. Ask for something more specific (a longer id or text, or a smaller depth).'}
+
+_MISSING	= object()	# Returned by AgenticGraph._subtree() for an id that is not in the navigation tree.
+
+
+def parent_of(index):
+	""" Returns the parent of a hierarchical id (the id without its last `|` level) or None if it has a single level. """
+
+	return index.rsplit('|', 1)[0] if '|' in index else None
+
+
+def descends_from(concept, ancestor):
+	""" Returns True if concept is ancestor or one of its descendants in the `|` hierarchy (person_group does not descend from person). """
+
+	return concept == ancestor or concept.startswith(ancestor + '|')
+
+
+def _positive_int(value, default):
+	""" Returns value as an integer if it is (or is text for) a number greater than zero and default otherwise. """
+
+	try:
+		return int(value) if int(value) > 0 else default
+
+	except (TypeError, ValueError):
+		return default
+
+
+def _as_bool(value):
+	""" Returns False for False or a text such as "false", "no" or "0" and True for anything else. """
+
+	return str(value).strip().lower() not in ('false', 'no', '0')
+
+
+def _role(attr, concept, inherited):
+	""" Returns the role ('src', 'dst' or 'both') of a type of entity in a relationship given its attributes, or None if it takes no part.
+	With inherited, a type of entity also takes part where one of its ancestors does.
+	"""
+
+	roles = [end for end in ('src', 'dst') if (descends_from(concept, attr[end]) if inherited else concept == attr[end])]
+
+	if len(roles) == 0:
+		return None
+
+	return roles[0] if len(roles) == 1 else 'both'
+
+
+def _parameters(required, **properties):
+	""" Returns the JSON schema of the parameters of a capability. """
+
+	return {'type': 'object', 'properties': properties, 'required': required}
+
+
+def _named(value, name):
+	""" Returns a copy of a capability definition with {name} replaced by the name of the AgenticGraph in every text. """
+
+	if isinstance(value, dict):
+		return {key: _named(item, name) for key, item in value.items()}
+
+	if isinstance(value, list):
+		return [_named(item, name) for item in value]
+
+	return value.replace('{name}', name) if isinstance(value, str) else value
+
+
+LIST = {'type': 'array', 'items': {'type': 'object'}}
+
+CAPABILITIES = {
+	'children_entities_by_idx': {
+		'description': 'List the types of entity under an id in the ontology "{name}", with their definitions. Ids are hierarchical, with '
+					   'levels separated by "|" (e.g., "parent|child"). Use "" to list the top level and depth to see several levels at once. '
+					   'Entries with "more": true have children of their own.',
+		'parameters': _parameters(
+			['index'],
+			index = {'type': 'string', 'description': 'Exact id, with levels separated by "|" (e.g., "parent|child"). Use "" for the top level.'},
+			depth = {'type': 'integer', 'description': 'Number of levels to go down. Defaults to 1.'}
+		),
+		'returns': LIST
+	},
+	'entity_by_idx': {
+		'description': 'Read a type of entity of the ontology "{name}" by its exact id: its properties, such as its definition, and its '
+					   'ancestors, which tell what kind of thing it is. Returns null if the id is not a type of entity; use '
+					   'search_entities_{name} to find ids.',
+		'parameters': _parameters(
+			['index'],
+			index = {'type': 'string', 'description': 'Exact id of the type of entity, with levels separated by "|" (e.g., "parent|child").'}
+		),
+		'returns': {'type': 'object'}
+	},
+	'search_entities': {
+		'description': 'Find the types of entity of the ontology "{name}" whose id or definition contains a text, ignoring case. Use it '
+					   'first when you do not know the exact id.',
+		'parameters': _parameters(
+			['text'],
+			text  = {'type': 'string', 'description': 'Text to find, such as a name or a word of a definition.'},
+			limit = {'type': 'integer', 'description': 'Maximum number of results. Defaults to 20.'}
+		),
+		'returns': LIST
+	},
+	'children_relationships_by_idx': {
+		'description': 'List the types of relationship under an id in the ontology "{name}", with their definitions and the types of entity '
+					   'they connect (src and dst). Ids are hierarchical, with levels separated by "|" (e.g., "parent|child"). Use "" to '
+					   'list the top level and depth to see several levels at once. Entries with "more": true have children of their own.',
+		'parameters': _parameters(
+			['index'],
+			index = {'type': 'string', 'description': 'Exact id, with levels separated by "|" (e.g., "parent|child"). Use "" for the top level.'},
+			depth = {'type': 'integer', 'description': 'Number of levels to go down. Defaults to 1.'}
+		),
+		'returns': LIST
+	},
+	'relationship_by_idx': {
+		'description': 'Read a type of relationship of the ontology "{name}" by its exact id: its properties (the types of entity it '
+					   'connects, src and dst, and its definition) and its ancestors. Returns null if the id is not a type of relationship; '
+					   'use search_relationships_{name} to find ids.',
+		'parameters': _parameters(
+			['index'],
+			index = {'type': 'string', 'description': 'Exact id of the type of relationship, with levels separated by "|" (e.g., '
+													  '"parent|child").'}
+		),
+		'returns': {'type': 'object'}
+	},
+	'search_relationships': {
+		'description': 'Find the types of relationship of the ontology "{name}" whose id or definition contains a text, ignoring case. Use '
+					   'it first when you do not know the exact id.',
+		'parameters': _parameters(
+			['text'],
+			text  = {'type': 'string', 'description': 'Text to find, such as a verb or a word of a definition.'},
+			limit = {'type': 'integer', 'description': 'Maximum number of results. Defaults to 20.'}
+		),
+		'returns': LIST
+	},
+	'relations_for': {
+		'description': 'Get the types of relationship that a type of entity can take part in according to the ontology "{name}", and '
+					   'whether it is their source (src), destination (dst) or both. Includes those of its ancestors unless inherited is '
+					   'false.',
+		'parameters': _parameters(
+			['concept'],
+			concept	  = {'type': 'string', 'description': 'Exact id of a type of entity, with levels separated by "|" (e.g., "parent|child").'},
+			inherited = {'type': 'boolean', 'description': 'Include the relationships declared for the ancestors of the type of entity. '
+														   'Defaults to true.'}
+		),
+		'returns': LIST
+	}
+}
+
+
 class GraphState(Enum):
 	""" The `GraphState` is an enumeration that defines all possible states of an AgenticGraph. """
 
@@ -72,6 +220,298 @@ class MultiGraph(Graph):
 		return l
 
 
+def graph_from_files(nodes = None, edges = None, file_format = None):
+	""" Returns a MultiGraph built from a file of nodes and a file of edges (empty if there are none).
+
+	Every id must be unique, and every src and dst of the edges must be one of the nodes. Edges cannot be loaded without nodes.
+
+	Args:
+		nodes (dict): the optional file of nodes, a dictionary with a "type" ("csv" or "pickle") and a "path".
+		edges (dict): the optional file of edges, like nodes.
+		file_format (dict): the optional names of the columns ("src", "dst" and "id"), "directed" and the separator ("sep") of the .csv
+			files. Every key left out takes its default value.
+
+	Returns:
+		(MultiGraph): the graph.
+	"""
+
+	keys = {**DEFAULT_FILE_FORMAT, **(file_format or {})}
+
+	nodes = _read_table(nodes, keys['sep'])
+	edges = _read_table(edges, keys['sep'])
+
+	if nodes is not None:
+		_check_unique_ids(nodes, keys, 'Nodes')
+
+	if edges is None:
+		edges = _no_edges(keys)
+	else:
+		_check_edge_ends(nodes, edges, keys)
+		_check_unique_ids(edges, keys, 'Edges')
+
+	return MultiGraph(data = edges, keys = keys, nodes = nodes)
+
+
+def _read_table(spec, sep):
+	""" Returns the pandas DataFrame described by spec (a "type" and a "path"), or None if there is no spec. """
+
+	if spec is None:
+		return None
+
+	if spec['type'] == 'csv':
+		return pd.read_csv(spec['path'], sep = sep)
+
+	if spec['type'] == 'pickle':
+		return pd.read_pickle(spec['path'])
+
+	raise ValueError('Unsupported file type "%s".' % spec['type'])
+
+
+def _check_unique_ids(table, keys, kind):
+	""" Raises a ValueError listing every id that is repeated in table (the nodes or the edges, as named by kind).
+
+	Without this check, NetworkX would silently merge repeated nodes (and edges with the same ends), keeping the last attributes.
+	"""
+
+	ids		 = table[keys['id']]
+	repeated = ids[ids.duplicated()].unique()
+
+	if len(repeated) > 0:
+		raise ValueError('%s have repeated ids: %s.' % (kind, ', '.join('"%s"' % index for index in repeated)))
+
+
+def _check_edge_ends(nodes, edges, keys):
+	""" Raises a ValueError if there are no nodes or if any src or dst of the edges is not one of them (all are listed at once).
+
+	Without this check, NetworkX would silently create a node, without any attributes, for every undeclared src or dst.
+	"""
+
+	if nodes is None:
+		raise ValueError('Edges cannot be loaded without a file of nodes.')
+
+	undeclared = _undeclared_ends(set(nodes[keys['id']]), edges, keys)
+
+	if len(undeclared) > 0:
+		raise ValueError('Edges refer to nodes that are not declared: %s.' % ', '.join(undeclared))
+
+
+def _undeclared_ends(declared, edges, keys):
+	""" Returns a description of every src or dst of the edges that is not in declared, e.g. '"c" (dst of "e1")'. """
+
+	undeclared = []
+	for _, row in edges.iterrows():
+		for end in ('src', 'dst'):
+			if row[keys[end]] not in declared:
+				undeclared.append('"%s" (%s of "%s")' % (row[keys[end]], end, row[keys['id']]))
+
+	return undeclared
+
+
+def _no_edges(keys):
+	""" Returns an empty DataFrame of edges with just the column headers required by a graph. """
+
+	return pd.DataFrame({keys['src']: pd.Series(dtype = 'str'), keys['dst']: pd.Series(dtype = 'str')})
+
+
+def _tree(ids):
+	""" Returns the tree of nested dictionaries of hierarchical ids: every level is a key whose value is the dictionary of its children,
+	or None if it has none.
+	"""
+
+	tree = {}
+	for index in ids:
+		_add_to_tree(tree, index.split('|'))
+
+	return tree
+
+
+def _add_to_tree(tree, levels):
+	""" Adds the levels of an id to a tree, creating the dictionaries it needs. A parent added after its children keeps them. """
+
+	for level in levels[:-1]:
+		if tree.get(level, None) is None:
+			tree[level] = {}
+
+		tree = tree[level]
+
+	if levels[-1] not in tree:
+		tree[levels[-1]] = None
+
+
+def _limited(entries, limit):
+	""" Returns at most limit entries, followed by TRUNCATED if some were left out. """
+
+	return entries[:limit] + [TRUNCATED] if len(entries) > limit else entries
+
+
+class NavigableTree:
+	""" A tree of hierarchical ids (with levels separated by `|`) and the properties of each id, navigated by the capabilities of an
+	AgenticGraph. For internal use of AgenticGraph only, which has one for its entities (its nodes) and one for its relationships (its
+	edges).
+
+	Its public methods answer the capabilities: they take the arguments given by an agent and return the answer, limited to max_results
+	entries. Ids are levels of the tree: an id without properties (e.g., `person|student` when only `person|student|Noah` is defined) is
+	a folder.
+
+	Args:
+		properties (dict): the properties of every id, as {id: {property: value}}.
+		max_results (int): the maximum number of entries in an answer.
+		summary (tuple): the properties that come with an id when it is listed.
+	"""
+
+	def __init__(self, properties, max_results = MAX_RESULTS, summary = ('definition',)):
+		self._properties  = properties
+		self._max_results = max_results
+		self._summary	  = summary
+		self._tree		  = _tree(properties.keys())
+
+
+	def children(self, index):
+		""" Returns the ids of the children of an id (None or "" is the root), or None if it is a leaf or does not exist. """
+
+		subtree = self._subtree(index)
+
+		if type(subtree) is not dict:
+			return None
+
+		prefix = '' if index is None or index == '' else index + '|'
+
+		return [prefix + key for key in subtree.keys()]
+
+
+	def properties(self, index):
+		""" Returns a copy of the properties of an id, or None if it has none (a folder or an id that does not exist). """
+
+		return dict(self._properties[index]) if index in self._properties else None
+
+
+	def ids(self):
+		""" Returns every id that has properties, sorted. """
+
+		return sorted(self._properties.keys())
+
+
+	def children_by_idx(self, arguments):
+		""" Answers arguments "index" and "depth": the children of an id with their summary, down to depth levels. Returns None if the id
+		does not exist and ends with TRUNCATED when there are more than max_results entries.
+		"""
+
+		index = arguments['index']
+
+		if self._subtree(index) is _MISSING:
+			return None
+
+		budget	= {'left': self._max_results, 'truncated': False}
+		entries = self._entries(index, _positive_int(arguments.get('depth', 1), 1), budget)
+
+		return entries + [TRUNCATED] if budget['truncated'] else entries
+
+
+	def by_idx(self, arguments):
+		""" Answers argument "index": the properties of an id and its ancestors, or None if it has no properties. """
+
+		index		= arguments['index']
+		properties	= self.properties(index)
+
+		if properties is None:
+			return None
+
+		return {'id': index, 'properties': properties, 'ancestors': self._ancestors(index)}
+
+
+	def search(self, arguments):
+		""" Answers arguments "text" and "limit": the ids that contain a text followed by those whose definition contains it. """
+
+		text = str(arguments['text']).strip().lower()
+
+		if text == '':
+			return []
+
+		limit = min(_positive_int(arguments.get('limit', 20), 20), self._max_results)
+
+		return _limited([self.described(index) for index in self._matching(text)], limit)
+
+
+	def described(self, index):
+		""" Returns the entry of an id: the id and the properties of its summary that it has as text. """
+
+		properties = self._properties.get(index, {})
+
+		return dict({'id': index}, **{key: properties[key] for key in self._summary if isinstance(properties.get(key, None), str)})
+
+
+	def _entries(self, index, depth, budget):
+		""" Returns the entries of the children of an id, expanded down to depth levels, spending one unit of budget per entry. All
+		the siblings are listed before expanding any of them.
+		"""
+
+		entries = []
+		for child in self.children(index) or []:
+			if budget['left'] == 0:
+				budget['truncated'] = True
+				break
+
+			budget['left'] -= 1
+			entries.append(self.described(child))
+
+		for entry in entries:
+			self._expand(entry, depth - 1, budget)
+
+		return entries
+
+
+	def _expand(self, entry, depth, budget):
+		""" Adds to an entry its children down to depth levels, or marks it with "more" if it has children that are not included. """
+
+		if type(self._subtree(entry['id'])) is not dict:
+			return
+
+		children = self._entries(entry['id'], depth, budget) if depth > 0 else []
+
+		if len(children) > 0:
+			entry['children'] = children
+		else:
+			entry['more'] = True
+
+
+	def _ancestors(self, index):
+		""" Returns the entries of the ancestors of an id, from its parent to the root. """
+
+		levels = index.split('|')
+
+		return [self.described('|'.join(levels[:n])) for n in range(len(levels) - 1, 0, -1)]
+
+
+	def _matching(self, text):
+		""" Returns the ids that contain text followed by those whose definition contains it, each group sorted. """
+
+		in_id, in_definition = [], []
+		for index, properties in self._properties.items():
+			definition = properties.get('definition', None)
+			if text in index.lower():
+				in_id.append(index)
+			elif isinstance(definition, str) and text in definition.lower():
+				in_definition.append(index)
+
+		return sorted(in_id) + sorted(in_definition)
+
+
+	def _subtree(self, index):
+		""" Returns the subtree under an id (None for a leaf) or _MISSING if the id is not in the tree. """
+
+		if index is None or index == '':
+			return self._tree
+
+		subtree = self._tree
+		for level in index.split('|'):
+			if type(subtree) is not dict or level not in subtree:
+				return _MISSING
+
+			subtree = subtree[level]
+
+		return subtree
+
+
 class AgenticGraph(Agentic):
 	""" AgenticGraph is the class that exposes a `mercury.graph.Graph` using the Agentic interface.
 
@@ -80,9 +520,10 @@ class AgenticGraph(Agentic):
 	A graph is a persisted storage of anything: the storage of nodes is a key/value store with any properties. On top of that, nodes
 	can be connected by edges that also have properties. AgenticGraph objects are typically persisted (that is part of their configuration
 	to store such things as hierarchical ontologies for both entities and relationships). They can read from .csv files that
-	contain ontologies, for initialization, but do not write to .csv files to keep project management simple. Once the graph is
-	initialized, it stores itself as a pickle file. When initializing the object, if the pickle file exists, it will be loaded rather
-	than initializing the graph from .csv files.
+	contain ontologies (the keys "nodes" and "edges" of its configuration), for initialization, but do not write to .csv files to keep
+	project management simple. Once the graph is initialized, it stores itself as a pickle file. When initializing the object, if the
+	pickle file exists, it will be loaded rather than initializing the graph from .csv files, and a message is logged for every .csv file
+	modified after the pickle was saved.
 
 	## IDs and hierarchical structure
 
@@ -96,8 +537,8 @@ class AgenticGraph(Agentic):
 
 	There a three components:
 
-	* The Ontologies are just graphs with IDs and definitions for concepts. Typically entities and
-	relationships live in different graphs (relationships may not be used, all that is configurable).
+	* The Ontology is a graph with IDs and definitions: its nodes are the types of entities and its edges the types of relationships
+	between them.
 	* The Formalizer takes concepts defined in the Ontology (E.g., person, product, country, etc.) also possibly relationships
 	(E.g., is_owned_by, is_located_in, etc.) and finds instances of those concepts in natural language text.
 	* The EvidenceGraph creates an aggregated graph of all that information handling contradictions, reinforcements and confidence.
@@ -105,12 +546,27 @@ class AgenticGraph(Agentic):
 	## What the AgenticGraph exposes via the Agentic interface
 
 	All the internals of a graph are basically understood by the Formalizer and the EvidenceGraph. The AgenticGraph is an understandable
-	storage for concepts, entity indices and relationships and, via the Agentic interface that is what is accessible: A mechanism
-	similar to that of a source to retrieve, via unique indices, concepts, entities and relationships.
+	storage for concepts, entity indices and relationships, and that is what is accessible via the Agentic interface. Ids are used exactly
+	as in the .csv files (e.g., `person|student`), without the name of the AgenticGraph in front, and an empty id is the root:
+
+	- `children_entities_by_idx_<name>`: the types of entity (nodes) under an id with their definitions, down to a given depth.
+	- `entity_by_idx_<name>`: the properties of a type of entity and its ancestors with their definitions.
+	- `search_entities_<name>`: the types of entity whose id or definition contains a text.
+
+	Only if the graph has edges:
+
+	- `children_relationships_by_idx_<name>`: the types of relationship (edges) under an id with their definitions, src and dst.
+	- `relationship_by_idx_<name>`: the properties of a type of relationship (src, dst and definition) and its ancestors.
+	- `search_relationships_<name>`: the types of relationship whose id or definition contains a text.
+	- `relations_for_<name>`: the relationships a type of entity takes part in, including those of its ancestors.
+
+	Entities and relationships are navigated in two separate trees (see `NavigableTree`). Every answer is limited to `max_results` entries (50 by default, configurable in
+	`extra_args`) and ends with a truncated marker when it has been cut.
 
 	## Known Limitations
 
-	There is no "graph language" exposed via the Agentic interface that allows for arbitrary graph oriented queries. Note that Agentic
+	There is no "graph language" exposed via the Agentic interface that allows for arbitrary graph oriented queries, only the capabilities
+	above. Note that Agentic
 	objects have a mechanism to access the objects directly and will typically bypass the Agentic interface for intense computations such
 	as crawling entire corpora. In the future, Agents, besides discovering the hierarchy tree may also have to modify it by creating or
 	updating concepts and relationships.
@@ -146,21 +602,33 @@ class AgenticGraph(Agentic):
 			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
 
-		call = self.call.get(request['name'], None)
+		name = request['name']
+		call = self.call.get(name, None)
 
 		if call is None:
-			self.log_error('AgenticGraph does not have a function named "%s".' % request['name'])
+			self.log_error('AgenticGraph does not have a function named "%s".' % name)
 			raise AgenticRunInvalidRequest
 
-		index = request['arguments'].get('index', None)
+		args = request['arguments']
+		missing = self._missing_arguments(name, args)
 
-		if index is None:
-			self.log_error('AgenticGraph function "%s" requires an "index" argument.' % request['name'])
+		if len(missing) > 0:
+			self.log_error('AgenticGraph function "%s" requires the argument "%s".' % (name, missing[0]))
 			raise AgenticRunInvalidRequest
 
-		ret = {'finish_reason': 'stop', 'message': call(index)}
+		return {'finish_reason': 'stop', 'message': call(args)}
 
-		return ret
+
+	def _missing_arguments(self, name, arguments):
+		""" Returns the required arguments of the capability called name (as declared in its definition) that are missing or None. """
+
+		for capability in self._meta_['capabilities']:
+			if capability['function']['name'] == name:
+				required = capability['function']['parameters'].get('required', [])
+
+				return [argument for argument in required if arguments.get(argument, None) is None]
+
+		return []
 
 
 	def _meta(self):
@@ -202,34 +670,6 @@ class AgenticGraph(Agentic):
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
 
-		def new_graph():
-			""" Creates a new graph when there is no persisted graph to load, but possibly initial_nodes and/or initial_edges. """
-
-			keys = self.conf.get('file_format', None)
-			if keys is None:
-				keys = {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': True, 'sep': '\t'}
-
-			nodes = None
-			fn_nodes = self.conf.get('initial_nodes', None)
-			if fn_nodes is not None:
-				if fn_nodes['type'] == 'csv':
-					sep = ',' if keys is None or 'sep' not in keys else keys['sep']
-					nodes = pd.read_csv(fn_nodes['path'], sep = sep)
-				elif fn_nodes['type'] == 'pickle':
-					nodes = pd.read_pickle(fn_nodes['path'])
-
-			fn_edges = self.conf.get('initial_edges', None)
-			if fn_edges is not None:
-				if fn_edges['type'] == 'csv':
-					sep = ',' if keys is None or 'sep' not in keys else keys['sep']
-					edges = pd.read_csv(fn_edges['path'], sep = sep)
-				elif fn_edges['type'] == 'pickle':
-					edges = pd.read_pickle(fn_edges['path'])
-			else:
-				edges = pd.DataFrame({keys['src']: pd.Series(dtype='str'), keys['dst']: pd.Series(dtype='str')})
-
-			return MultiGraph(data = edges, keys = keys, nodes = nodes)
-
 		if self.meta['state'] < 0:
 			self.log_error('AgenticGraph is in error state %d' % self._meta_['state'])
 
@@ -240,7 +680,7 @@ class AgenticGraph(Agentic):
 				try:
 					self._fname = self.conf.get('persistence', None)
 					if self._fname is None:
-						self._graph = new_graph()
+						self._graph = self._graph_from_files()
 					else:
 						self._fname = self._fname['path']
 						parent_dir	= os.path.dirname(self._fname)
@@ -252,11 +692,12 @@ class AgenticGraph(Agentic):
 							with open(self._fname, 'rb') as f:
 								ntx = pickle.load(f)			# A NetworkX graph object saved by this class.
 							self._graph = MultiGraph(data = ntx)
+							self._warn_about_newer_files()
 						else:
-							self._graph = new_graph()
+							self._graph = self._graph_from_files()
 
-				except:
-					self.log_error('Graph could not be created and initialized for AgenticGraph "%s".' % self.name)
+				except Exception as e:
+					self.log_error('Graph could not be created and initialized for AgenticGraph "%s": %s' % (self.name, e))
 					self._meta_['state'] = self.states.ERR_GRAPH_INIT.value
 					break
 
@@ -267,90 +708,130 @@ class AgenticGraph(Agentic):
 
 			if self._meta_['state'] == self.states.GRAPH_LOADED_OK.value:
 				self._build_indices()
+				self._meta_['capabilities'] = self._capabilities()		# Some capabilities depend on the content of the graph.
 				self._meta_['state'] = self.states.READY.value
 
 				break
 
 
 	def get_children_idx(self, index = None):
-		""" Returns the children indices following the SourceNode interface.
+		""" Returns the ids of the children of an id following the SourceNode interface.
+
+		Ids are used exactly as in the .csv files that define the graph (e.g., `person|student`), without the name of the AgenticGraph in
+		front. None or an empty string is the root.
 
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
 		"""
 
-		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('AgenticGraph is not ready for get_children_idx.')
-
+		if not self._is_ready('get_children_idx'):
 			return None
 
-		if index is None or index == '':
-			index = self.name
-
-		idx_stack = index.split('|')
-
-		if idx_stack.pop(0) != self.name:
-			return None
-
-		d = self._indices
-		for i in idx_stack:
-			if i not in d:
-				return None
-
-			d = d[i]
-
-		if type(d) is dict:
-			return ['%s|%s' % (index, k) for k in d.keys()]
-
-		return None
+		return self._entities.children(index)
 
 
 	def child(self, index):
-		""" Returns the corresponding SourceNode object following the SourceNode interface and serializes it to a dictionary.
+		""" Returns the properties of the node with the given id following the SourceNode interface.
+
+		Ids are used exactly as in the .csv files that define the graph (e.g., `person|student`), without the name of the AgenticGraph in
+		front.
 
 		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
 		"""
 
+		if not self._is_ready('child') or index is None or index == '':
+			return None
+
+		return self._entities.properties(index)
+
+
+	def _children_entities_by_idx(self, arguments):
+		""" Runs the children_entities_by_idx capability (see `NavigableTree.children_by_idx()`). """
+
+		if not self._is_ready('children_entities_by_idx'):
+			return None
+
+		return self._entities.children_by_idx(arguments)
+
+
+	def _entity_by_idx(self, arguments):
+		""" Runs the entity_by_idx capability (see `NavigableTree.by_idx()`). """
+
+		if not self._is_ready('entity_by_idx'):
+			return None
+
+		return self._entities.by_idx(arguments)
+
+
+	def _search_entities(self, arguments):
+		""" Runs the search_entities capability (see `NavigableTree.search()`). """
+
+		if not self._is_ready('search_entities'):
+			return None
+
+		return self._entities.search(arguments)
+
+
+	def _children_relationships_by_idx(self, arguments):
+		""" Runs the children_relationships_by_idx capability (see `NavigableTree.children_by_idx()`). """
+
+		if not self._is_ready('children_relationships_by_idx'):
+			return None
+
+		return self._relationships.children_by_idx(arguments)
+
+
+	def _relationship_by_idx(self, arguments):
+		""" Runs the relationship_by_idx capability (see `NavigableTree.by_idx()`). """
+
+		if not self._is_ready('relationship_by_idx'):
+			return None
+
+		return self._relationships.by_idx(arguments)
+
+
+	def _search_relationships(self, arguments):
+		""" Runs the search_relationships capability (see `NavigableTree.search()`). """
+
+		if not self._is_ready('search_relationships'):
+			return None
+
+		return self._relationships.search(arguments)
+
+
+	def _relations_for(self, arguments):
+		""" Runs the relations_for capability: the relationships a type of entity takes part in (by inheritance by default), sorted by id. """
+
+		if not self._is_ready('relations_for'):
+			return None
+
+		concept	  = arguments['concept']
+		inherited = _as_bool(arguments.get('inherited', True))
+		entries	  = [self._relation_entry(index, concept, inherited) for index in self._relationships.ids()]
+
+		return _limited([entry for entry in entries if entry is not None], self.conf.get('max_results', MAX_RESULTS))
+
+
+	def _relation_entry(self, index, concept, inherited):
+		""" Returns the entry of a relationship with the role of a type of entity in it, or None if it takes no part in it. """
+
+		attr = self._relationships.properties(index)
+		role = _role(attr, concept, inherited)
+
+		if role is None:
+			return None
+
+		return dict({'id': index, 'src': attr['src'], 'dst': attr['dst'], 'as': role}, **self._relationships.described(index))
+
+
+	def _is_ready(self, function):
+		""" Returns True if the AgenticGraph is ready, logging an error naming the calling function if it is not. """
+
 		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('AgenticGraph is not ready for child.')
+			self.log_error('AgenticGraph is not ready for %s.' % function)
 
-			return None
+			return False
 
-		idx_stack = index.split('|')
-
-		if idx_stack.pop(0) != self.name:
-			return None
-
-		d = self._indices
-		for i in idx_stack:
-			if i not in d:
-				return None
-
-			d = d[i]
-
-		ntx = self._graph.networkx
-
-		if idx_stack[0] != '_edge_':
-			ix = '|'.join(idx_stack)
-
-			try:
-				ret = dict(ntx.nodes(data = True))[ix]
-
-				return ret
-
-			except:
-				return None
-
-		else:
-			idx_stack.pop(0)
-
-			try:
-				src, dst, key = '|'.join(idx_stack).split('||')
-				ret = dict(ntx.edges[src, dst, key])
-
-				return ret
-
-			except:
-				return None
+		return True
 
 
 	def close(self, endpoint_locked):
@@ -367,48 +848,40 @@ class AgenticGraph(Agentic):
 		self._graph = None
 
 
-	def _add_index_to_tree(self, index):
-		""" Adds an index to the hierarchical tree structure. It traverses the tree rooted at self._indices and adds dictionaries
-		as required. The same tree contains node and edge indices, but the latter have their index prefixed by `_edge_` which
-		places them in a dictionary under the `_edge_` key.
+	def _graph_from_files(self):
+		""" Returns the graph built from the files of nodes and edges in the configuration. """
 
-		Args:
-			index (str): The index to add, represented as a string with components separated by '|'.
-		"""
+		return graph_from_files(self.conf.get('nodes', None), self.conf.get('edges', None), self.conf.get('file_format', None))
 
-		ii = index.split('|')
-		last = len(ii) - 1
 
-		tree = self._indices
+	def _warn_about_newer_files(self):
+		""" Logs a message for every file of nodes or edges modified after the pickle was saved, since loading the pickle ignores it. """
 
-		for i, ix in enumerate(ii):
-			if i == last:
-				tree[ix] = None
-
-			else:
-				if ix not in tree or tree[ix] is None:
-					tree[ix] = {}
-
-				tree = tree[ix]
+		for kind in ('nodes', 'edges'):
+			spec = self.conf.get(kind, None)
+			if spec is not None and os.path.isfile(spec['path']) and os.path.getmtime(spec['path']) > os.path.getmtime(self._fname):
+				self.log_message('"%s" changed after "%s" was saved, so its changes are not loaded. Delete "%s" to load them.' %
+								 (spec['path'], self._fname, self._fname))
 
 
 	def _build_indices(self):
-		""" Builds the indices for the AgenticGraph for the first time after it is loaded.
-
-		This builds a hierarchical tree structure of dictionaries, rooted at self._indices.
+		""" Builds the two navigable trees of the AgenticGraph after it is loaded: one with the ids of its nodes (the entities) and one
+		with the ids of its edges (the relationships), whose properties include their src and dst.
 		"""
 
-		self._indices = {}
+		ntx			= self._graph.networkx
+		max_results = self.conf.get('max_results', MAX_RESULTS)
+		relations	= {key: dict(attr, src = src, dst = dst) for src, dst, key, attr in ntx.edges(keys = True, data = True)}
 
-		for id, _ in self._graph.networkx.nodes.data('id'):
-			self._add_index_to_tree(id)
-
-		for src, dst, key in self._graph.networkx.edges.data(keys = True, data = False):
-			self._add_index_to_tree('_edge_|%s||%s||%s' % (src, dst, key))
+		self._entities		= NavigableTree(dict(ntx.nodes(data = True)), max_results)
+		self._relationships = NavigableTree(dict(sorted(relations.items())), max_results, ('definition', 'src', 'dst'))
 
 
 	def _capabilities(self):
-		""" Returns the capabilities of the AgenticGraph.
+		""" Returns the capabilities of the AgenticGraph and sets self.call to run them.
+
+		The capabilities of relationships require edges. Before the graph is loaded, only those of entities are returned, and the
+		capabilities are set again once the graph is loaded.
 
 		Returns:
 			(list): A list of capabilities, each represented as a dictionary with the following keys:
@@ -424,53 +897,19 @@ class AgenticGraph(Agentic):
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
 
-		name_children_idx = 'children_by_idx_%s' % self.name
-		name_node_by_idx  = 'node_by_idx_%s' % self.name
+		available = {'children_entities_by_idx': self._children_entities_by_idx, 'entity_by_idx': self._entity_by_idx,
+					 'search_entities': self._search_entities}
 
-		self.call = {name_children_idx: self.get_children_idx, name_node_by_idx: self.child}
+		if self._has_edges():
+			available.update({'children_relationships_by_idx': self._children_relationships_by_idx, 'relationship_by_idx':
+							  self._relationship_by_idx, 'search_relationships': self._search_relationships, 'relations_for': self._relations_for})
 
-		return [
-			{
-				'type': 'function',
-				'function': {
-					'name': name_children_idx,
-					'description': 'Get indices of the children of an index.',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'index': {
-								'type': 'string',
-								'description': 'Index whose children indices are required.'
-							}
-						},
-						'required': ['index']
-					},
-					'returns': {
-						'type': 'array',
-						'items': {
-							'type': 'string'
-						}
-					}
-				}
-			},
-			{
-				'type': 'function',
-				'function': {
-					'name': name_node_by_idx,
-					'description': 'Get the properties of a node by its index.',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'index': {
-								'type': 'string',
-								'description': 'Index of the node.'
-							}
-						},
-						'required': ['index']
-					},
-					'returns': {
-						'type': 'dict'
-					}
-				}
-			}
-		]
+		self.call = {'%s_%s' % (name, self.name): run for name, run in available.items()}
+
+		return [{'type': 'function', 'function': dict(name = '%s_%s' % (name, self.name), **_named(CAPABILITIES[name], self.name))} for name in available]
+
+
+	def _has_edges(self):
+		""" Returns True if the graph is loaded and has edges. """
+
+		return self._graph is not None and self._graph.networkx.number_of_edges() > 0

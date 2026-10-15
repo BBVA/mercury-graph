@@ -14,7 +14,7 @@ PySpark [**GraphFrames**](https://graphframes.github.io/graphframes/docs/_site/i
 ----
 <div class="maturity-warning" role="note" aria-label="Early release warning">
 <img
-  src="../../images/warning-read-first-reader.svg"
+  src="../images/warning-read-first-reader.svg"
   width="128px"
   alt="Read first"
 >

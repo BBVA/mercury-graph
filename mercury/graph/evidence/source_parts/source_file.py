@@ -144,8 +144,9 @@ class SourceFile(SourceNode):
 	def _load_and_parse(self):
 		""" This method has all the internal logic of the class. It starts by loading the file into memory (self._content, which is a
 		list of str). The coordinates in terms of lines and character ranges cannot be modified. Markdown parsing is very line-oriented,
-		so even if pathological paragraphs are found, they will live in one line and be broken by characters. Every division is either
-		multiline with no character range or single-line with a character range. This is enforced by this method.
+		but the text of a paragraph is kept whole: it is a single multiline entity, so line breaks inside a paragraph never split it.
+		Links and images are single-line entities with a character range. Every division is either multiline with no character range or
+		single-line with a character range. This is enforced by this method.
 
 		This method uses numpy (as np) to build integer indices to define header levels, table rows, etc. The Markdown interpretation
 		is done by the class MarkdownParser to keep this class simple.
@@ -156,23 +157,22 @@ class SourceFile(SourceNode):
 		HEADER_1 Title_1
 		    └── HEADER_2 Subtitle_1_1
 		        └── PARAGRAPH
-		            └── Chunk_1, Chunk_2, Chunk_3
+		            └── Text_1, Link_1
 		```
 
 		Markdown has an inherent hierarchy, like in the example above. In that case, Header 1 becomes an entity with two children:
 		Header 2 and the Title. The Title has content (the title itself) and no children. Header 2 has two children: the Subtitle and
 		the Paragraph. This becomes:
 
-		| entity       | content             | description                | children                  |
-		| ------------ | ------------------- | -------------------------- | ------------------------- |
-		| HEADER_1     |                     | "Title: The life of birds" | Title_1, HEADER_2         |
-		| Title_1      | "The life of birds" |                            |                           |
-		| HEADER_2     |                     | "Section 1: Overview"      | Subtitle_1_1, PARAGRAPH   |
-		| Subtitle_1_1 | "Overview"          |                            |                           |
-		| PARAGRAPH    |                     | "Content of 1.1"           | Chunk_1, Chunk_2, Chunk_3 |
-		| Chunk_1      | "Bla, bla, bla"     |                            |                           |
-		| Chunk_2      | "Pio, pio, pio"     |                            |                           |
-		| Chunk_3      | "Trust me."         |                            |                           |
+		| entity       | content               | description                | children                  |
+		| ------------ | --------------------- | -------------------------- | ------------------------- |
+		| HEADER_1     |                       | "Title: The life of birds" | Title_1, HEADER_2         |
+		| Title_1      | "The life of birds"   |                            |                           |
+		| HEADER_2     |                       | "Section 1: Overview"      | Subtitle_1_1, PARAGRAPH   |
+		| Subtitle_1_1 | "Overview"            |                            |                           |
+		| PARAGRAPH    |                       | "Content of 1.1"           | Text_1, Link_1            |
+		| Text_1       | "Bla, `[pio](a.md)`." |                            |                           |
+		| Link_1       | "`[pio](a.md)`"       |                            |                           |
 
 		Note that, range-wise, HEADER_1 covers all the lines in the file from itself to the line before the next HEADER_1 (possibly the
 		whole file), but Title_1 is only the slice of the line that contains the title. The same applies to HEADER_2, etc.
