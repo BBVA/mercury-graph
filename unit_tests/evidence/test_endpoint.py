@@ -367,6 +367,12 @@ def test_endpoint_pilot_states(tmp_path, monkeypatch):
 	endpoint.pilot(EndPointState.ALL_READY.value, just_once = True)
 	assert endpoint.meta['state'] == EndPointState.ERR_TOOL_CAPS.value
 
+	endpoint.meta['state'] = EndPointState.TOOLS_ARE_READY.value
+	monkeypatch.setattr(endpoint, '_expose_api', lambda: False)
+	endpoint.pilot(EndPointState.ALL_READY.value, just_once = True)
+	assert endpoint.meta['state'] == EndPointState.ERR_EXPOSING.value
+	monkeypatch.setattr(endpoint, '_expose_api', lambda: True)
+
 	endpoint.meta['state'] = EndPointState.LOADED_OBJ.value
 	monkeypatch.setattr(endpoint, '_link_objects', lambda: True)
 	endpoint.pilot(EndPointState.LINKED_OBJ.value, just_once = True)
@@ -643,6 +649,34 @@ def test_endpoint_expose_api(tmp_path):
 	assert type(endpoint.meta) == dict
 	assert endpoint._expose_api() is True
 	assert list(endpoint.agentic_by_capability) == ['first', 'second']
+
+
+def test_endpoint_exposes_the_capabilities_of_ready_tools(tmp_path, monkeypatch):
+	""" Capabilities that change while a tool is piloted (like Formalizer removing hint_edges) are exposed as they are once every tool
+	is ready, not as they were before piloting.
+	"""
+	capability = lambda name: {'type': 'function', 'function': {'name': name}}
+	tool = Mock()
+	tool.id = 'tool'
+	tool.meta = {'state': 0, 'capabilities': [capability('kept'), capability('removed')]}
+
+	def pilot(intent, just_once = False):
+		tool.meta = {'state': intent, 'capabilities': [capability('kept'), capability('added')]}
+
+	tool.pilot = pilot
+	endpoint = _make_endpoint(tmp_path, 'refresh_api')
+	endpoint.conf['expose'] = ['tool']
+	endpoint.name_to_agentic = {'tool': tool}
+	endpoint.tools = {'tool': tool}
+	monkeypatch.setattr(endpoint, '_load_objects', lambda: True)
+	monkeypatch.setattr(endpoint, '_link_objects', lambda: True)
+
+	endpoint.pilot(EndPointState.ALL_READY.value)
+
+	assert endpoint.meta['state'] == EndPointState.ALL_READY.value
+	assert [c['function']['name'] for c in endpoint.meta['capabilities']] == ['kept', 'added']
+	assert set(endpoint.agentic_by_capability) == {'kept', 'added'}
+	assert set(endpoint.capabilities_by_name) == {'kept', 'added'}
 
 
 def test_endpoint_next_agentic_below(tmp_path):

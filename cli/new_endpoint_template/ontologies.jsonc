@@ -9,68 +9,43 @@
 // You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
 //
 
-	"entities": {
-		// An ontology is just a persisted AgenticGraph. It is typically as a key/value to hold anything in nodes or a graph.
+	"ontology": {
+		// An ontology is a persisted AgenticGraph: its nodes are the types of entities and its edges the types of relationships
+		// between them.
 
-		"name": "entities",
+		"name": "ontology",
 
 		// "extra_args" is given to the AgenticGraph's constructor.
 		"extra_args": {
 			// The description will be exposed in the AgenticGraph's Agentic API. It can be a string or a list of strings.
 			"description": [
-				"This ontology holds all the entities that can be used in the Evidence Graph. E.g., person, organization, location ...",
-				"It uses the node ids as keys and an attribute 'definition' to explain the entity.",
-				"The hierarchy is defined by the | separator in the IDs. E.g., location, location|country, location|country|city"
+				"This ontology holds the types of entities and of relationships that can be used in the Evidence Graph.",
+				"Entities (e.g., person, organization, location ...) are its nodes, with their id as key and an attribute 'definition'.",
+				"Relationships (e.g., works_for, located_in, ...) are its edges: each one goes from the type of entity in 'src' to the",
+				"one in 'dst', with its id as key and an attribute 'definition'. Relationship ids are unique.",
+				"The hierarchy of both is defined by the | separator in the IDs. E.g., location, location|country, location|country|city"
 			],
 
 			// This optional dictionary defines the names of the columns in csv files, if the graph is directed and the separator.
-			// Default is: {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': true, 'sep': '\t'}
+			// Default is: {'src': 'src', 'dst': 'dst', 'id': 'id', 'directed': true, 'sep': '\t'}. Any key left out takes its default value.
 			"file_format": {"src": "src", "dst": "dst", "id": "id", "directed": true, "sep" : "\t"},
 
-			// This optional dataframe (default is an empty graph) is only loaded when the file in "persistence" does not exist.
-			// It can be either a csv or a pickle of a pandas dataframe.
-			"initial_nodes" : {"type" : "csv", "$path" : "ontology_source/entities_concepts.csv"},
+			// The types of entities (nodes) and of relationships (edges). They are only loaded when the file in "persistence" does not
+			// exist. Each can be either a csv or a pickle of a pandas dataframe. The src and dst of every edge must be a node.
+			"nodes" : {"type" : "csv", "$path" : "ontology_source/entities_concepts.csv"},
+			"edges" : {"type" : "csv", "$path" : "ontology_source/relationships_concepts.csv"},
 
-			// This is where the AgenticGraph will persist itself. The "initial_nodes" and "initial_edges" are only used when the graph
-			// is first created for the first time. It is a pickle of a NetworkX graph.
+			// This is where the AgenticGraph will persist itself. When this file exists, it is loaded and "nodes" and "edges" are ignored:
+			// delete it after editing them (a message is logged when they are newer than this file). It is a pickle of a NetworkX graph.
 			// $path is a relative path (inside the endpoint) that will be resolved by the Endpoint at runtime and become "path".
-			"persistence" : {"type" : "pickle", "$path" : "graphs/entities.pickle"}
+			"persistence" : {"type" : "pickle", "$path" : "graphs/ontology.pickle"},
+
+			// This optional number (default is 50) limits the entries in every answer given to agents. Longer answers are cut and end
+			// with a "truncated" marker that asks for something more specific.
+			"max_results" : 50
 		},
 
 		// "tools" is expected by the Endpoint to make all Agentic configurations consistent. Ontologies do not use tools.
-		"tools": []
-	},
-
-	"relationships": {
-		"name": "relationships",
-		"extra_args": {
-			"description": [
-				"This ontology holds the relationships between entities. E.g., works_for, located_in, ...",
-				"It defined a relationship id as a key, src and dest define the type of entity the relationship connects as defined",
-				"in 'entities'. An attribute 'definition' explains the relationship. Hierarchy is defined by the | separator in the IDs."
-			],
-			"initial_nodes" : {"type" : "csv", "$path" : "ontology_source/relationships_concepts.csv"},
-			"persistence" : {"type" : "pickle", "$path" : "graphs/relationships.pickle"}
-		},
-		"tools": []
-	},
-
-	"known_ids": {
-		"name": "known_ids",
-
-		"extra_args": {
-			"description": [
-				"This AgenticGraph holds the keys to every entity and relation that has been identified. E.g., if location|country|city",
-				"is defined in 'entities', this can hold ids such as: location|country|city|Helsinki or location|country|city|Anchorage.",
-				"Also, if teaches_at(person|teacher, organization|school) is defined in 'relationships', this holds ids for specific instances.",
-				"This does not contain any other information (that belongs in the EvidenceGraph)."
-			],
-			"initial_nodes" : {"type" : "csv", "$path" : "ontology_source/known_ids_nodes.csv"},
-			// This optional requires the entities to be defined in "initial_nodes". Both are only loaded when the file in "persistence"
-			// does not exist. It can be either a csv or a pickle of a pandas dataframe.
-			"initial_edges" : {"type" : "csv", "$path" : "ontology_source/known_ids_edges.csv"},
-			"persistence" : {"type" : "pickle", "$path" : "graphs/known_ids.pickle"}
-		},
 		"tools": []
 	}
 }
