@@ -227,6 +227,20 @@ class Agentic(ABC):
 			self.seq_num += 1
 
 
+	def log_message(self, message):
+		""" Logs a message that is not an error, such as a warning.
+
+		Args:
+			message (str): the message to log.
+		"""
+
+		if self.logger is not None:
+			event = {'type': 'message', 'timestamp': self._now(), 'id': self.id, 'seq_num': self.seq_num, 'message': message}
+
+			self.logger.append(event)
+			self.seq_num += 1
+
+
 	def run(self, request):
 		""" Runs a query.
 
