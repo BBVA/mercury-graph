@@ -409,6 +409,23 @@ class Formalizer(Agentic):
 					break
 
 
+	def _create_schema(self, arguments):
+		ntx = self._ontology._graph.networkx
+		schema = {}
+		concepts = arguments.get('concepts', None)
+		if concepts is None:
+			for id, _ in ntx.nodes.data('id'):
+				node = dict(ntx.nodes(data = True))[id]
+				schema[id] = node.get('definition', '')
+		else:
+			for id in concepts:
+				node = dict(ntx.nodes(data = True)).get(id, {})
+				schema[id] = node.get('definition', '')
+
+		schema = self._model.create_schema().entities(schema)
+		return schema
+
+
 	def hint_nodes(self, arguments):
 		""" Identifies nodes in a text from the ontology or some concepts in it.
 
@@ -423,30 +440,14 @@ class Formalizer(Agentic):
 
 		if self._meta_['state'] != self.states.READY.value:
 			self.log_error('Formalizer is not ready for hint_nodes.')
-
 			return None
 
 		text = arguments.get('text', None)
-
 		if text is None:
 			self.log_error('Formalizer.hint_nodes() %s called without "text" argument.' % self.id)
-
 			return None
 
-		ntx = self._ontology._graph.networkx
-		schema = {}
-		concepts = arguments.get('concepts', None)
-		if concepts is None:
-			for id, _ in ntx.nodes.data('id'):
-				node = dict(ntx.nodes(data = True))[id]
-				schema[id] = node.get('definition', '')
-		else:
-			for id in concepts:
-				node = dict(ntx.nodes(data = True)).get(id, {})
-				schema[id] = node.get('definition', '')
-
-		schema = self._model.create_schema().entities(schema)
-
+		schema = self._create_schema(arguments)
 		result = self._model.extract(text, schema)
 
 		return result.get('entities', {})
