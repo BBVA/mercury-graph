@@ -1,4 +1,4 @@
-import os, warnings
+import os, re, unicodedata, warnings
 
 from enum import Enum
 
@@ -240,6 +240,8 @@ class Formalizer(Agentic):
 		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
 
+	IGNORED_WORDS = ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof']	# Default "ignored_words": titles left out when comparing names.
+
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'formalizer', schema = schema, endpoint = endpoint, logger = logger)
 
@@ -433,10 +435,17 @@ class Formalizer(Agentic):
 			arguments (dict): A dictionary containing the following keys:
 				- 'text' (str): The text from which to identify nodes.
 				- 'concepts' (list): A list of concepts to identify in the text. If empty, all concepts will be considered.
+				- 'candidates' (list): The ids of the known instances a mention can be. If missing, no mention has candidates.
 
 		Returns:
 			(list): One dictionary per mention with 'mention' (the text as it appears), 'type' (the most specific of the types found for
-				it that are compatible with the most confident one) and 'confidence' (that of the type).
+				it that are compatible with the most confident one), 'confidence' (that of the type) and 'candidates'.
+
+				The candidates of a mention are those of its root type that share a word with it, as {'id', 'score'}, from the highest to
+				the lowest score. The score is the share of words in common (1.0 when all of them are), leaving out the words of both types,
+				possessives, accents and the "ignored_words" of the configuration (titles by default). A candidate whose type is neither
+				an ancestor nor a descendant of the type of the mention has 'type_conflict' True. The score measures how alike the names
+				are, not whether they are the same instance: that is decided by the caller.
 		"""
 
 		if self._meta_['state'] != self.states.READY.value:
@@ -451,18 +460,19 @@ class Formalizer(Agentic):
 		schema	   = self._create_schema(arguments)
 		extraction = self._model.extract(text, schema, include_confidence = True)
 
-		entities = extraction.get('entities', {})
-		result	 = self._resolve_mentions(entities)
+		entities   = extraction.get('entities', {})
+		candidates = arguments.get('candidates', [])
+		result	   = self._resolve_mentions(entities, candidates)
 
 		return result
 
 
-	def _resolve_mentions(self, entities):
-		""" Returns one node per mention in the entities found by the model, with a single type chosen among those found for it. """
+	def _resolve_mentions(self, entities, candidates):
+		""" Returns one node per mention in the entities found by the model, with a single type and its candidates. """
 
 		confidences_by_mention = self._group_types_by_mention(entities)
 
-		result = [self._resolve_mention(mention, confidences) for mention, confidences in confidences_by_mention.items()]
+		result = [self._resolve_mention(mention, confidences, candidates) for mention, confidences in confidences_by_mention.items()]
 
 		return result
 
@@ -482,11 +492,12 @@ class Formalizer(Agentic):
 		return found
 
 
-	def _resolve_mention(self, mention, confidences):
-		""" Returns the node of a mention: its text, its chosen type and the confidence of that type. """
+	def _resolve_mention(self, mention, confidences, candidates):
+		""" Returns the node of a mention: its text, its chosen type, the confidence of that type and its candidates. """
 
 		concept = self._choose_type(confidences)
-		node	= {'mention': mention, 'type': concept, 'confidence': confidences[concept]}
+		found	= self._find_candidates(mention, concept, candidates)
+		node	= {'mention': mention, 'type': concept, 'confidence': confidences[concept], 'candidates': found}
 
 		return node
 
@@ -501,6 +512,79 @@ class Formalizer(Agentic):
 		compatible = [concept for concept in confidences if descends_from(concept, anchor) or descends_from(anchor, concept)]
 
 		result = max(compatible, key = lambda concept: (concept.count('|'), confidences[concept]))
+
+		return result
+
+
+	def _find_candidates(self, mention, concept, candidates):
+		""" Returns the candidates of the root type of concept that share a word with the mention, from the highest to the lowest score. """
+
+		same_root = [candidate for candidate in candidates if self._have_same_root(concept, parent_of(candidate))]
+		scored	  = [self._score_candidate(mention, concept, candidate) for candidate in same_root]
+		found	  = [candidate for candidate in scored if candidate['score'] > 0]
+
+		result = sorted(found, key = lambda candidate: candidate['score'], reverse = True)
+
+		return result
+
+
+	def _have_same_root(self, concept, known_type):
+		""" Returns True if both types are under the same root type (person|teacher and person|student are). """
+
+		if known_type is None:
+			return False
+
+		return concept.split('|')[0] == known_type.split('|')[0]
+
+
+	def _score_candidate(self, mention, concept, candidate):
+		""" Returns {'id', 'score'} of a candidate for a mention, with 'type_conflict' if their types are in different branches. """
+
+		known_type = parent_of(candidate)
+		generic	   = self._get_words(concept) | self._get_words(known_type)
+
+		words	   = self._get_significant_words(mention, generic)
+		name_words = self._get_significant_words(candidate.rsplit('|', 1)[1], generic)
+		score	   = self._jaccard(words, name_words)
+		scored	   = {'id': candidate, 'score': score}
+
+		if not (descends_from(concept, known_type) or descends_from(known_type, concept)):
+			scored['type_conflict'] = True
+
+		return scored
+
+
+	def _get_significant_words(self, name, generic):
+		""" Returns the words of a name without possessives, the generic words (those of the types) and the ignored words. """
+
+		without_possessives = re.sub("['’]s\\b", '', name)
+		ignored = set(self.conf.get('ignored_words', self.IGNORED_WORDS))
+
+		result = self._get_words(without_possessives) - generic - ignored
+
+		return result
+
+
+	def _get_words(self, text):
+		""" Returns the set of lowercase words of a text, without accents (`|` and `_` separate words). """
+
+		decomposed = unicodedata.normalize('NFKD', text.lower())
+		plain	   = ''.join(char for char in decomposed if not unicodedata.combining(char))
+
+		result = set(re.findall('[^\\W_]+', plain))
+
+		return result
+
+
+	def _jaccard(self, words, other_words):
+		""" Returns the share of words in common between two sets of words (0 if both are empty). """
+
+		every = words | other_words
+
+		if len(every) == 0:
+			return 0
+
+		result = len(words & other_words)/len(every)
 
 		return result
 
@@ -649,6 +733,13 @@ class Formalizer(Agentic):
 									'type': 'string'
 								},
 								'description': 'List of concepts to identify in the text. If empty, all concepts will be considered.'
+							},
+							'candidates': {
+								'type': 'array',
+								'items': {
+									'type': 'string'
+								},
+								'description': 'Ids of the known instances a mention can be. If missing, no mention has candidates.'
 							}
 						},
 						'required': ['text']
@@ -657,7 +748,7 @@ class Formalizer(Agentic):
 						'type': 'array',
 						'items': {
 							'type': 'object',
-							'description': 'One node per mention, with "mention", "type" and "confidence".'
+							'description': 'One node per mention, with "mention", "type", "confidence" and "candidates" ({"id", "score"}).'
 						}
 					}
 				}

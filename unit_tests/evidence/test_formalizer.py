@@ -230,44 +230,118 @@ def _found(*matches):
 	return entities
 
 
-def _hint_nodes(monkeypatch, directory, found):
-	"""Return the output of hint_nodes on a ready Formalizer whose model finds the given entities."""
+def _hint_nodes(monkeypatch, directory, found, candidates = None, **conf):
+	"""Return the output of hint_nodes on a ready Formalizer whose model finds the given entities, optionally given candidates."""
 	formalizer = _ready_formalizer(monkeypatch, directory)
+	formalizer.conf.update(conf)
 	DummyModel.entities = found
-	return formalizer.hint_nodes({'text': 'Some text.'})
+	arguments = {'text': 'Some text.'}
+	if candidates is not None:
+		arguments['candidates'] = candidates
+	return formalizer.hint_nodes(arguments)
 
 
 def test_hint_nodes_returns_one_node_per_mention(monkeypatch, tmp_path):
-	"""Every mention is a node with its type and confidence, in the order the model found them."""
+	"""Every mention is a node with its type and confidence, in the order the model found them, and no candidates if none are given."""
 	found = _found(('person|teacher', 'Elena Ruiz', 0.9), ('organization|school', 'Riverside School', 0.8))
 	assert _hint_nodes(monkeypatch, tmp_path, found) == [
-		{'mention': 'Elena Ruiz', 'type': 'person|teacher', 'confidence': 0.9},
-		{'mention': 'Riverside School', 'type': 'organization|school', 'confidence': 0.8}
+		{'mention': 'Elena Ruiz', 'type': 'person|teacher', 'confidence': 0.9, 'candidates': []},
+		{'mention': 'Riverside School', 'type': 'organization|school', 'confidence': 0.8, 'candidates': []}
 	]
 
 
 def test_hint_nodes_gives_a_mention_the_most_specific_compatible_type(monkeypatch, tmp_path):
 	"""A mention found as a type and its ancestor is one node with the most specific type, even if it is less confident."""
 	found = _found(('person', 'Ms. Ruiz', 0.95), ('person|teacher', 'Ms. Ruiz', 0.7))
-	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Ms. Ruiz', 'type': 'person|teacher', 'confidence': 0.7}]
+	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Ms. Ruiz', 'type': 'person|teacher', 'confidence': 0.7, 'candidates': []}]
 
 
 def test_hint_nodes_discards_the_types_of_other_branches(monkeypatch, tmp_path):
 	"""Types that are neither ancestors nor descendants of the most confident one are discarded."""
 	found = _found(('person|student', 'Lucas Moreno', 0.98), ('person|teacher', 'Lucas Moreno', 0.99), ('person', 'Lucas Moreno', 0.9))
-	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Lucas Moreno', 'type': 'person|teacher', 'confidence': 0.99}]
+	assert _hint_nodes(monkeypatch, tmp_path, found) == [
+		{'mention': 'Lucas Moreno', 'type': 'person|teacher', 'confidence': 0.99, 'candidates': []}
+	]
 
 
 def test_hint_nodes_breaks_ties_between_equally_specific_types_by_confidence(monkeypatch, tmp_path):
 	"""When the most confident type is an ancestor of several equally specific types, the most confident of them is chosen."""
 	found = _found(('person', 'Noah', 0.9), ('person|teacher', 'Noah', 0.6), ('person|student', 'Noah', 0.8))
-	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Noah', 'type': 'person|student', 'confidence': 0.8}]
+	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Noah', 'type': 'person|student', 'confidence': 0.8, 'candidates': []}]
 
 
 def test_hint_nodes_keeps_the_highest_confidence_of_a_repeated_mention(monkeypatch, tmp_path):
 	"""A mention found twice with the same type is one node with the highest confidence."""
 	found = _found(('person', 'Noah', 0.6), ('person', 'Noah', 0.8))
-	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Noah', 'type': 'person', 'confidence': 0.8}]
+	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Noah', 'type': 'person', 'confidence': 0.8, 'candidates': []}]
+
+
+KNOWN = ['person|teacher|Elena Ruiz', 'organization|school|Riverside School', 'person|student|Noah Kim', 'person|teacher|Noah Brown',
+		 'project|Helios Solar Car']
+
+
+def _candidates_of(monkeypatch, directory, concept, mention, candidates = KNOWN, **conf):
+	"""Return the candidates hint_nodes gives to a single mention of a type."""
+	nodes = _hint_nodes(monkeypatch, directory, _found((concept, mention, 0.9)), candidates, **conf)
+	assert len(nodes) == 1
+	return nodes[0]['candidates']
+
+
+def test_hint_nodes_gives_known_mentions_their_candidates(monkeypatch, tmp_path):
+	"""Case 2: the mentions of known instances, found with their types, have them as candidates with score 1."""
+	found = _found(('person|teacher', 'Elena Ruiz', 0.9), ('organization|school', 'Riverside School', 0.8))
+	assert _hint_nodes(monkeypatch, tmp_path, found, KNOWN) == [
+		{'mention': 'Elena Ruiz', 'type': 'person|teacher', 'confidence': 0.9, 'candidates': [{'id': 'person|teacher|Elena Ruiz', 'score': 1.0}]},
+		{'mention': 'Riverside School', 'type': 'organization|school', 'confidence': 0.8,
+		 'candidates': [{'id': 'organization|school|Riverside School', 'score': 1.0}]}
+	]
+
+
+def test_hint_nodes_accepts_ancestors_and_descendants_of_the_known_type(monkeypatch, tmp_path):
+	"""Case 3: a mention found with an ancestor of the known type is not a conflict, nor is one found with a descendant."""
+	assert _candidates_of(monkeypatch, tmp_path, 'person', 'Elena Ruiz') == [{'id': 'person|teacher|Elena Ruiz', 'score': 1.0}]
+	assert _candidates_of(monkeypatch, tmp_path, 'person|teacher|science', 'Elena Ruiz') == [{'id': 'person|teacher|Elena Ruiz', 'score': 1.0}]
+
+
+def test_hint_nodes_reports_a_type_conflict_with_a_candidate_of_another_branch(monkeypatch, tmp_path):
+	"""Case 4: a mention found with a type of another branch of the same root keeps the candidate, with type_conflict."""
+	assert _candidates_of(monkeypatch, tmp_path, 'person|student', 'Elena Ruiz') == [
+		{'id': 'person|teacher|Elena Ruiz', 'score': 1.0, 'type_conflict': True}
+	]
+
+
+def test_hint_nodes_scores_a_partial_name_by_the_share_of_words_in_common(monkeypatch, tmp_path):
+	"""Case 5: titles are ignored, so "Ms. Ruiz" shares one of the two words of "Elena Ruiz"."""
+	assert _candidates_of(monkeypatch, tmp_path, 'person|teacher', 'Ms. Ruiz') == [{'id': 'person|teacher|Elena Ruiz', 'score': 0.5}]
+	assert _candidates_of(monkeypatch, tmp_path, 'person|teacher', 'Ms. Ruiz', ignored_words = []) == [
+		{'id': 'person|teacher|Elena Ruiz', 'score': pytest.approx(1/3)}
+	]
+
+
+def test_hint_nodes_gives_every_candidate_that_shares_a_word_from_the_highest_score(monkeypatch, tmp_path):
+	"""A first name shared by two known instances gives both, and a full name ranks its own instance first."""
+	assert _candidates_of(monkeypatch, tmp_path, 'person', 'Noah') == [
+		{'id': 'person|student|Noah Kim', 'score': 0.5}, {'id': 'person|teacher|Noah Brown', 'score': 0.5}
+	]
+	assert _candidates_of(monkeypatch, tmp_path, 'person|teacher', 'Noah Brown') == [
+		{'id': 'person|teacher|Noah Brown', 'score': 1.0}, {'id': 'person|student|Noah Kim', 'score': pytest.approx(1/3), 'type_conflict': True}
+	]
+
+
+def test_hint_nodes_leaves_out_the_words_of_the_types(monkeypatch, tmp_path):
+	"""The words of the types are generic: "Helios project" shares only "helios" and "the school" names no school."""
+	assert _candidates_of(monkeypatch, tmp_path, 'project', 'Helios project') == [{'id': 'project|Helios Solar Car', 'score': pytest.approx(1/3)}]
+	assert _candidates_of(monkeypatch, tmp_path, 'organization|school', 'the school') == []
+
+
+def test_hint_nodes_compares_names_without_case_accents_or_possessives(monkeypatch, tmp_path):
+	"""Case, accents and possessives do not change the words of a name."""
+	assert _candidates_of(monkeypatch, tmp_path, 'person', "ELENA RUÍZ's") == [{'id': 'person|teacher|Elena Ruiz', 'score': 1.0}]
+
+
+def test_hint_nodes_only_gives_candidates_of_the_same_root_type(monkeypatch, tmp_path):
+	"""A known instance of another root type is not a candidate, even with the same name, nor is an id without a type."""
+	assert _candidates_of(monkeypatch, tmp_path, 'place', 'Riverside School', KNOWN + ['Riverside School']) == []
 
 
 def test_formalizer_request_state_errors_and_close():
