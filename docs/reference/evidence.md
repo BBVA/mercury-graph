@@ -10,6 +10,7 @@
 
 Other classes :
 [MultiGraph](#mercury.graph.evidence.MultiGraph) ·
+[NavigableTree](#mercury.graph.evidence.NavigableTree) ·
 [Crawl](#mercury.graph.evidence.Crawl)
 
 ----
@@ -22,4 +23,5 @@ Other classes :
 ::: mercury.graph.evidence.Agent
 ::: mercury.graph.evidence.Endpoint
 ::: mercury.graph.evidence.MultiGraph
+::: mercury.graph.evidence.NavigableTree
 ::: mercury.graph.evidence.Crawl
