@@ -1,5 +1,8 @@
 # The parts of a Source
 
+A [Source](evidence.md#mercury.graph.evidence.Source) implements a certain amount of logic to support files formats, etc. and is
+therefore divided into several parts. If you need details about the internal structure or implementation, this document is where
+these parts are described.
 
 ## Overview
 
@@ -15,7 +18,6 @@ For production environments, this module is not yet ready. It works well enough 
 components. This should be seen as a starting point that will evolve into a more robust and production-ready implementation.
 
 
-::: mercury.graph.evidence.Source
 ::: mercury.graph.evidence.source_parts.SourceNode
 ::: mercury.graph.evidence.source_parts.SourceMaker
 ::: mercury.graph.evidence.source_parts.SourceFile
