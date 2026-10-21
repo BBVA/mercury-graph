@@ -61,6 +61,8 @@ class DummyModel:
 	loaded = []
 	fail_loading = False
 	entities = {}
+	structures = {}
+	pairs = {}
 
 	@classmethod
 	def from_pretrained(cls, model, **arguments):
@@ -79,9 +81,15 @@ class DummyModel:
 		self.extracted = (text, include_confidence)
 		return {'entities': DummyModel.entities}
 
-	def extract_json(self, text, format):
-		"""Return the relationship format supplied by the Formalizer."""
-		return {'text': text, 'format': format}
+	def extract_json(self, text, format, include_confidence = False):
+		"""Record the request and return the configured structures, as GLiNER2 does with include_confidence."""
+		self.json_request = (text, format, include_confidence)
+		return DummyModel.structures
+
+	def extract_relations(self, text, relations, include_confidence = False):
+		"""Record the request and return the configured (head, tail) pairs, as GLiNER2 does with include_confidence."""
+		self.relations_request = (text, relations, include_confidence)
+		return {'relation_extraction': DummyModel.pairs}
 
 
 def set_gliner_extractor(monkeypatch, extractor):
@@ -107,14 +115,16 @@ def _configuration(**extra):
 	return conf
 
 
-def _ready_formalizer(monkeypatch, directory):
-	"""Build a ready Formalizer with a deterministic model and an ontology of two entities and one relationship."""
+def _ready_formalizer(monkeypatch, directory, entities = ('person', 'place'), relations = (('located', 'person', 'place'),)):
+	"""Build a ready Formalizer with a deterministic model and an ontology (by default, two entities and one relationship)."""
 	set_gliner_extractor(monkeypatch, DummyModel)
 	DummyModel.loaded = []
 	DummyModel.fail_loading = False
 	DummyModel.entities = {}
+	DummyModel.structures = {}
+	DummyModel.pairs = {}
 	formalizer = Formalizer(schema = 'test', extra_args = _configuration())
-	formalizer.tools['formalizer_test/agentic_graph_ontology'] = _multigraph(directory, ('person', 'place'), (('located', 'person', 'place'),))
+	formalizer.tools['formalizer_test/agentic_graph_ontology'] = _multigraph(directory, entities, relations)
 	formalizer.pilot(FormalizerState.READY.value)
 	return formalizer
 
@@ -211,13 +221,12 @@ def test_formalizer_hint_nodes_and_edges(monkeypatch, tmp_path):
 	assert formalizer._model.entity_schema == {'person': 'Definition of person.', 'place': 'Definition of place.'}
 	formalizer.hint_nodes({'text': 'Ada', 'concepts': ['person', 'missing']})
 	assert formalizer._model.entity_schema == {'person': 'Definition of person.', 'missing': ''}
-	assert formalizer.hint_edges({'text': 'Ada lives here'}) == {
-		'text': 'Ada lives here', 'format': {'Definition of located.': ['person', 'place']}
-	}
-	assert formalizer.hint_edges({'text': 'Ada lives here', 'concepts': []}) == {'text': 'Ada lives here', 'format': {}}
-	assert formalizer.hint_edges({'text': 'Ada lives here', 'concepts': ['located']}) == {
-		'text': 'Ada lives here', 'format': {'Definition of located.': ['person', 'place']}
-	}
+	assert formalizer.hint_edges({'text': 'Ada lives here', 'nodes': []}) == []
+	assert formalizer._model.json_request == ('Ada lives here', {'Definition of located.': ['person', 'place']}, True)
+	formalizer.hint_edges({'text': 'Ada lives here', 'nodes': [], 'concepts': []})
+	assert formalizer._model.json_request[1] == {}
+	formalizer.hint_edges({'text': 'Ada lives here', 'nodes': [], 'concepts': ['located']})
+	assert formalizer._model.json_request[1] == {'Definition of located.': ['person', 'place']}
 	assert formalizer.run({'name': 'hint_nodes_test', 'arguments': {'text': 'Ada'}})['finish_reason'] == 'stop'
 
 
@@ -433,6 +442,106 @@ def test_link_mention_prefers_the_only_whole_name(monkeypatch, tmp_path):
 	}
 
 
+EDGE_ENTITIES  = ('person', 'person|teacher', 'person|student', 'organization', 'organization|school', 'place')
+EDGE_RELATIONS = (('works_at', 'person', 'organization'), ('works_at|teaches_at', 'person|teacher', 'organization|school'),
+				  ('located_in', 'place', 'place'))
+
+NODES = [
+	{'mention': 'Ms. Ruiz', 'id': 'person|teacher|Elena Ruiz', 'status': 'known'},
+	{'mention': 'Tom', 'id': 'person|student|Tom', 'status': 'new'},
+	{'mention': 'Riverside', 'id': 'organization|school|Riverside School', 'status': 'known'},
+	{'mention': 'Noah', 'id': None, 'status': 'ambiguous', 'candidates': ['person|student|Noah Kim', 'person|teacher|Noah Brown']},
+	{'mention': 'Rift Valley', 'id': 'place|Rift Valley', 'status': 'new'},
+	{'mention': 'Africa', 'id': 'place|Africa', 'status': 'known'}
+]
+
+
+def _span(text, confidence = 0.9):
+	"""Return a span of GLiNER2 with confidence."""
+	return {'text': text, 'confidence': confidence}
+
+
+def _hint_edges(monkeypatch, directory, structures, pairs = None, **arguments):
+	"""Return the formalizer and the output of hint_edges on NODES, with the given structures and pairs found by the model."""
+	formalizer = _ready_formalizer(monkeypatch, directory, EDGE_ENTITIES, EDGE_RELATIONS)
+	DummyModel.structures = structures
+	DummyModel.pairs = pairs or {}
+	arguments = {'text': 'Some text.', 'nodes': NODES, **arguments}
+	return formalizer, formalizer.hint_edges(arguments)
+
+
+def test_hint_edges_replaces_the_mentions_by_the_ids_of_the_nodes(monkeypatch, tmp_path):
+	"""Every source and destination mention of a match is an edge between their ids, with the lowest confidence of both."""
+	structures = {'Definition of works_at|teaches_at.': [
+		{'person|teacher': [_span('Ms. Ruiz', 0.9)], 'organization|school': [_span('Riverside', 0.7)]}
+	]}
+	formalizer, edges = _hint_edges(monkeypatch, tmp_path, structures)
+	assert edges == [{'src': 'person|teacher|Elena Ruiz', 'relation': 'works_at|teaches_at', 'dst': 'organization|school|Riverside School', 'confidence': 0.7}]
+	assert formalizer._model.json_request[1] == {
+		'Definition of works_at.': ['person', 'organization'], 'Definition of works_at|teaches_at.': ['person|teacher', 'organization|school'],
+		'Definition of located_in.': ['place', 'place']
+	}
+
+
+def test_hint_edges_drops_ends_that_are_not_nodes_or_have_no_id(monkeypatch, tmp_path):
+	"""An end that is not the mention of a node, or that is ambiguous, gives no edge."""
+	structures = {'Definition of works_at.': [{'person': [_span('Noah'), _span('Ana')], 'organization': [_span('Riverside')]}]}
+	assert _hint_edges(monkeypatch, tmp_path, structures)[1] == []
+
+
+def test_hint_edges_requires_ends_of_the_types_of_the_relationship(monkeypatch, tmp_path):
+	"""Ends of descendant types are valid, while those of other types are not (a student does not teach)."""
+	structures = {
+		'Definition of works_at.': [{'person': [_span('Tom')], 'organization': [_span('Riverside')]}],
+		'Definition of works_at|teaches_at.': [{'person|teacher': [_span('Tom')], 'organization|school': [_span('Riverside')]}]
+	}
+	assert _hint_edges(monkeypatch, tmp_path, structures)[1] == [
+		{'src': 'person|student|Tom', 'relation': 'works_at', 'dst': 'organization|school|Riverside School', 'confidence': 0.9}
+	]
+
+
+def test_hint_edges_keeps_the_highest_confidence_of_a_repeated_edge(monkeypatch, tmp_path):
+	"""The same edge found twice is one edge with its highest confidence."""
+	structures = {'Definition of works_at.': [
+		{'person': [_span('Tom', 0.6)], 'organization': [_span('Riverside', 0.6)]},
+		{'person': [_span('Tom', 0.8)], 'organization': [_span('Riverside', 0.9)]}
+	]}
+	assert _hint_edges(monkeypatch, tmp_path, structures)[1] == [
+		{'src': 'person|student|Tom', 'relation': 'works_at', 'dst': 'organization|school|Riverside School', 'confidence': 0.8}
+	]
+
+
+def test_hint_edges_drops_an_edge_when_the_same_pair_has_a_more_specific_one(monkeypatch, tmp_path):
+	"""works_at is implied by works_at|teaches_at between the same nodes."""
+	structures = {
+		'Definition of works_at.': [{'person': [_span('Ms. Ruiz')], 'organization': [_span('Riverside')]}],
+		'Definition of works_at|teaches_at.': [{'person|teacher': [_span('Ms. Ruiz')], 'organization|school': [_span('Riverside')]}]
+	}
+	assert [edge['relation'] for edge in _hint_edges(monkeypatch, tmp_path, structures)[1]] == ['works_at|teaches_at']
+
+
+def test_hint_edges_asks_for_pairs_of_relationships_with_the_same_type_at_both_ends(monkeypatch, tmp_path):
+	"""The structure of place to place only tells that located_in is in the text: its direction comes from the (head, tail) pairs."""
+	structures = {'Definition of located_in.': [{'place': [_span('Rift Valley')]}, {'place': [_span('Africa')]}]}
+	pairs = {'located_in': [{'head': _span('Rift Valley', 0.8), 'tail': _span('Africa', 0.8)}]}
+	formalizer, edges = _hint_edges(monkeypatch, tmp_path, structures, pairs)
+	assert edges == [{'src': 'place|Rift Valley', 'relation': 'located_in', 'dst': 'place|Africa', 'confidence': 0.8}]
+	assert formalizer._model.relations_request == ('Some text.', {'located_in': 'Definition of located_in.'}, True)
+
+
+def test_hint_edges_does_not_ask_for_pairs_when_no_relationship_needs_them(monkeypatch, tmp_path):
+	"""Without mentions of a relationship with the same type at both ends, the model is not asked for pairs."""
+	formalizer, edges = _hint_edges(monkeypatch, tmp_path, {'Definition of located_in.': [{'place': []}]})
+	assert edges == []
+	assert not hasattr(formalizer._model, 'relations_request')
+
+
+def test_hint_edges_only_asks_for_the_given_relationships(monkeypatch, tmp_path):
+	"""With concepts, only those relationships are asked for."""
+	formalizer, _ = _hint_edges(monkeypatch, tmp_path, {}, concepts = ['located_in'])
+	assert formalizer._model.json_request[1] == {'Definition of located_in.': ['place', 'place']}
+
+
 def test_formalizer_request_state_errors_and_close():
 	"""Cover unavailable request handling, logging, and resource cleanup."""
 	formalizer = Formalizer(schema = 'errors', extra_args = _configuration(), logger = [])
@@ -442,13 +551,14 @@ def test_formalizer_request_state_errors_and_close():
 	formalizer._meta_['state'] = FormalizerState.READY.value
 	assert formalizer.hint_nodes({}) is None
 	assert formalizer.hint_edges({}) is None
+	assert formalizer.hint_edges({'text': 'Ada'}) is None
 	assert formalizer.is_same_node({'node': {'id': 'person|Ada'}}) is None
 	formalizer._ontology = object()
 	formalizer._model = object()
 	formalizer.close(False)
 	assert formalizer._ontology is None
 	assert formalizer._model is None
-	assert len(formalizer.logger) == 6
+	assert len(formalizer.logger) == 7
 
 
 def test_formalizer_handles_missing_gliner_dependency(monkeypatch):

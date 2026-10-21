@@ -201,6 +201,8 @@ class Formalizer(Agentic):
 	in the EvidenceGraph.
 	- **AutoExtractor** (Structure Extraction): Is given an `extract_json()` format created by the Formalizer to match the definitions
 	of both the relationship and its elements from the Ontology.
+	- **AutoExtractor** (Relation Extraction): `extract_relations()` gives (head, tail) pairs. It is only asked for the relationships
+	with the same type at both ends, whose structure cannot tell one end from the other.
 	Whether two nodes are the same instance ([`is_same_node()`][mercury.graph.evidence.Formalizer.is_same_node]) is not asked to
 	GLiNER2: it is scored comparing their names.
 
@@ -215,7 +217,7 @@ class Formalizer(Agentic):
 	The Formalizer exposes three capabilities:
 
 	1. Entity Extraction (`hint_nodes`): every mention of a type of the ontology, with the known instances it can be.
-	2. Relationship Extraction (`hint_edges`)
+	2. Relationship Extraction (`hint_edges`): every edge of a relationship of the ontology between the nodes found in a text.
 	3. Node comparison (`is_same_node`): how likely two nodes (known instances or mentions) are the same instance.
 
 	## Linking mentions to known instances
@@ -231,7 +233,6 @@ class Formalizer(Agentic):
 	- Confidence scoring is not implemented.
 	- There is not mechanism to specify "threshold"
 	- The key 'definition' is hardcoded, it should be included in the config to make it easier to find and modify.
-	- hint_edges() requires a different logic since it is forcing to return all possible edges, not just those
 	- is_same_node() only compares the names in the ids: it ignores the texts of the nodes.
 
 	In general, the whole system is very early-stage, released for developer use and experimentation. The best way of formalizing
@@ -611,15 +612,29 @@ class Formalizer(Agentic):
 
 
 	def hint_edges(self, arguments):
-		""" Identifies edges in a text from the ontology or some concepts in it.
+		""" Identifies edges of the ontology, or of some relationships in it, between the nodes of a text.
+
+		The model is asked for every relationship as a structure with a field for each end, named by its type. A relationship whose
+		ends have the same type (e.g., place to place) has two fields with the same name, so the model only finds that the relationship
+		is in the text, not its pairs: the model is then asked again, only for those relationships, for (head, tail) pairs.
+
+		The mentions at both ends are replaced by the ids of the nodes, and the edges are kept if both ends are nodes with an id and
+		their types are those of the relationship or descendants of them. A repeated edge keeps its highest confidence, and an edge is
+		dropped when the same pair has an edge of a more specific relationship (e.g., works_on when works_on|leads is found).
+
+		Unlike `hint_nodes`, which is given the known instances as candidates, `hint_edges` is given the nodes already linked: it must be
+		called after `hint_nodes` and `link_mention()` on the same text. Whether an edge is already known is not part of its output:
+		once both ends are ids, that is an exact lookup in the graph, and what to do with it (confirm, aggregate or contradict) is
+		decided by the EvidenceGraph.
 
 		Args:
 			arguments (dict): A dictionary containing the following keys:
 				- 'text' (str): The text from which to identify edges.
-				- 'concepts' (list): A list of concepts to identify in the text. If empty, all concepts will be considered.
+				- 'nodes' (list): The nodes of the text, with 'mention' and 'id' (as returned by `link_mention()`).
+				- 'concepts' (list): The ids of the relationships to identify. If missing, all of them are considered.
 
 		Returns:
-			(dict): A dictionary where keys are identified edges and values are their descriptions.
+			(list): One dictionary per edge with 'src', 'relation', 'dst' (ids) and 'confidence'.
 		"""
 
 		if self._meta_['state'] != self.states.READY.value:
@@ -627,24 +642,152 @@ class Formalizer(Agentic):
 
 			return None
 
-		text = arguments.get('text', None)
+		text  = arguments.get('text', None)
+		nodes = arguments.get('nodes', None)
 
-		if text is None:
-			self.log_error('Formalizer.hint_edges() %s called without "text" argument.' % self.id)
+		if text is None or nodes is None:
+			self.log_error('Formalizer.hint_edges() %s called without "text" and "nodes" arguments.' % self.id)
 
 			return None
 
-		ntx = self._ontology._graph.networkx
+		relations = self._get_relations(arguments.get('concepts', None))
+		ids		  = {node['mention']: node['id'] for node in nodes}
 
-		format = {}
-		concepts = arguments.get('concepts', None)
-		for src, dst, id, definition in ntx.edges(keys = True, data = 'definition'):
-			if concepts is None or id in concepts:
-				format[definition] = [src, dst]
+		found	  = self._extract_structures(text, relations)
+		triples	  = self._pair_mentions(found, relations, ids)
+		same_type = self._find_same_type_relations(found, relations)
 
-		result = self._model.extract_json(text, format)
+		if len(same_type) > 0:
+			triples += self._extract_directed_pairs(text, same_type, relations, ids)
+
+		result = self._finish_edges(triples, relations)
 
 		return result
+
+
+	def _get_relations(self, concepts):
+		""" Returns {id: (src, dst, definition)} of the relationships of the ontology, or of those in concepts. """
+
+		ntx = self._ontology._graph.networkx
+
+		relations = {}
+		for src, dst, index, definition in ntx.edges(keys = True, data = 'definition'):
+			if concepts is None or index in concepts:
+				relations[index] = (src, dst, definition)
+
+		return relations
+
+
+	def _extract_structures(self, text, relations):
+		""" Returns {relation id: matches} found by the model, every relationship asked as a structure named by its definition. """
+
+		structures = {definition: [src, dst] for src, dst, definition in relations.values()}
+		extraction = self._model.extract_json(text, structures, include_confidence = True)
+
+		by_definition = {definition: index for index, (_, _, definition) in relations.items()}
+		result		  = {by_definition[definition]: matches for definition, matches in extraction.items()}
+
+		return result
+
+
+	def _pair_mentions(self, found, relations, ids):
+		""" Returns (src id, relation, dst id, confidence) for every pair of mentions of the matches of relations with different end types. """
+
+		triples = []
+		for index, matches in found.items():
+			src_type, dst_type, _ = relations[index]
+			if src_type != dst_type:
+				for match in matches:
+					triples += self._pair_match(index, match.get(src_type, []), match.get(dst_type, []), ids)
+
+		return triples
+
+
+	def _pair_match(self, index, sources, destinations, ids):
+		""" Returns a triple for every source and destination mention of one match, with the lowest of both confidences. """
+
+		triples = []
+		for src in sources:
+			for dst in destinations:
+				confidence = min(src['confidence'], dst['confidence'])
+				triples.append((ids.get(src['text'], None), index, ids.get(dst['text'], None), confidence))
+
+		return triples
+
+
+	def _find_same_type_relations(self, found, relations):
+		""" Returns the ids of the relationships with the same type at both ends that the model found mentions of. """
+
+		result = []
+		for index, matches in found.items():
+			src_type, dst_type, _ = relations[index]
+			mentions = [span for match in matches for spans in match.values() for span in spans]
+			if src_type == dst_type and len(mentions) > 0:
+				result.append(index)
+
+		return result
+
+
+	def _extract_directed_pairs(self, text, same_type, relations, ids):
+		""" Returns (src id, relation, dst id, confidence) for every (head, tail) pair the model finds for the given relationships. """
+
+		schema = {index: relations[index][2] for index in same_type}
+		found  = self._model.extract_relations(text, schema, include_confidence = True)
+
+		triples = []
+		for index, pairs in found.get('relation_extraction', {}).items():
+			for pair in pairs:
+				src = ids.get(pair['head']['text'], None)
+				dst = ids.get(pair['tail']['text'], None)
+				triples.append((src, index, dst, pair['head']['confidence']))
+
+		return triples
+
+
+	def _finish_edges(self, triples, relations):
+		""" Returns the edges of the triples with valid ends, without repeated edges or edges of a relationship more generic than another. """
+
+		valid = [triple for triple in triples if self._has_valid_ends(triple, relations)]
+		best  = self._keep_highest_confidence(valid)
+
+		result = []
+		for (src, index, dst), confidence in best.items():
+			if not self._has_more_specific_edge(src, index, dst, best):
+				result.append({'src': src, 'relation': index, 'dst': dst, 'confidence': confidence})
+
+		return result
+
+
+	def _has_valid_ends(self, triple, relations):
+		""" Returns True if both ends have an id whose type is that of the relationship or a descendant of it. """
+
+		src, index, dst, _ = triple
+		src_type, dst_type, _ = relations[index]
+
+		if src is None or dst is None:
+			return False
+
+		return descends_from(parent_of(src), src_type) and descends_from(parent_of(dst), dst_type)
+
+
+	def _keep_highest_confidence(self, triples):
+		""" Returns {(src, relation, dst): confidence} with the highest confidence of every repeated edge. """
+
+		best = {}
+		for src, index, dst, confidence in triples:
+			best[(src, index, dst)] = max(confidence, best.get((src, index, dst), 0))
+
+		return best
+
+
+	def _has_more_specific_edge(self, src, index, dst, edges):
+		""" Returns True if the same pair has an edge of a relationship that descends from index. """
+
+		for other_src, other_index, other_dst in edges:
+			if (other_src, other_dst) == (src, dst) and other_index != index and descends_from(other_index, index):
+				return True
+
+		return False
 
 
 	def is_same_node(self, arguments):
@@ -851,7 +994,7 @@ class Formalizer(Agentic):
 				'type': 'function',
 				'function': {
 					'name': name_hint_edges,
-					'description': 'Identify edges in a text from the ontology or some concepts in it.',
+					'description': 'Identify edges of the ontology, or of some relationships in it, between the nodes of a text.',
 					'parameters': {
 						'type': 'object',
 						'properties': {
@@ -859,20 +1002,28 @@ class Formalizer(Agentic):
 								'type': 'string',
 								'description': 'Text from which to identify edges.'
 							},
+							'nodes': {
+								'type': 'array',
+								'items': {
+									'type': 'object'
+								},
+								'description': 'The nodes of the text, with "mention" and "id".'
+							},
 							'concepts': {
 								'type': 'array',
 								'items': {
 									'type': 'string'
 								},
-								'description': 'List of concepts to identify in the text. If empty, all concepts will be considered.'
+								'description': 'Ids of the relationships to identify. If missing, all of them are considered.'
 							}
 						},
-						'required': ['text']
+						'required': ['text', 'nodes']
 					},
 					'returns': {
-						'type': 'dict',
+						'type': 'array',
 						'items': {
-							'key': 'description'
+							'type': 'object',
+							'description': 'One edge with "src", "relation", "dst" (ids) and "confidence".'
 						}
 					}
 				}
