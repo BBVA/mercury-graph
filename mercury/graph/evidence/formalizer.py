@@ -201,8 +201,8 @@ class Formalizer(Agentic):
 	in the EvidenceGraph.
 	- **AutoExtractor** (Structure Extraction): Is given an `extract_json()` format created by the Formalizer to match the definitions
 	of both the relationship and its elements from the Ontology.
-	-  **AutoExtractor** (Classification): With a classification schema provided. This is used to classify the entire text as
-	containing the information or to determine if nodes belong to the same entity.
+	Whether two nodes are the same instance ([`is_same_node()`][mercury.graph.evidence.Formalizer.is_same_node]) is not asked to
+	GLiNER2: it is scored comparing their names.
 
 	## Ontology validation
 
@@ -214,9 +214,15 @@ class Formalizer(Agentic):
 
 	The Formalizer exposes three capabilities:
 
-	1. Entity Extraction
-	2. Relationship Extraction
-	3. Classification
+	1. Entity Extraction (`hint_nodes`): every mention of a type of the ontology, with the known instances it can be.
+	2. Relationship Extraction (`hint_edges`)
+	3. Node comparison (`is_same_node`): how likely two nodes (known instances or mentions) are the same instance.
+
+	## Linking mentions to known instances
+
+	[`link_mention()`][mercury.graph.evidence.Formalizer.link_mention] decides whether a mention found by `hint_nodes` is a known
+	instance, a new one or ambiguous, asking `is_same_node` when the name alone is not enough. It is not a capability: those rules
+	belong to the caller (the EvidenceGraph) and are here until it uses them.
 
 	## Known Limitations
 
@@ -226,7 +232,7 @@ class Formalizer(Agentic):
 	- There is not mechanism to specify "threshold"
 	- The key 'definition' is hardcoded, it should be included in the config to make it easier to find and modify.
 	- hint_edges() requires a different logic since it is forcing to return all possible edges, not just those
-	- is_a() is not implemented. It is still unclear how to merge entities and if text classification should play a role in it.
+	- is_same_node() only compares the names in the ids: it ignores the texts of the nodes.
 
 	In general, the whole system is very early-stage, released for developer use and experimentation. The best way of formalizing
 	entities and relationships from text is still to be determined. It requires a functioning architecture to experiment, and that
@@ -240,7 +246,8 @@ class Formalizer(Agentic):
 		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
 
-	IGNORED_WORDS = ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof']	# Default "ignored_words": titles left out when comparing names.
+	IGNORED_WORDS		= ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof']	# Default "ignored_words": titles left out when comparing names.
+	SAME_NODE_THRESHOLD = 0.3	# Default "same_node_threshold": the is_same_node() score from which link_mention() accepts a candidate.
 
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'formalizer', schema = schema, endpoint = endpoint, logger = logger)
@@ -519,39 +526,53 @@ class Formalizer(Agentic):
 	def _find_candidates(self, mention, concept, candidates):
 		""" Returns the candidates of the root type of concept that share a word with the mention, from the highest to the lowest score. """
 
-		same_root = [candidate for candidate in candidates if self._have_same_root(concept, parent_of(candidate))]
-		scored	  = [self._score_candidate(mention, concept, candidate) for candidate in same_root]
-		found	  = [candidate for candidate in scored if candidate['score'] > 0]
+		mention_id = '%s|%s' % (concept, mention)
+		scored	   = [self._score_candidate(mention_id, candidate) for candidate in candidates]
+		found	   = [candidate for candidate in scored if candidate['score'] > 0]
 
 		result = sorted(found, key = lambda candidate: candidate['score'], reverse = True)
 
 		return result
 
 
-	def _have_same_root(self, concept, known_type):
-		""" Returns True if both types are under the same root type (person|teacher and person|student are). """
-
-		if known_type is None:
-			return False
-
-		return concept.split('|')[0] == known_type.split('|')[0]
-
-
-	def _score_candidate(self, mention, concept, candidate):
+	def _score_candidate(self, mention_id, candidate):
 		""" Returns {'id', 'score'} of a candidate for a mention, with 'type_conflict' if their types are in different branches. """
 
+		concept	   = parent_of(mention_id)
 		known_type = parent_of(candidate)
-		generic	   = self._get_words(concept) | self._get_words(known_type)
-
-		words	   = self._get_significant_words(mention, generic)
-		name_words = self._get_significant_words(candidate.rsplit('|', 1)[1], generic)
-		score	   = self._jaccard(words, name_words)
+		score	   = self._compare_names(mention_id, candidate)
 		scored	   = {'id': candidate, 'score': score}
 
-		if not (descends_from(concept, known_type) or descends_from(known_type, concept)):
+		if known_type is not None and not (descends_from(concept, known_type) or descends_from(known_type, concept)):
 			scored['type_conflict'] = True
 
 		return scored
+
+
+	def _compare_names(self, index, other):
+		""" Returns the share of significant words in common between the names of two ids, or 0 if their types have different roots. """
+
+		concept		  = parent_of(index)
+		other_concept = parent_of(other)
+		if not self._have_same_root(concept, other_concept):
+			return 0
+
+		generic		= self._get_words(concept) | self._get_words(other_concept)
+		words		= self._get_significant_words(index.rsplit('|', 1)[1], generic)
+		other_words = self._get_significant_words(other.rsplit('|', 1)[1], generic)
+
+		result = self._jaccard(words, other_words)
+
+		return result
+
+
+	def _have_same_root(self, concept, other_concept):
+		""" Returns True if both types are under the same root type (person|teacher and person|student are). """
+
+		if concept is None or other_concept is None:
+			return False
+
+		return concept.split('|')[0] == other_concept.split('|')[0]
 
 
 	def _get_significant_words(self, name, generic):
@@ -626,25 +647,98 @@ class Formalizer(Agentic):
 		return result
 
 
-	def is_a(self, arguments):
-		""" Checks if a given concept is a subclass of another concept in the ontology.
+	def is_same_node(self, arguments):
+		""" Scores how likely two nodes are the same instance. It is symmetric.
+
+		A node is a known instance or a mention, whose id is its type followed by the mention (e.g., `person|teacher|Ms. Ruiz`). This
+		Formalizer only compares the names in the ids, as `hint_nodes` does with its candidates: 0 if their types have different roots
+		and the share of significant words in common otherwise. The texts are accepted for Formalizers that read them.
 
 		Args:
 			arguments (dict): A dictionary containing the following keys:
-				- 'child' (str): The child concept to check.
-				- 'parent' (str): The parent concept to check against.
+				- 'node' (dict): A node, with 'id' (str) and optionally 'texts' (list), the texts that mention it.
+				- 'other' (dict): The other node, in the same format.
 
 		Returns:
-			(float): Returns a [0..1] score indicating the likelihood that the child is a subclass of the parent.
+			(float): A score in [0..1], or None if the Formalizer is not ready or a node is missing.
 		"""
 
 		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('Formalizer is not ready for is_a.')
+			self.log_error('Formalizer is not ready for is_same_node.')
 
 			return None
 
-		# TODO: Implement is_a().
-		return 0
+		node  = arguments.get('node', None)
+		other = arguments.get('other', None)
+
+		if node is None or other is None:
+			self.log_error('Formalizer.is_same_node() %s called without "node" and "other" arguments.' % self.id)
+
+			return None
+
+		result = self._compare_names(node['id'], other['id'])
+
+		return result
+
+
+	def link_mention(self, node, text = None):
+		""" Decides whether a mention found by `hint_nodes` is a known instance, a new one or ambiguous.
+
+		1. Candidates with `type_conflict` are discarded unless their score is 1 (the whole name).
+		2. A single candidate with score 1 is the instance.
+		3. Otherwise, `is_same_node` scores the mention (with the text) against every candidate left, and those from the configured
+		"same_node_threshold" on are kept.
+
+		Args:
+			node (dict): A node returned by `hint_nodes`.
+			text (str): The text where the mention was found, passed to `is_same_node`.
+
+		Returns:
+			(dict): The 'mention' with its 'id' and 'status': 'known' (with 'type_conflict' True if the type found contradicts the known
+				one), 'new' (its type followed by the mention) or 'ambiguous' (id None, with the ids of the instances it can be in
+				'candidates').
+		"""
+
+		viable = [candidate for candidate in node['candidates'] if candidate['score'] == 1 or not candidate.get('type_conflict', False)]
+		whole  = [candidate for candidate in viable if candidate['score'] == 1]
+
+		accepted = whole if len(whole) == 1 else self._confirm_candidates(node, viable, text)
+		result	 = self._build_link(node, accepted)
+
+		return result
+
+
+	def _confirm_candidates(self, node, candidates, text):
+		""" Returns the candidates that is_same_node scores from the configured threshold on as the same instance as the mention. """
+
+		threshold = self.conf.get('same_node_threshold', self.SAME_NODE_THRESHOLD)
+		texts	  = [] if text is None else [text]
+		mention	  = {'id': '%s|%s' % (node['type'], node['mention']), 'texts': texts}
+
+		result = []
+		for candidate in candidates:
+			score = self.is_same_node({'node': mention, 'other': candidate})
+			if score >= threshold:
+				result.append(candidate)
+
+		return result
+
+
+	def _build_link(self, node, accepted):
+		""" Returns the decision for a mention given the candidates accepted: new if none, known if one and ambiguous if several. """
+
+		if len(accepted) == 0:
+			index = '%s|%s' % (node['type'], node['mention'])
+			link  = {'mention': node['mention'], 'id': index, 'status': 'new'}
+		elif len(accepted) == 1:
+			link = {'mention': node['mention'], 'id': accepted[0]['id'], 'status': 'known'}
+			if accepted[0].get('type_conflict', False):
+				link['type_conflict'] = True
+		else:
+			ids	 = [candidate['id'] for candidate in accepted]
+			link = {'mention': node['mention'], 'id': None, 'status': 'ambiguous', 'candidates': ids}
+
+		return link
 
 
 	def close(self, endpoint_locked):
@@ -710,9 +804,9 @@ class Formalizer(Agentic):
 
 		name_hint_nodes = 'hint_nodes_%s' % self.name
 		name_hint_edges = 'hint_edges_%s' % self.name
-		name_is_a		= 'is_a_%s' % self.name
+		name_is_same	= 'is_same_node_%s' % self.name
 
-		self.call = {name_hint_nodes: self.hint_nodes, name_hint_edges: self.hint_edges, name_is_a: self.is_a}
+		self.call = {name_hint_nodes: self.hint_nodes, name_hint_edges: self.hint_edges, name_is_same: self.is_same_node}
 
 		return [
 			{
@@ -786,32 +880,25 @@ class Formalizer(Agentic):
 			{
 				'type': 'function',
 				'function': {
-					'name': name_is_a,
-					'description': 'Determine if a given concept is a type of another concept in the ontology.',
+					'name': name_is_same,
+					'description': 'Score how likely two nodes (known instances or mentions, as "type|name" ids) are the same instance.',
 					'parameters': {
 						'type': 'object',
 						'properties': {
-							'text': {
-								'type': 'string',
-								'description': 'Text from which to determine the relationship between concepts.'
+							'node': {
+								'type': 'object',
+								'description': 'A node: "id" and optionally "texts", a list of texts that mention it.'
 							},
-							'concept': {
-								'type': 'string',
-								'description': 'The concept to check.'
-							},
-							'parent_concept': {
-								'type': 'string',
-								'description': 'The parent concept to check against.'
+							'other': {
+								'type': 'object',
+								'description': 'The other node, in the same format.'
 							}
 						},
-						'required': ['text', 'concept', 'parent_concept']
+						'required': ['node', 'other']
 					},
 					'returns': {
 						'type': 'number',
-						'description': 'A numerical score (0..1) indicating the confidence.',
-						'score': {
-							'type': 'number'
-						}
+						'description': 'A score (0..1): how likely both nodes are the same instance.'
 					}
 				}
 			}

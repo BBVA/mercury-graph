@@ -186,7 +186,7 @@ def test_formalizer_pilot_ready_exposes_every_capability(monkeypatch, tmp_path):
 	formalizer = _ready_formalizer(monkeypatch, tmp_path)
 	assert formalizer.meta['state'] == FormalizerState.READY.value
 	assert DummyModel.loaded == [('dummy', {'map_location': 'cpu', 'quantize': True, 'compile': False})]
-	assert [capability['function']['name'] for capability in formalizer.meta['capabilities']] == ['hint_nodes_test', 'hint_edges_test', 'is_a_test']
+	assert [capability['function']['name'] for capability in formalizer.meta['capabilities']] == ['hint_nodes_test', 'hint_edges_test', 'is_same_node_test']
 
 
 def test_formalizer_pilot_just_once_reaches_each_stage(monkeypatch, tmp_path):
@@ -203,7 +203,7 @@ def test_formalizer_pilot_just_once_reaches_each_stage(monkeypatch, tmp_path):
 	assert formalizer.meta['state'] == FormalizerState.READY.value
 
 
-def test_formalizer_hint_nodes_edges_and_is_a(monkeypatch, tmp_path):
+def test_formalizer_hint_nodes_and_edges(monkeypatch, tmp_path):
 	"""Exercise ready-state extraction with every concepts selection path."""
 	formalizer = _ready_formalizer(monkeypatch, tmp_path)
 	assert formalizer.hint_nodes({'text': 'Ada'}) == []
@@ -218,7 +218,6 @@ def test_formalizer_hint_nodes_edges_and_is_a(monkeypatch, tmp_path):
 	assert formalizer.hint_edges({'text': 'Ada lives here', 'concepts': ['located']}) == {
 		'text': 'Ada lives here', 'format': {'Definition of located.': ['person', 'place']}
 	}
-	assert formalizer.is_a({'child': 'person', 'parent': 'thing'}) == 0
 	assert formalizer.run({'name': 'hint_nodes_test', 'arguments': {'text': 'Ada'}})['finish_reason'] == 'stop'
 
 
@@ -344,21 +343,112 @@ def test_hint_nodes_only_gives_candidates_of_the_same_root_type(monkeypatch, tmp
 	assert _candidates_of(monkeypatch, tmp_path, 'place', 'Riverside School', KNOWN + ['Riverside School']) == []
 
 
+def _is_same_node(formalizer, index, other, texts = ()):
+	"""Return the score of is_same_node for two ids, the first one with the given texts."""
+	return formalizer.is_same_node({'node': {'id': index, 'texts': list(texts)}, 'other': {'id': other}})
+
+
+def test_is_same_node_scores_the_names_of_nodes_of_the_same_root(monkeypatch, tmp_path):
+	"""The score is the share of words in common of the names, whatever the branch, and 0 for another root type."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path)
+	assert _is_same_node(formalizer, 'person|Elena Ruiz', 'person|teacher|Elena Ruiz') == 1.0
+	assert _is_same_node(formalizer, 'person|teacher|Ms. Ruiz', 'person|teacher|Elena Ruiz') == 0.5
+	assert _is_same_node(formalizer, 'person|student|Elena Ruiz', 'person|teacher|Elena Ruiz') == 1.0
+	assert _is_same_node(formalizer, 'place|Elena Ruiz', 'person|teacher|Elena Ruiz') == 0
+
+
+def test_is_same_node_is_symmetric_and_ignores_the_texts(monkeypatch, tmp_path):
+	"""Swapping the nodes gives the same score, and the texts do not change it in this Formalizer."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path)
+	score = _is_same_node(formalizer, 'person|teacher|Ms. Ruiz', 'person|teacher|Elena Ruiz')
+	assert _is_same_node(formalizer, 'person|teacher|Elena Ruiz', 'person|teacher|Ms. Ruiz') == score
+	assert _is_same_node(formalizer, 'person|teacher|Ms. Ruiz', 'person|teacher|Elena Ruiz', ['Ms. Ruiz teaches science.']) == score
+
+
+def test_is_same_node_is_a_capability(monkeypatch, tmp_path):
+	"""is_same_node can be run by its capability name."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path)
+	arguments  = {'node': {'id': 'person|Ada'}, 'other': {'id': 'person|Ada Lovelace'}}
+	assert formalizer.run({'name': 'is_same_node_test', 'arguments': arguments}) == {'finish_reason': 'stop', 'message': 0.5}
+
+
+def _link(monkeypatch, directory, concept, mention, candidates = KNOWN, **conf):
+	"""Return the decision of link_mention for a single mention of a type found by the model."""
+	formalizer = _ready_formalizer(monkeypatch, directory)
+	formalizer.conf.update(conf)
+	DummyModel.entities = _found((concept, mention, 0.9))
+	nodes = formalizer.hint_nodes({'text': 'Some text.', 'candidates': candidates})
+	return formalizer.link_mention(nodes[0], 'Some text.')
+
+
+def test_link_mention_creates_a_mention_with_no_candidates(monkeypatch, tmp_path):
+	"""Case 1: with no known instances, the mention is new, with its type followed by the mention as id."""
+	assert _link(monkeypatch, tmp_path, 'person|teacher', 'Elena Ruiz', []) == {
+		'mention': 'Elena Ruiz', 'id': 'person|teacher|Elena Ruiz', 'status': 'new'
+	}
+
+
+def test_link_mention_links_the_whole_name_of_a_known_instance(monkeypatch, tmp_path):
+	"""Cases 2 and 3: the whole name of a known instance is that instance, found with its type or an ancestor."""
+	expected = {'mention': 'Elena Ruiz', 'id': 'person|teacher|Elena Ruiz', 'status': 'known'}
+	assert _link(monkeypatch, tmp_path, 'person|teacher', 'Elena Ruiz') == expected
+	assert _link(monkeypatch, tmp_path, 'person', 'Elena Ruiz') == expected
+
+
+def test_link_mention_links_the_whole_name_despite_a_type_conflict(monkeypatch, tmp_path):
+	"""Case 4: the whole name with a type of another branch is the known instance, with type_conflict."""
+	assert _link(monkeypatch, tmp_path, 'person|student', 'Elena Ruiz') == {
+		'mention': 'Elena Ruiz', 'id': 'person|teacher|Elena Ruiz', 'status': 'known', 'type_conflict': True
+	}
+
+
+def test_link_mention_links_a_partial_name_from_the_threshold_on(monkeypatch, tmp_path):
+	"""Case 5: a partial name is linked if is_same_node scores it from the threshold on, and new otherwise."""
+	assert _link(monkeypatch, tmp_path, 'person|teacher', 'Ms. Ruiz') == {'mention': 'Ms. Ruiz', 'id': 'person|teacher|Elena Ruiz', 'status': 'known'}
+	assert _link(monkeypatch, tmp_path, 'person|teacher', 'Ms. Ruiz', same_node_threshold = 0.6) == {
+		'mention': 'Ms. Ruiz', 'id': 'person|teacher|Ms. Ruiz', 'status': 'new'
+	}
+
+
+def test_link_mention_reports_a_mention_of_several_instances_as_ambiguous(monkeypatch, tmp_path):
+	"""A first name of two known instances is ambiguous, and so is the whole name of two homonyms."""
+	assert _link(monkeypatch, tmp_path, 'person', 'Noah') == {
+		'mention': 'Noah', 'id': None, 'status': 'ambiguous', 'candidates': ['person|student|Noah Kim', 'person|teacher|Noah Brown']
+	}
+	homonyms = KNOWN + ['person|student|Elena Ruiz']
+	assert _link(monkeypatch, tmp_path, 'person', 'Elena Ruiz', homonyms) == {
+		'mention': 'Elena Ruiz', 'id': None, 'status': 'ambiguous', 'candidates': ['person|teacher|Elena Ruiz', 'person|student|Elena Ruiz']
+	}
+
+
+def test_link_mention_discards_partial_names_with_a_type_conflict(monkeypatch, tmp_path):
+	"""A partial name with a type of another branch is not enough: "Noah" as a principal is a new principal."""
+	assert _link(monkeypatch, tmp_path, 'person|principal', 'Noah') == {'mention': 'Noah', 'id': 'person|principal|Noah', 'status': 'new'}
+
+
+def test_link_mention_prefers_the_only_whole_name(monkeypatch, tmp_path):
+	"""A whole name is the instance even if other candidates share some of its words."""
+	assert _link(monkeypatch, tmp_path, 'person|teacher', 'Noah Brown') == {
+		'mention': 'Noah Brown', 'id': 'person|teacher|Noah Brown', 'status': 'known'
+	}
+
+
 def test_formalizer_request_state_errors_and_close():
 	"""Cover unavailable request handling, logging, and resource cleanup."""
 	formalizer = Formalizer(schema = 'errors', extra_args = _configuration(), logger = [])
 	assert formalizer.hint_nodes({'text': 'Ada'}) is None
 	assert formalizer.hint_edges({'text': 'Ada'}) is None
-	assert formalizer.is_a({}) is None
+	assert formalizer.is_same_node({}) is None
 	formalizer._meta_['state'] = FormalizerState.READY.value
 	assert formalizer.hint_nodes({}) is None
 	assert formalizer.hint_edges({}) is None
+	assert formalizer.is_same_node({'node': {'id': 'person|Ada'}}) is None
 	formalizer._ontology = object()
 	formalizer._model = object()
 	formalizer.close(False)
 	assert formalizer._ontology is None
 	assert formalizer._model is None
-	assert len(formalizer.logger) == 5
+	assert len(formalizer.logger) == 6
 
 
 def test_formalizer_handles_missing_gliner_dependency(monkeypatch):
