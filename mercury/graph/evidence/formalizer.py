@@ -468,25 +468,29 @@ class Formalizer(Agentic):
 		schema	   = self._create_schema(arguments)
 		extraction = self._model.extract(text, schema, include_confidence = True)
 
-		entities   = extraction.get('entities', {})
-		candidates = arguments.get('candidates', [])
-		result	   = self._resolve_mentions(entities, candidates)
+		entities		= extraction.get('entities', {})
+		candidate_nodes = arguments.get('candidates', [])
+		result			= self._resolve_mentions(entities, candidate_nodes)
 
 		return result
 
 
-	def _resolve_mentions(self, entities, candidates):
-		""" Returns one node per mention in the entities found by the model, with a single type and its candidates. """
+	def _resolve_mentions(self, entities, candidate_nodes):
+		""" Returns one node per mention in the entities found by the model, with a single type and its candidate nodes. """
 
-		confidences_by_mention = self._group_types_by_mention(entities)
+		candidate_types_by_mention = self._group_types_by_mention(entities)
 
-		result = [self._resolve_mention(mention, confidences, candidates) for mention, confidences in confidences_by_mention.items()]
+		result = []
+		for mention, candidate_types in candidate_types_by_mention.items():
+			node = self._resolve_mention(mention, candidate_types, candidate_nodes)
+			result.append(node)
 
 		return result
 
 
 	def _group_types_by_mention(self, entities):
-		""" Returns {mention: {type: confidence}} from the entities found by the model ({type: [{'text': ..., 'confidence': ...}]}).
+		""" Returns {mention: {type: confidence}}, the candidate types of every mention, from the entities found by the model
+		({type: [{'text': ..., 'confidence': ...}]}).
 
 		A mention found more than once with the same type keeps its highest confidence.
 		"""
@@ -494,41 +498,42 @@ class Formalizer(Agentic):
 		found = {}
 		for concept, matches in entities.items():
 			for match in matches:
-				confidences = found.setdefault(match['text'], {})
-				confidences[concept] = max(match['confidence'], confidences.get(concept, 0))
+				candidate_types = found.setdefault(match['text'], {})
+				candidate_types[concept] = max(match['confidence'], candidate_types.get(concept, 0))
 
 		return found
 
 
-	def _resolve_mention(self, mention, confidences, candidates):
-		""" Returns the node of a mention: its text, its chosen type, the confidence of that type and its candidates. """
+	def _resolve_mention(self, mention, candidate_types, candidate_nodes):
+		""" Returns the node of a mention: its text, its chosen type, the confidence of that type and its candidate nodes. """
 
-		concept = self._choose_type(confidences)
-		found	= self._find_candidates(mention, concept, candidates)
-		node	= {'mention': mention, 'type': concept, 'confidence': confidences[concept], 'candidates': found}
+		inferred_type = self._choose_type(candidate_types)
+		found		  = self._find_candidates(mention, inferred_type, candidate_nodes)
+		node		  = {'mention': mention, 'type': inferred_type, 'confidence': candidate_types[inferred_type], 'candidates': found}
 
 		return node
 
 
-	def _choose_type(self, confidences):
-		""" Returns the most specific type compatible with the most confident one (it, its ancestors or its descendants).
+	def _choose_type(self, candidate_types):
+		""" Returns the most specific candidate type compatible with the most confident one (it, its ancestors or its descendants).
 
 		Among equally specific types, the most confident is chosen. Types of other branches are discarded.
 		"""
 
-		anchor	   = max(confidences, key = confidences.get)
-		compatible = [concept for concept in confidences if descends_from(concept, anchor) or descends_from(anchor, concept)]
+		anchor	   = max(candidate_types, key = candidate_types.get)
+		compatible = [concept for concept in candidate_types if descends_from(concept, anchor) or descends_from(anchor, concept)]
 
-		result = max(compatible, key = lambda concept: (concept.count('|'), confidences[concept]))
+		result = max(compatible, key = lambda concept: (concept.count('|'), candidate_types[concept]))
 
 		return result
 
 
-	def _find_candidates(self, mention, concept, candidates):
-		""" Returns the candidates of the root type of concept that share a word with the mention, from the highest to the lowest score. """
+	def _find_candidates(self, mention, concept, candidate_nodes):
+		""" Returns the candidate nodes of the root type of concept that share a word with the mention, from the highest to the lowest
+		score. """
 
 		mention_id = '%s|%s' % (concept, mention)
-		scored	   = [self._score_candidate(mention_id, candidate) for candidate in candidates]
+		scored	   = [self._score_candidate(mention_id, candidate) for candidate in candidate_nodes]
 		found	   = [candidate for candidate in scored if candidate['score'] > 0]
 
 		result = sorted(found, key = lambda candidate: candidate['score'], reverse = True)
@@ -851,15 +856,15 @@ class Formalizer(Agentic):
 		return result
 
 
-	def _confirm_candidates(self, node, candidates, text):
-		""" Returns the candidates that is_same_node scores from the configured threshold on as the same instance as the mention. """
+	def _confirm_candidates(self, node, candidate_nodes, text):
+		""" Returns the candidate nodes that is_same_node scores from the configured threshold on as the same instance as the mention. """
 
 		threshold = self.conf.get('same_node_threshold', self.SAME_NODE_THRESHOLD)
 		texts	  = [] if text is None else [text]
 		mention	  = {'id': '%s|%s' % (node['type'], node['mention']), 'texts': texts}
 
 		result = []
-		for candidate in candidates:
+		for candidate in candidate_nodes:
 			score = self.is_same_node({'node': mention, 'other': candidate})
 			if score >= threshold:
 				result.append(candidate)
