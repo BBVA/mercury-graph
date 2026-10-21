@@ -627,15 +627,18 @@ class Formalizer(Agentic):
 		their types are those of the relationship or descendants of them. A repeated edge keeps its highest confidence, and an edge is
 		dropped when the same pair has an edge of a more specific relationship (e.g., works_on when works_on|leads is found).
 
-		Unlike `hint_nodes`, which is given the known instances as candidates, `hint_edges` is given the nodes already linked: it must be
-		called after `hint_nodes` and `link_mention()` on the same text. Whether an edge is already known is not part of its output:
-		once both ends are ids, that is an exact lookup in the graph, and what to do with it (confirm, aggregate or contradict) is
-		decided by the EvidenceGraph.
+		Unlike `hint_nodes`, which is given the known instances as candidates, `hint_edges` is given the nodes already linked: the
+		EvidenceGraph calls it after `hint_nodes` and `link_mention()` on the same text. Without nodes (e.g., when it is used as a tool by
+		an Agent), it finds them itself the same way with no known instances, so every node is new (its type followed by the mention).
+
+		Whether an edge is already known is not part of its output: once both ends are ids, that is an exact lookup in the graph, and
+		what to do with it (confirm, aggregate or contradict) is decided by the EvidenceGraph.
 
 		Args:
 			arguments (dict): A dictionary containing the following keys:
 				- 'text' (str): The text from which to identify edges.
-				- 'nodes' (list): The nodes of the text, with 'mention' and 'id' (as returned by `link_mention()`).
+				- 'nodes' (list): The nodes of the text, with 'mention' and 'id' (as returned by `link_mention()`). If missing, they
+				are found in the text with no known instances.
 				- 'concepts' (list): The ids of the relationships to identify. If missing, all of them are considered.
 
 		Returns:
@@ -647,13 +650,16 @@ class Formalizer(Agentic):
 
 			return None
 
-		text  = arguments.get('text', None)
-		nodes = arguments.get('nodes', None)
+		text = arguments.get('text', None)
 
-		if text is None or nodes is None:
-			self.log_error('Formalizer.hint_edges() %s called without "text" and "nodes" arguments.' % self.id)
+		if text is None:
+			self.log_error('Formalizer.hint_edges() %s called without "text" argument.' % self.id)
 
 			return None
+
+		nodes = arguments.get('nodes', None)
+		if nodes is None:
+			nodes = self._find_new_nodes(text)
 
 		relations = self._get_relations(arguments.get('concepts', None))
 		ids		  = {node['mention']: node['id'] for node in nodes}
@@ -666,6 +672,16 @@ class Formalizer(Agentic):
 			triples += self._extract_directed_pairs(text, same_type, relations, ids)
 
 		result = self._finish_edges(triples, relations)
+
+		return result
+
+
+	def _find_new_nodes(self, text):
+		""" Returns the nodes of a text found by hint_nodes and linked by link_mention() with no known instances: all of them are new. """
+
+		nodes = self.hint_nodes({'text': text})
+
+		result = [self.link_mention(node, text) for node in nodes]
 
 		return result
 
@@ -1012,7 +1028,7 @@ class Formalizer(Agentic):
 								'items': {
 									'type': 'object'
 								},
-								'description': 'The nodes of the text, with "mention" and "id".'
+								'description': 'The nodes of the text, with "mention" and "id". If missing, they are found in the text as new nodes.'
 							},
 							'concepts': {
 								'type': 'array',
@@ -1022,7 +1038,7 @@ class Formalizer(Agentic):
 								'description': 'Ids of the relationships to identify. If missing, all of them are considered.'
 							}
 						},
-						'required': ['text', 'nodes']
+						'required': ['text']
 					},
 					'returns': {
 						'type': 'array',

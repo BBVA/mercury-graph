@@ -536,6 +536,18 @@ def test_hint_edges_does_not_ask_for_pairs_when_no_relationship_needs_them(monke
 	assert not hasattr(formalizer._model, 'relations_request')
 
 
+def test_hint_edges_finds_new_nodes_when_it_is_not_given_any(monkeypatch, tmp_path):
+	"""Without nodes, those found by hint_nodes in the text are the ends, all of them new (as for an Agent using it as a tool)."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path, EDGE_ENTITIES, EDGE_RELATIONS)
+	DummyModel.entities = _found(('person|teacher', 'Ms. Ruiz', 0.9), ('organization|school', 'Riverside', 0.8))
+	DummyModel.structures = {'Definition of works_at|teaches_at.': [
+		{'person|teacher': [_span('Ms. Ruiz', 0.9)], 'organization|school': [_span('Riverside', 0.8)]}
+	]}
+	assert formalizer.hint_edges({'text': 'Ms. Ruiz teaches at Riverside.'}) == [
+		{'src': 'person|teacher|Ms. Ruiz', 'relation': 'works_at|teaches_at', 'dst': 'organization|school|Riverside', 'confidence': 0.8}
+	]
+
+
 def test_hint_edges_only_asks_for_the_given_relationships(monkeypatch, tmp_path):
 	"""With concepts, only those relationships are asked for."""
 	formalizer, _ = _hint_edges(monkeypatch, tmp_path, {}, concepts = ['located_in'])
@@ -551,14 +563,13 @@ def test_formalizer_request_state_errors_and_close():
 	formalizer._meta_['state'] = FormalizerState.READY.value
 	assert formalizer.hint_nodes({}) is None
 	assert formalizer.hint_edges({}) is None
-	assert formalizer.hint_edges({'text': 'Ada'}) is None
 	assert formalizer.is_same_node({'node': {'id': 'person|Ada'}}) is None
 	formalizer._ontology = object()
 	formalizer._model = object()
 	formalizer.close(False)
 	assert formalizer._ontology is None
 	assert formalizer._model is None
-	assert len(formalizer.logger) == 7
+	assert len(formalizer.logger) == 6
 
 
 def test_formalizer_handles_missing_gliner_dependency(monkeypatch):
