@@ -435,7 +435,8 @@ class Formalizer(Agentic):
 				- 'concepts' (list): A list of concepts to identify in the text. If empty, all concepts will be considered.
 
 		Returns:
-			(dict): A dictionary where keys are identified nodes and values are their descriptions.
+			(list): One dictionary per mention with 'mention' (the text as it appears), 'type' (the most specific of the types found for
+				it that are compatible with the most confident one) and 'confidence' (that of the type).
 		"""
 
 		if self._meta_['state'] != self.states.READY.value:
@@ -447,10 +448,61 @@ class Formalizer(Agentic):
 			self.log_error('Formalizer.hint_nodes() %s called without "text" argument.' % self.id)
 			return None
 
-		schema = self._create_schema(arguments)
-		result = self._model.extract(text, schema)
+		schema	   = self._create_schema(arguments)
+		extraction = self._model.extract(text, schema, include_confidence = True)
 
-		return result.get('entities', {})
+		entities = extraction.get('entities', {})
+		result	 = self._resolve_mentions(entities)
+
+		return result
+
+
+	def _resolve_mentions(self, entities):
+		""" Returns one node per mention in the entities found by the model, with a single type chosen among those found for it. """
+
+		confidences_by_mention = self._group_types_by_mention(entities)
+
+		result = [self._resolve_mention(mention, confidences) for mention, confidences in confidences_by_mention.items()]
+
+		return result
+
+
+	def _group_types_by_mention(self, entities):
+		""" Returns {mention: {type: confidence}} from the entities found by the model ({type: [{'text': ..., 'confidence': ...}]}).
+
+		A mention found more than once with the same type keeps its highest confidence.
+		"""
+
+		found = {}
+		for concept, matches in entities.items():
+			for match in matches:
+				confidences = found.setdefault(match['text'], {})
+				confidences[concept] = max(match['confidence'], confidences.get(concept, 0))
+
+		return found
+
+
+	def _resolve_mention(self, mention, confidences):
+		""" Returns the node of a mention: its text, its chosen type and the confidence of that type. """
+
+		concept = self._choose_type(confidences)
+		node	= {'mention': mention, 'type': concept, 'confidence': confidences[concept]}
+
+		return node
+
+
+	def _choose_type(self, confidences):
+		""" Returns the most specific type compatible with the most confident one (it, its ancestors or its descendants).
+
+		Among equally specific types, the most confident is chosen. Types of other branches are discarded.
+		"""
+
+		anchor	   = max(confidences, key = confidences.get)
+		compatible = [concept for concept in confidences if descends_from(concept, anchor) or descends_from(anchor, concept)]
+
+		result = max(compatible, key = lambda concept: (concept.count('|'), confidences[concept]))
+
+		return result
 
 
 	def hint_edges(self, arguments):
@@ -602,9 +654,10 @@ class Formalizer(Agentic):
 						'required': ['text']
 					},
 					'returns': {
-						'type': 'dict',
+						'type': 'array',
 						'items': {
-							'key': 'description'
+							'type': 'object',
+							'description': 'One node per mention, with "mention", "type" and "confidence".'
 						}
 					}
 				}

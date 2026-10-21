@@ -60,6 +60,7 @@ class DummyModel:
 
 	loaded = []
 	fail_loading = False
+	entities = {}
 
 	@classmethod
 	def from_pretrained(cls, model, **arguments):
@@ -73,9 +74,10 @@ class DummyModel:
 		"""Return a schema recorder for entity extraction."""
 		return DummySchema(self)
 
-	def extract(self, text, schema):
-		"""Return entities along with the supplied text and schema."""
-		return {'entities': {'text': text, 'schema': schema}}
+	def extract(self, text, schema, include_confidence = False):
+		"""Record the request and return the configured entities, as GLiNER2 does with include_confidence."""
+		self.extracted = (text, include_confidence)
+		return {'entities': DummyModel.entities}
 
 	def extract_json(self, text, format):
 		"""Return the relationship format supplied by the Formalizer."""
@@ -110,6 +112,7 @@ def _ready_formalizer(monkeypatch, directory):
 	set_gliner_extractor(monkeypatch, DummyModel)
 	DummyModel.loaded = []
 	DummyModel.fail_loading = False
+	DummyModel.entities = {}
 	formalizer = Formalizer(schema = 'test', extra_args = _configuration())
 	formalizer.tools['formalizer_test/agentic_graph_ontology'] = _multigraph(directory, ('person', 'place'), (('located', 'person', 'place'),))
 	formalizer.pilot(FormalizerState.READY.value)
@@ -203,10 +206,11 @@ def test_formalizer_pilot_just_once_reaches_each_stage(monkeypatch, tmp_path):
 def test_formalizer_hint_nodes_edges_and_is_a(monkeypatch, tmp_path):
 	"""Exercise ready-state extraction with every concepts selection path."""
 	formalizer = _ready_formalizer(monkeypatch, tmp_path)
-	assert formalizer.hint_nodes({'text': 'Ada'}) == {'text': 'Ada', 'schema': {'person': 'Definition of person.', 'place': 'Definition of place.'}}
-	assert formalizer.hint_nodes({'text': 'Ada', 'concepts': ['person', 'missing']}) == {
-		'text': 'Ada', 'schema': {'person': 'Definition of person.', 'missing': ''}
-	}
+	assert formalizer.hint_nodes({'text': 'Ada'}) == []
+	assert formalizer._model.extracted == ('Ada', True)
+	assert formalizer._model.entity_schema == {'person': 'Definition of person.', 'place': 'Definition of place.'}
+	formalizer.hint_nodes({'text': 'Ada', 'concepts': ['person', 'missing']})
+	assert formalizer._model.entity_schema == {'person': 'Definition of person.', 'missing': ''}
 	assert formalizer.hint_edges({'text': 'Ada lives here'}) == {
 		'text': 'Ada lives here', 'format': {'Definition of located.': ['person', 'place']}
 	}
@@ -216,6 +220,54 @@ def test_formalizer_hint_nodes_edges_and_is_a(monkeypatch, tmp_path):
 	}
 	assert formalizer.is_a({'child': 'person', 'parent': 'thing'}) == 0
 	assert formalizer.run({'name': 'hint_nodes_test', 'arguments': {'text': 'Ada'}})['finish_reason'] == 'stop'
+
+
+def _found(*matches):
+	"""Return GLiNER2 entities with confidence from (type, mention, confidence) triples."""
+	entities = {}
+	for concept, mention, confidence in matches:
+		entities.setdefault(concept, []).append({'text': mention, 'confidence': confidence})
+	return entities
+
+
+def _hint_nodes(monkeypatch, directory, found):
+	"""Return the output of hint_nodes on a ready Formalizer whose model finds the given entities."""
+	formalizer = _ready_formalizer(monkeypatch, directory)
+	DummyModel.entities = found
+	return formalizer.hint_nodes({'text': 'Some text.'})
+
+
+def test_hint_nodes_returns_one_node_per_mention(monkeypatch, tmp_path):
+	"""Every mention is a node with its type and confidence, in the order the model found them."""
+	found = _found(('person|teacher', 'Elena Ruiz', 0.9), ('organization|school', 'Riverside School', 0.8))
+	assert _hint_nodes(monkeypatch, tmp_path, found) == [
+		{'mention': 'Elena Ruiz', 'type': 'person|teacher', 'confidence': 0.9},
+		{'mention': 'Riverside School', 'type': 'organization|school', 'confidence': 0.8}
+	]
+
+
+def test_hint_nodes_gives_a_mention_the_most_specific_compatible_type(monkeypatch, tmp_path):
+	"""A mention found as a type and its ancestor is one node with the most specific type, even if it is less confident."""
+	found = _found(('person', 'Ms. Ruiz', 0.95), ('person|teacher', 'Ms. Ruiz', 0.7))
+	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Ms. Ruiz', 'type': 'person|teacher', 'confidence': 0.7}]
+
+
+def test_hint_nodes_discards_the_types_of_other_branches(monkeypatch, tmp_path):
+	"""Types that are neither ancestors nor descendants of the most confident one are discarded."""
+	found = _found(('person|student', 'Lucas Moreno', 0.98), ('person|teacher', 'Lucas Moreno', 0.99), ('person', 'Lucas Moreno', 0.9))
+	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Lucas Moreno', 'type': 'person|teacher', 'confidence': 0.99}]
+
+
+def test_hint_nodes_breaks_ties_between_equally_specific_types_by_confidence(monkeypatch, tmp_path):
+	"""When the most confident type is an ancestor of several equally specific types, the most confident of them is chosen."""
+	found = _found(('person', 'Noah', 0.9), ('person|teacher', 'Noah', 0.6), ('person|student', 'Noah', 0.8))
+	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Noah', 'type': 'person|student', 'confidence': 0.8}]
+
+
+def test_hint_nodes_keeps_the_highest_confidence_of_a_repeated_mention(monkeypatch, tmp_path):
+	"""A mention found twice with the same type is one node with the highest confidence."""
+	found = _found(('person', 'Noah', 0.6), ('person', 'Noah', 0.8))
+	assert _hint_nodes(monkeypatch, tmp_path, found) == [{'mention': 'Noah', 'type': 'person', 'confidence': 0.8}]
 
 
 def test_formalizer_request_state_errors_and_close():
