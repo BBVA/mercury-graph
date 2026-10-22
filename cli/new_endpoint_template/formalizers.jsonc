@@ -41,7 +41,15 @@
 
 			// The AgenticGraph the Formalizer uses as its ontology (mandatory). The key is the role and the value is the "name" of that
 			// AgenticGraph in ontologies.jsonc (both happen to be "ontology" in this template). It must also be in "tools".
-			"ontology": "ontology"
+			"ontology": "ontology",
+
+			// Words left out when the name of a mention is compared with that of a known instance (e.g., "Ms. Ruiz" with "Elena Ruiz").
+			// These are the defaults: titles in English. Change them for documents in other languages.
+			"ignored_words": ["mr", "mrs", "ms", "miss", "dr", "prof"],
+
+			// The score (0..1) of is_same_node from which a mention that is only part of the name of a known instance is linked to it
+			// (e.g., "Ms. Ruiz" has 0.5 with "Elena Ruiz"). This is the default.
+			"same_node_threshold": 0.3
 		},
 
 		// "tools" is an argument for the Endpoint to serve these tools to the Formalizer. This must include the name in "ontology".
