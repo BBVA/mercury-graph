@@ -323,7 +323,7 @@ class EvidenceGraph(Agentic):
 
 		crawl.run()
 
-		return 'Crawl finished: error: %s, nodes crawled: %d' % (crawl.error, crawl.nodes_crawled)
+		return 'Crawl finished: error: %s, nodes crawled: %d' % (crawl.error, crawl.nodes_done)
 
 
 	def read_text(self, args):
