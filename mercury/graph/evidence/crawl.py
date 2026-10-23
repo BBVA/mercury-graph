@@ -73,7 +73,8 @@ class Crawl():
 				values represent the expected values for those attributes. Typically checking desired types of nodes to be accepted.
 			`serializer` (function, optional): a function that takes the crawled data and converts it into the format expected by the
 				target capability. If the serializer rejects the input data, it must return `None` in which case the data will not be sent
-				to the target.
+				to the target. The serializer takes two input arguments: `id` (string) and `obj` (the original dictionary) and returns
+				just one that may include the `id` if the target capability expects it.
 	"""
 
 	def __init__(self, domain, target):
@@ -221,7 +222,7 @@ class Crawl():
 
 		if include:
 			if self._serializer is not None:
-				obj = self._serializer(obj)
+				obj = self._serializer(id, obj)
 
 				if obj is None:
 					return True
