@@ -169,6 +169,7 @@ def test_agentic_graph_metadata_and_requests():
 
 	with pytest.raises(AgenticRunInvalidRequest):
 		graph._run({'name': 'unknown', 'function': 'unknown', 'arguments': {'index': 'ontology'}})
+	assert graph._missing_arguments('unknown', {}) == []
 
 	with pytest.raises(AgenticRunInvalidRequest):
 		graph._run({'name': children_name, 'function': children_name, 'arguments': {}})
