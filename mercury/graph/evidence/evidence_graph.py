@@ -1,9 +1,10 @@
 import os, pickle
 
-from .agentic import Agentic, AgenticRunInvalidRequest
+from .agentic import Agentic, AgenticRunInvalidRequest, AgenticRunFailed
 from .source import Source
 from .agentic_graph import GraphState, MultiGraph, graph_from_files
 from .formalizer import Formalizer, validate_initial_graph
+from .crawl import Crawl
 from .agent import Agent
 
 
@@ -176,13 +177,7 @@ class EvidenceGraph(Agentic):
 			self.log_error('EvidenceGraph does not have a function named "%s".' % request['name'])
 			raise AgenticRunInvalidRequest
 
-		index = request['arguments'].get('index', None)
-
-		if index is None:
-			self.log_error('EvidenceGraph function "%s" requires an "index" argument.' % request['name'])
-			raise AgenticRunInvalidRequest
-
-		ret = {'finish_reason': 'stop', 'message': call(index)}
+		ret = {'finish_reason': 'stop', 'message': call(request['arguments'])}
 
 		return ret
 
@@ -302,15 +297,46 @@ class EvidenceGraph(Agentic):
 		return len(errors) == 0
 
 
-	def crawl(self, index):
-		# TODO: Implement the crawl functionality for the EvidenceGraph.
+	def crawl(self, args):
+		try:
+			source_name = args['source_name']
 
-		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('EvidenceGraph is not ready for crawl.')
+			children = 'children_by_idx_%s' % source_name
+			get_object = 'object_by_idx_%s' % source_name
 
-			return None
+			source = self.endpoint.agentic_by_capability['children']
 
-		raise NotImplementedError('Crawl functionality is not yet implemented.')
+			domain = {}
+			domain['agentic']	 = source
+			domain['children']	 = children
+			domain['get_object'] = get_object
+			domain['root_id']	 = args['root_id']
+			if 'max_depth' in args:
+				domain['max_depth'] = args['max_depth']
+
+			target = {'agentic': self, 'target': 'read_text_%s' % self.name}
+
+		except Exception:
+			raise AgenticRunFailed
+
+		crawl = Crawl(domain = domain, target = target)
+
+		crawl.run()
+
+		return 'Crawl finished: error: %s, nodes crawled: %d' % (crawl.error, crawl.nodes_crawled)
+
+
+	def read_text(self, args):
+		# TODO: This is just a dummy to check the Crawl functionality. It only checks types and does nothing.
+
+		try:
+			id	 = args['id']
+			text = args['text']
+
+		except Exception:
+			raise AgenticRunFailed
+
+		return 'Test at %s was read.' % id
 
 
 	def _connect_downstream(self):
@@ -460,7 +486,7 @@ class EvidenceGraph(Agentic):
 		name_crawl	= 'crawl_source_%s' % self.name
 		name_target	= 'read_text_%s' % self.name
 
-		self.call = {name_crawl: self.crawl}
+		self.call = {name_crawl: self.crawl, name_target: self.read_text}
 
 		return [
 			{
@@ -477,17 +503,17 @@ class EvidenceGraph(Agentic):
 								'type': 'string',
 								'description': 'Name of the source to crawl.'
 							},
-							'start_id': {
+							'root_id': {
 								'type': 'string',
 								'description': 'ID containing the source name and source index from which the crawl starts.'
 							},
-							'max_recursion_level': {
+							'max_depth': {
 								'type': 'integer',
 								'minimum': 0,
-								'description': 'Maximum number of child levels to crawl below start_id. Zero processes only start_id.'
+								'description': 'Maximum number of child levels to crawl below root_id. Zero processes only root_id.'
 							}
 						},
-						'required': ['source_name', 'start_id']
+						'required': ['source_name', 'root_id']
 					},
 					'returns': {
 						'type': 'dict',
