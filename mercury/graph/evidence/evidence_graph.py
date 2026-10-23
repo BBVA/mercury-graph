@@ -1,9 +1,10 @@
 import os, pickle
 
-from .agentic import Agentic, AgenticRunInvalidRequest
+from .agentic import Agentic, AgenticRunInvalidRequest, AgenticRunFailed
 from .source import Source
 from .agentic_graph import GraphState, MultiGraph, graph_from_files
 from .formalizer import Formalizer, validate_initial_graph
+from .crawl import Crawl
 from .agent import Agent
 
 
@@ -176,13 +177,7 @@ class EvidenceGraph(Agentic):
 			self.log_error('EvidenceGraph does not have a function named "%s".' % request['name'])
 			raise AgenticRunInvalidRequest
 
-		index = request['arguments'].get('index', None)
-
-		if index is None:
-			self.log_error('EvidenceGraph function "%s" requires an "index" argument.' % request['name'])
-			raise AgenticRunInvalidRequest
-
-		ret = {'finish_reason': 'stop', 'message': call(index)}
+		ret = {'finish_reason': 'stop', 'message': call(request['arguments'])}
 
 		return ret
 
@@ -302,15 +297,46 @@ class EvidenceGraph(Agentic):
 		return len(errors) == 0
 
 
-	def crawl(self, index):
-		# TODO: Implement the crawl functionality for the EvidenceGraph.
+	def crawl(self, args):
+		try:
+			source_name = args['source_name']
 
-		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('EvidenceGraph is not ready for crawl.')
+			children = 'children_by_idx_%s' % source_name
+			get_object = 'object_by_idx_%s' % source_name
 
-			return None
+			source = self.endpoint.agentic_by_capability[children]
 
-		raise NotImplementedError('Crawl functionality is not yet implemented.')
+			domain = {}
+			domain['agentic']	 = source
+			domain['children']	 = children
+			domain['get_object'] = get_object
+			domain['root_id']	 = args['root_id']
+			if 'max_depth' in args:
+				domain['max_depth'] = args['max_depth']
+
+			target = {'agentic': self, 'target': 'read_text_%s' % self.name, 'serializer': self._serialize_crawl_source}
+
+		except Exception:
+			raise AgenticRunFailed
+
+		crawl = Crawl(domain = domain, target = target)
+
+		crawl.run()
+
+		return 'Crawl finished: error: %s, nodes crawled: %d' % (crawl.error, crawl.nodes_done)
+
+
+	def read_text(self, args):
+		# TODO: This is just a dummy to check the Crawl functionality. It only checks types and does nothing.
+
+		try:
+			id	 = args['id']
+			text = args['text']
+
+		except Exception:
+			raise AgenticRunFailed
+
+		return 'Test at %s was read.' % id
 
 
 	def _connect_downstream(self):
@@ -457,25 +483,64 @@ class EvidenceGraph(Agentic):
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
 
-		name_crawl = 'crawl_%s' % self.name
+		name_crawl	= 'crawl_source_%s' % self.name
+		name_target	= 'read_text_%s' % self.name
 
-		self.call = {name_crawl: self.crawl}
+		self.call = {name_crawl: self.crawl, name_target: self.read_text}
 
 		return [
 			{
 				'type': 'function',
 				'function': {
 					'name': name_crawl,
-					'description': 'Crawl the text starting from a given source index.',
+					'description': (
+						'Crawl a source tree from a given ID and send each text to the target "%s" function.' % name_target
+					),
 					'parameters': {
 						'type': 'object',
 						'properties': {
-							'index': {
+							'source_name': {
 								'type': 'string',
-								'description': 'Source index from which to start crawling the text.'
+								'description': 'Name of the source to crawl.'
+							},
+							'root_id': {
+								'type': 'string',
+								'description': 'ID containing the source name and source index from which the crawl starts.'
+							},
+							'max_depth': {
+								'type': 'integer',
+								'minimum': 0,
+								'description': 'Maximum number of child levels to crawl below root_id. Zero processes only root_id.'
 							}
 						},
-						'required': ['index']
+						'required': ['source_name', 'root_id']
+					},
+					'returns': {
+						'type': 'dict',
+						'items': {
+							'key': 'description'
+						}
+					}
+				}
+			},
+			{
+				'type': 'function',
+				'function': {
+					'name': name_target,
+					'description': 'Read and process text from a given source.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'id': {
+								'type': 'string',
+								'description': 'ID containing the source name and source index.'
+							},
+							'text': {
+								'type': 'string',
+								'description': 'Text content to read.'
+							}
+						},
+						'required': ['id', 'text']
 					},
 					'returns': {
 						'type': 'dict',
@@ -486,3 +551,32 @@ class EvidenceGraph(Agentic):
 				}
 			}
 		]
+
+
+	@staticmethod
+	def _serialize_crawl_source(id, obj):
+		"""
+		This is a crawl serializer to convert objects returned by a Source's object_by_idx_ capability into an object as expected by
+		this class's read_text_ capability.
+
+		Args:
+			id (str): The ID containing the source name and source index.
+			obj (dict): The object returned by the Source's object_by_idx_ capability.
+
+		Returns:
+			(dict): The serialized object as expected by the read_text_ capability. Or None if the object has no text.
+		"""
+
+		typ = obj.get('type')
+
+		if typ is None:
+			return None
+
+		if typ == 'object':
+			return None
+
+		if typ.startswith('SourceEntity:'):
+			return {'id': id, 'text': obj['description']}
+
+		return {'id': id, 'text': obj['content']}
+

@@ -1,4 +1,4 @@
-import os, re, unicodedata, warnings
+import os, re, unicodedata, logging, warnings
 
 from enum import Enum
 
@@ -382,9 +382,15 @@ class Formalizer(Agentic):
 					args['compile'] = compile
 
 				try:
+					previous_disable_level = logging.root.manager.disable
+					logging.disable(logging.WARNING)
+
 					with warnings.catch_warnings():
 						warnings.simplefilter('ignore')
+
 						self._model = self.AutoExtractor.from_pretrained(model, **args)
+
+					logging.disable(previous_disable_level)
 
 					self._meta_['state'] = self.states.MODEL_LOADED_OK.value
 

@@ -364,6 +364,7 @@ def test_is_same_node_scores_the_names_of_nodes_of_the_same_root(monkeypatch, tm
 	assert _is_same_node(formalizer, 'person|teacher|Ms. Ruiz', 'person|teacher|Elena Ruiz') == 0.5
 	assert _is_same_node(formalizer, 'person|student|Elena Ruiz', 'person|teacher|Elena Ruiz') == 1.0
 	assert _is_same_node(formalizer, 'place|Elena Ruiz', 'person|teacher|Elena Ruiz') == 0
+	assert _is_same_node(formalizer, 'person|Person', 'person|teacher|Teacher') == 0
 
 
 def test_is_same_node_is_symmetric_and_ignores_the_texts(monkeypatch, tmp_path):
