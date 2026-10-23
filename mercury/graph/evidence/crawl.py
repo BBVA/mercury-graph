@@ -202,7 +202,6 @@ class Crawl():
 				ret = self._domain._run({'name': self._children, 'arguments': {'index': id}})
 				if ret['finish_reason'] == 'stop':
 					child_ids = ret['message']
-					assert isinstance(child_ids, list)
 
 				else:
 					self._error = True
@@ -212,12 +211,13 @@ class Crawl():
 				self._error = True
 				return False
 
-			i = depth + 1
-			if len(self._pending) <= i:
-				self._pending.append(set())
+			if child_ids is not None:
+				i = depth + 1
+				if len(self._pending) <= i:
+					self._pending.append(set())
 
-			for child_id in child_ids:
-				self._pending[i].add(child_id)
+				for child_id in child_ids:
+					self._pending[i].add(child_id)
 
 		if include:
 			if self._serializer is not None:
