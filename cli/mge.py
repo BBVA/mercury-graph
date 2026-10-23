@@ -278,7 +278,7 @@ class MgeCli:
             print('Error: The newly created Endpoint "%s" failed to load.' % self.name)
             sys.exit(1)
 
-        print ('Created a new Endpoint object "%s" in folder "%s".' % (ep.id, ep.home))
+        print('Created a new Endpoint object "%s" in folder "%s".' % (ep.id, ep.home))
 
 
     def summary(self):
@@ -308,7 +308,7 @@ class MgeCli:
             print('Error: Could not lock the Endpoint "%s". It is locked by another process.' % ep.id)
             sys.exit(1)
 
-        print ('Piloting the Endpoint "%s" to the state "%s" with just_once=%s ...' % (ep.id, self.intent, self.just_once))
+        print('Piloting the Endpoint "%s" to the state "%s" with just_once=%s ...' % (ep.id, self.intent, self.just_once))
 
         try:
             ep.pilot(self.intent, just_once = self.just_once)
@@ -322,7 +322,7 @@ class MgeCli:
         if name is None:
             name = '\033[2m(no name)\033[0m'
 
-        print ('\nFinal state is %d "%s"\n\nDone.' % (state, name))
+        print('\nFinal state is %d "%s"\n\nDone.' % (state, name))
 
 
     def serve(self):
@@ -349,7 +349,7 @@ class MgeCli:
             print('Error: The Endpoint "%s" is in state %d "%s" but the intent is "%s".' % (ep.id, state, name, self.intent))
             sys.exit(1)
 
-        print ('Serving the Endpoint "%s" see "http://127.0.0.1:%s/meta" ...' % (ep.id, self.port))
+        print('Serving the Endpoint "%s" see "http://127.0.0.1:%s/meta" ...' % (ep.id, self.port))
 
         try:
             MgeHttpServe(ep).serve(self.port)
@@ -371,7 +371,7 @@ class MgeCli:
 
         ep.lock(mg.evidence.endpoint.LockState.FORCE_FREE)
 
-        print ('Endpoint "%s" forcefully unlocked.' % ep.id)
+        print('Endpoint "%s" forcefully unlocked.' % ep.id)
 
 
     def complete(self):
