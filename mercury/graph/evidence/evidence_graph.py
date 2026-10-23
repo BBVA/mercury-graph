@@ -314,7 +314,7 @@ class EvidenceGraph(Agentic):
 			if 'max_depth' in args:
 				domain['max_depth'] = args['max_depth']
 
-			target = {'agentic': self, 'target': 'read_text_%s' % self.name}
+			target = {'agentic': self, 'target': 'read_text_%s' % self.name, 'serializer': self._serialize_crawl_source}
 
 		except Exception:
 			raise AgenticRunFailed
@@ -551,3 +551,32 @@ class EvidenceGraph(Agentic):
 				}
 			}
 		]
+
+
+	@staticmethod
+	def _serialize_crawl_source(id, obj):
+		"""
+		This is a crawl serializer to convert objects returned by a Source's object_by_idx_ capability into an object as expected by
+		this class's read_text_ capability.
+
+		Args:
+			id (str): The ID containing the source name and source index.
+			obj (dict): The object returned by the Source's object_by_idx_ capability.
+
+		Returns:
+			(dict): The serialized object as expected by the read_text_ capability. Or None if the object has no text.
+		"""
+
+		typ = obj.get('type')
+
+		if typ is None:
+			return None
+
+		if typ == 'object':
+			return None
+
+		if typ.startswith('SourceEntity:'):
+			return {'id': id, 'text': obj['description']}
+
+		return {'id': id, 'text': obj['content']}
+
