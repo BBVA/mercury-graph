@@ -47,7 +47,7 @@ def test_evidence_graph_metadata_and_requests():
 	assert type(graph) is EvidenceGraph
 	assert graph.meta['state'] == graph.states.INITIAL.value
 	assert graph.meta['description'] == 'First line.\nSecond line.'
-	assert graph.meta['capabilities'][0]['function']['name'] == 'crawl_any'
+	assert graph.meta['capabilities'][0]['function']['name'] == 'crawl_source_any'
 	assert graph.dry_run({}) == {'status': 0, 'description': 'Valid request.'}
 
 	graph.call['test'] = lambda index: index
