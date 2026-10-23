@@ -1,4 +1,5 @@
 import pickle
+from unittest.mock import Mock
 
 import pandas as pd
 import pytest
@@ -145,6 +146,89 @@ def test_evidence_graph_handles_initialization_errors_and_crawling():
 	graph.pilot(graph.states.READY.value)
 	with pytest.raises(AgenticRunFailed):
 		graph.crawl('source')
+
+
+@pytest.mark.parametrize('max_depth, expected_ids', [
+	(None, ['source', 'source|heading', 'source|text']),
+	(0, ['source']),
+	(1, ['source', 'source|heading']),
+	(2, ['source', 'source|heading', 'source|text']),
+])
+def test_evidence_graph_crawls_source_through_endpoint(max_depth, expected_ids):
+	"""Resolve source capabilities through the endpoint and deliver serialized text within the optional depth limit."""
+	objects = {
+		'source': {'type': 'object'},
+		'source|heading': {'type': 'SourceEntity: HEADER_1', 'description': 'Heading'},
+		'source|text': {'type': 'SourceLeaf: TEXT', 'content': 'Body text'},
+	}
+	children = {'source': ['source|heading'], 'source|heading': ['source|text']}
+
+	def run_source(request):
+		"""Return source objects or child ids for a capability request dictionary."""
+		index = request['arguments']['index']
+		if request['name'] == 'children_by_idx_source':
+			message = children.get(index)
+		else:
+			assert request['name'] == 'object_by_idx_source'
+			message = objects[index]
+		return {'finish_reason': 'stop', 'message': message}
+
+	source = Mock()
+	source._run.side_effect = run_source
+	endpoint = Mock(id = 'endpoint', agentic_by_capability = {'children_by_idx_source': source})
+	graph = EvidenceGraph(schema = 'crawl', extra_args = {}, endpoint = endpoint)
+	read_text = Mock(wraps = graph.read_text)
+	graph.call['read_text_crawl'] = read_text
+	args = {'source_name': 'source', 'root_id': 'source'}
+	if max_depth is not None:
+		args['max_depth'] = max_depth
+
+	graph.run({'name': 'crawl_source_crawl', 'arguments': args})
+
+	visited = [call.args[0]['arguments']['index'] for call in source._run.call_args_list
+			   if call.args[0]['name'] == 'object_by_idx_source']
+	assert visited == expected_ids
+	expected_text = {'source|heading': 'Heading', 'source|text': 'Body text'}
+	assert [call.args[0] for call in read_text.call_args_list] == [
+		{'id': index, 'text': expected_text[index]} for index in expected_ids if index in expected_text
+	]
+
+
+@pytest.mark.parametrize('args', [
+	{},
+	{'source_name': 'missing', 'root_id': 'source'},
+	{'source_name': 'source'},
+])
+def test_evidence_graph_rejects_incomplete_crawl_configuration(args):
+	"""Reject missing crawl arguments or an unavailable source before invoking any source capability."""
+	source = Mock()
+	endpoint = Mock(id = 'endpoint', agentic_by_capability = {'children_by_idx_source': source})
+	graph = EvidenceGraph(schema = 'crawl', extra_args = {}, endpoint = endpoint)
+
+	with pytest.raises(AgenticRunFailed):
+		graph.run({'name': 'crawl_source_crawl', 'arguments': args})
+
+	source._run.assert_not_called()
+
+
+@pytest.mark.parametrize('args', [None, {}, {'id': 'source|text'}, {'text': 'Body text'}])
+def test_evidence_graph_read_text_requires_id_and_text(args):
+	"""Reject incomplete text-reading requests without relying on the placeholder's success message."""
+	graph = EvidenceGraph(schema = 'crawl', extra_args = {})
+
+	with pytest.raises(AgenticRunFailed):
+		graph.run({'name': 'read_text_crawl', 'arguments': args})
+
+
+@pytest.mark.parametrize('obj, expected', [
+	({}, None),
+	({'type': 'object', 'content': 'Container'}, None),
+	({'type': 'SourceEntity: HEADER_1', 'description': 'Heading', 'content': 'Other'}, {'id': 'source|text', 'text': 'Heading'}),
+	({'type': 'SourceLeaf: TEXT', 'description': 'Other', 'content': 'Body text'}, {'id': 'source|text', 'text': 'Body text'}),
+])
+def test_evidence_graph_serializes_source_objects(obj, expected):
+	"""Skip objects without text and select entity descriptions or leaf content while preserving the source id."""
+	assert EvidenceGraph._serialize_crawl_source('source|text', obj) == expected
 
 
 def _csv(directory, name, rows):
