@@ -169,7 +169,7 @@ class Crawl():
 		id = self._pending[depth].pop()
 
 		try:
-			ret = self._domain._call({'name': self._get_obj, 'arguments': {'index': id}})
+			ret = self._domain._run({'name': self._get_obj, 'arguments': {'index': id}})
 			if ret['finish_reason'] == 'stop':
 				obj = ret['message']
 			else:
@@ -199,7 +199,7 @@ class Crawl():
 
 		if traverse:
 			try:
-				ret = self._domain._call({'name': self._children, 'arguments': {'index': id}})
+				ret = self._domain._run({'name': self._children, 'arguments': {'index': id}})
 				if ret['finish_reason'] == 'stop':
 					child_ids = ret['message']
 					assert isinstance(child_ids, list)
@@ -227,7 +227,7 @@ class Crawl():
 					return True
 
 			try:
-				ret = self._target._call({'name': self._put_obj, 'arguments': obj})
+				ret = self._target._run({'name': self._put_obj, 'arguments': obj})
 				if ret['finish_reason'].lower().startswith('err'):
 					self._error = True
 
