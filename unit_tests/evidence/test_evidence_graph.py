@@ -2,6 +2,7 @@ import pickle
 
 import pandas as pd
 import pytest
+from mercury.graph.evidence.agentic import AgenticRunFailed
 
 from mercury.graph.evidence import AgenticGraph, EvidenceGraph
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest
@@ -50,15 +51,15 @@ def test_evidence_graph_metadata_and_requests():
 	assert graph.meta['capabilities'][0]['function']['name'] == 'crawl_source_any'
 	assert graph.dry_run({}) == {'status': 0, 'description': 'Valid request.'}
 
-	graph.call['test'] = lambda index: index
+	graph.call['test'] = lambda args: args['index']
 	assert graph._run({'name': 'test', 'arguments': {'index': 'index'}})['message'] == 'index'
 
 	with pytest.raises(AgenticRunInvalidRequest):
 		graph._run({'name': 'missing', 'arguments': {'index': 'index'}})
-	with pytest.raises(AgenticRunInvalidRequest):
+	with pytest.raises(KeyError, match = 'index'):
 		graph._run({'name': 'test', 'arguments': {}})
 
-	assert len(logger) == 2
+	assert len(logger) == 1
 
 
 def test_evidence_graph_allows_schema_discovery_without_configuration():
@@ -128,19 +129,21 @@ def test_evidence_graph_persists_and_reloads_graph(tmp_path):
 
 
 def test_evidence_graph_handles_initialization_errors_and_crawling():
-	"""Verifies initialization failures and the current crawl availability contract."""
+	"""Verifies initialization failures and rejection of invalid crawl arguments."""
 	logger = []
 	broken = EvidenceGraph(schema = 'broken', extra_args = {'persistence': {'path': None}}, logger = logger)
 	broken.pilot(broken.states.READY.value)
 	assert broken.meta['state'] == broken.states.ERR_GRAPH_INIT.value
 	broken.pilot(broken.states.READY.value)
 	assert len(logger) == 2
-	assert broken.crawl('source') is None
+	with pytest.raises(AgenticRunFailed):
+		broken.crawl('source')
 
 	graph, _, _ = _connected_graph(schema = 'crawl')
-	assert graph.crawl('source') is None
+	with pytest.raises(AgenticRunFailed):
+		graph.crawl('source')
 	graph.pilot(graph.states.READY.value)
-	with pytest.raises(NotImplementedError):
+	with pytest.raises(AgenticRunFailed):
 		graph.crawl('source')
 
 
