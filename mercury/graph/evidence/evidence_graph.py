@@ -457,7 +457,8 @@ class EvidenceGraph(Agentic):
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
 
-		name_crawl = 'crawl_%s' % self.name
+		name_crawl	= 'crawl_source_%s' % self.name
+		name_target	= 'read_text_%s' % self.name
 
 		self.call = {name_crawl: self.crawl}
 
@@ -466,16 +467,54 @@ class EvidenceGraph(Agentic):
 				'type': 'function',
 				'function': {
 					'name': name_crawl,
-					'description': 'Crawl the text starting from a given source index.',
+					'description': (
+						'Crawl a source tree from a given ID and send each text to the target "%s" function.' % name_target
+					),
 					'parameters': {
 						'type': 'object',
 						'properties': {
-							'index': {
+							'source_name': {
 								'type': 'string',
-								'description': 'Source index from which to start crawling the text.'
+								'description': 'Name of the source to crawl.'
+							},
+							'start_id': {
+								'type': 'string',
+								'description': 'ID containing the source name and source index from which the crawl starts.'
+							},
+							'max_recursion_level': {
+								'type': 'integer',
+								'minimum': 0,
+								'description': 'Maximum number of child levels to crawl below start_id. Zero processes only start_id.'
 							}
 						},
-						'required': ['index']
+						'required': ['source_name', 'start_id']
+					},
+					'returns': {
+						'type': 'dict',
+						'items': {
+							'key': 'description'
+						}
+					}
+				}
+			},
+			{
+				'type': 'function',
+				'function': {
+					'name': name_target,
+					'description': 'Read and process text from a given source.',
+					'parameters': {
+						'type': 'object',
+						'properties': {
+							'id': {
+								'type': 'string',
+								'description': 'ID containing the source name and source index.'
+							},
+							'text': {
+								'type': 'string',
+								'description': 'Text content to read.'
+							}
+						},
+						'required': ['id', 'text']
 					},
 					'returns': {
 						'type': 'dict',
