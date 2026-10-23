@@ -304,7 +304,7 @@ class EvidenceGraph(Agentic):
 			children = 'children_by_idx_%s' % source_name
 			get_object = 'object_by_idx_%s' % source_name
 
-			source = self.endpoint.agentic_by_capability['children']
+			source = self.endpoint.agentic_by_capability[children]
 
 			domain = {}
 			domain['agentic']	 = source
