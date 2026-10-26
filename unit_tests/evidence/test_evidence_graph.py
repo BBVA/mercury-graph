@@ -1,7 +1,9 @@
 import pickle
+from unittest.mock import Mock
 
 import pandas as pd
 import pytest
+from mercury.graph.evidence.agentic import AgenticRunFailed
 
 from mercury.graph.evidence import AgenticGraph, EvidenceGraph
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest
@@ -47,18 +49,18 @@ def test_evidence_graph_metadata_and_requests():
 	assert type(graph) is EvidenceGraph
 	assert graph.meta['state'] == graph.states.INITIAL.value
 	assert graph.meta['description'] == 'First line.\nSecond line.'
-	assert graph.meta['capabilities'][0]['function']['name'] == 'crawl_any'
+	assert graph.meta['capabilities'][0]['function']['name'] == 'crawl_source_any'
 	assert graph.dry_run({}) == {'status': 0, 'description': 'Valid request.'}
 
-	graph.call['test'] = lambda index: index
+	graph.call['test'] = lambda args: args['index']
 	assert graph._run({'name': 'test', 'arguments': {'index': 'index'}})['message'] == 'index'
 
 	with pytest.raises(AgenticRunInvalidRequest):
 		graph._run({'name': 'missing', 'arguments': {'index': 'index'}})
-	with pytest.raises(AgenticRunInvalidRequest):
+	with pytest.raises(KeyError, match = 'index'):
 		graph._run({'name': 'test', 'arguments': {}})
 
-	assert len(logger) == 2
+	assert len(logger) == 1
 
 
 def test_evidence_graph_allows_schema_discovery_without_configuration():
@@ -128,20 +130,105 @@ def test_evidence_graph_persists_and_reloads_graph(tmp_path):
 
 
 def test_evidence_graph_handles_initialization_errors_and_crawling():
-	"""Verifies initialization failures and the current crawl availability contract."""
+	"""Verifies initialization failures and rejection of invalid crawl arguments."""
 	logger = []
 	broken = EvidenceGraph(schema = 'broken', extra_args = {'persistence': {'path': None}}, logger = logger)
 	broken.pilot(broken.states.READY.value)
 	assert broken.meta['state'] == broken.states.ERR_GRAPH_INIT.value
 	broken.pilot(broken.states.READY.value)
 	assert len(logger) == 2
-	assert broken.crawl('source') is None
+	with pytest.raises(AgenticRunFailed):
+		broken.crawl('source')
 
 	graph, _, _ = _connected_graph(schema = 'crawl')
-	assert graph.crawl('source') is None
-	graph.pilot(graph.states.READY.value)
-	with pytest.raises(NotImplementedError):
+	with pytest.raises(AgenticRunFailed):
 		graph.crawl('source')
+	graph.pilot(graph.states.READY.value)
+	with pytest.raises(AgenticRunFailed):
+		graph.crawl('source')
+
+
+@pytest.mark.parametrize('max_depth, expected_ids', [
+	(None, ['source', 'source|heading', 'source|text']),
+	(0, ['source']),
+	(1, ['source', 'source|heading']),
+	(2, ['source', 'source|heading', 'source|text']),
+])
+def test_evidence_graph_crawls_source_through_endpoint(max_depth, expected_ids):
+	"""Resolve source capabilities through the endpoint and deliver serialized text within the optional depth limit."""
+	objects = {
+		'source': {'type': 'object'},
+		'source|heading': {'type': 'SourceEntity: HEADER_1', 'description': 'Heading'},
+		'source|text': {'type': 'SourceLeaf: TEXT', 'content': 'Body text'},
+	}
+	children = {'source': ['source|heading'], 'source|heading': ['source|text']}
+
+	def run_source(request):
+		"""Return source objects or child ids for a capability request dictionary."""
+		index = request['arguments']['index']
+		if request['name'] == 'children_by_idx_source':
+			message = children.get(index)
+		else:
+			assert request['name'] == 'object_by_idx_source'
+			message = objects[index]
+		return {'finish_reason': 'stop', 'message': message}
+
+	source = Mock()
+	source._run.side_effect = run_source
+	endpoint = Mock(id = 'endpoint', agentic_by_capability = {'children_by_idx_source': source})
+	graph = EvidenceGraph(schema = 'crawl', extra_args = {}, endpoint = endpoint)
+	read_text = Mock(wraps = graph.read_text)
+	graph.call['read_text_crawl'] = read_text
+	args = {'source_name': 'source', 'root_id': 'source'}
+	if max_depth is not None:
+		args['max_depth'] = max_depth
+
+	graph.run({'name': 'crawl_source_crawl', 'arguments': args})
+
+	visited = [call.args[0]['arguments']['index'] for call in source._run.call_args_list
+			   if call.args[0]['name'] == 'object_by_idx_source']
+	assert visited == expected_ids
+	expected_text = {'source|heading': 'Heading', 'source|text': 'Body text'}
+	assert [call.args[0] for call in read_text.call_args_list] == [
+		{'id': index, 'text': expected_text[index]} for index in expected_ids if index in expected_text
+	]
+
+
+@pytest.mark.parametrize('args', [
+	{},
+	{'source_name': 'missing', 'root_id': 'source'},
+	{'source_name': 'source'},
+])
+def test_evidence_graph_rejects_incomplete_crawl_configuration(args):
+	"""Reject missing crawl arguments or an unavailable source before invoking any source capability."""
+	source = Mock()
+	endpoint = Mock(id = 'endpoint', agentic_by_capability = {'children_by_idx_source': source})
+	graph = EvidenceGraph(schema = 'crawl', extra_args = {}, endpoint = endpoint)
+
+	with pytest.raises(AgenticRunFailed):
+		graph.run({'name': 'crawl_source_crawl', 'arguments': args})
+
+	source._run.assert_not_called()
+
+
+@pytest.mark.parametrize('args', [None, {}, {'id': 'source|text'}, {'text': 'Body text'}])
+def test_evidence_graph_read_text_requires_id_and_text(args):
+	"""Reject incomplete text-reading requests without relying on the placeholder's success message."""
+	graph = EvidenceGraph(schema = 'crawl', extra_args = {})
+
+	with pytest.raises(AgenticRunFailed):
+		graph.run({'name': 'read_text_crawl', 'arguments': args})
+
+
+@pytest.mark.parametrize('obj, expected', [
+	({}, None),
+	({'type': 'object', 'content': 'Container'}, None),
+	({'type': 'SourceEntity: HEADER_1', 'description': 'Heading', 'content': 'Other'}, {'id': 'source|text', 'text': 'Heading'}),
+	({'type': 'SourceLeaf: TEXT', 'description': 'Other', 'content': 'Body text'}, {'id': 'source|text', 'text': 'Body text'}),
+])
+def test_evidence_graph_serializes_source_objects(obj, expected):
+	"""Skip objects without text and select entity descriptions or leaf content while preserving the source id."""
+	assert EvidenceGraph._serialize_crawl_source('source|text', obj) == expected
 
 
 def _csv(directory, name, rows):

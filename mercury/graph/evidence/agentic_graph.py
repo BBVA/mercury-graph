@@ -560,8 +560,8 @@ class AgenticGraph(Agentic):
 	- `search_relationships_<name>`: the types of relationship whose id or definition contains a text.
 	- `relations_for_<name>`: the relationships a type of entity takes part in, including those of its ancestors.
 
-	Entities and relationships are navigated in two separate trees (see `NavigableTree`). Every answer is limited to `max_results` entries (50 by default, configurable in
-	`extra_args`) and ends with a truncated marker when it has been cut.
+	Entities and relationships are navigated in two separate trees (see `NavigableTree`). Every answer is limited to `max_results` entries
+	(50 by default, configurable in `extra_args`) and ends with a truncated marker when it has been cut.
 
 	## Known Limitations
 
