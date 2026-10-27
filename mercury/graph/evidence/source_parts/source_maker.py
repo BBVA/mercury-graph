@@ -1,11 +1,15 @@
-import importlib, os, re
+import importlib, os, threading
 
-from lxml import etree
+from collections import OrderedDict
 
 from .source_node import SourceNode, SourceState
 from .source_file import SourceFile
+from .xml_build import build_xml_markdown, open_xml_catalogue
 
-from mercury.graph.evidence.formats import MDbyPDFoxide, PdfToMarkdown, WikiMarkdownWriter
+from mercury.graph.evidence.formats import MDbyPDFoxide, PdfToMarkdown
+
+
+XML_FILE_CACHE = 64	# The number of SourceFile objects of an "xml_stream" SourceMaker that are kept in memory.
 
 
 class SourceMaker(SourceNode):
@@ -74,8 +78,9 @@ class SourceMaker(SourceNode):
 
 		self._descr	= 'SourceMaker: %s, type: %s, output: %s' % (self._index, self._type, self._dst)
 
-		# Note the ':' is %-encoded in file names by _safe_filename(), therefore it is used in cluster indices to make collisions with
-		self.rex_kwap = re.compile('(^ |[<>:"/\\\\|?*\\x00-\\x1f])')	# actual file names impossible.
+		self._xml = None
+		self._files = OrderedDict()
+		self._files_lock = threading.Lock()
 
 		self._ext = extensions
 		if self._ext is None:
@@ -106,13 +111,16 @@ class SourceMaker(SourceNode):
 		  * **pdf_mirror**: Mirrors the source tree of PDF files into the destination tree of markdown files, creating the directories.
 		  	It returns the indices of (non existing) markdown files via get_children_idx(). When the files is requested via child(), it
 			is created on demand by calling the PDF to markdown conversion tool.
-		  * **xml_stream**: Creates the destination tree of markdown files from the source XML file. Since it doesn't have an efficient
-		  	way to access the XML file randomly, it creates all the markdown files in the destination. Those files will not be created
-			again unless the source XML file is updated.
+		  * **xml_stream**: Opens the output index of the XML export. When there is no complete and current build, the export is
+		  	converted first, and this waits until the conversion has finished. The Markdown files are only converted again when the
+		  	source XML file is updated. (See mercury.graph.evidence.source_parts.xml_build.)
 
 		Returns:
 			(bool): True if the indices were successfully built, False otherwise.
 		"""
+
+		if self._type == 'xml_stream':
+			return self._build_xml_indices()
 
 		if self._type == 'markdown_tree':
 			if not os.path.isdir(self._dst):
@@ -134,26 +142,6 @@ class SourceMaker(SourceNode):
 
 			if type(self._children) is not dict:
 				return False
-
-		else:	# self._type == 'xml_stream'
-			if not os.path.isfile(self._src):
-				return False
-
-			src_time = int(os.path.getmtime(self._src))
-
-			if os.path.isdir(self._dst):
-				self._children = self._recurse_tree(abort_if_before = src_time)
-			else:
-				self._children = None
-
-			if type(self._children) is not dict:	# The destination files are not up to date and need to be created again.
-				if not self._create_markdown_from_xml():
-					return False
-
-				self._children = self._recurse_tree()
-
-				if type(self._children) is not dict:
-					return False
 
 		depth = 0
 		while len(self._children) > self._cl_size:
@@ -191,6 +179,9 @@ class SourceMaker(SourceNode):
 		if index is None:	# The index is mandatory for the SourceMaker.
 			return None
 
+		if self._type == 'xml_stream':
+			return self._xml_children_idx(index)
+
 		idx_stack = index.split('|')
 
 		if idx_stack.pop(0) != self._index:
@@ -218,6 +209,9 @@ class SourceMaker(SourceNode):
 
 		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
 		"""
+
+		if self._type == 'xml_stream':
+			return self._xml_child(index)
 
 		idx_stack = index.split('|')
 
@@ -256,29 +250,12 @@ class SourceMaker(SourceNode):
 		return ret
 
 
-	def _safe_filename(self, path, name):
-		""" This %-encodes the characters that are not allowed in file names (defined by self.rex_kwap). It also %-encodes leading spaces
-		and removes trailing spaces. It has been tested to avoid collisions in wikipedia dumps using titles and page file names.
-
-		Args:
-			path (str): The absolute path some storage tree. (Typically self.src or self.dst, but any name without a trailing / is valid.)
-			name (str): The relative name of the file within path. Only the last part of the path is encoded, path is assumed to be valid.
-
-		Returns:
-			(str): Absolute path to the file with a safe name.
-		"""
-
-		return '%s/%s.md' % (path, self.rex_kwap.sub(lambda m: '%%%02X' % ord(m.group()), name).rstrip(' '))
-
-
-	def _recurse_tree(self, root = None, abort_if_before = None):
+	def _recurse_tree(self, root = None):
 		""" Recursively builds a dictionary of indices for the SourceMaker. It is used by build_indices() to build the indices of the
 		SourceFile objects.
 
 		Args:
 			root (str): the path to the source files. If None, it uses self._dst.
-			abort_if_before (int): If given, it will abort the recursion returning None if it finds a file with a modification time
-				older than this value. This is used to check if the source XML file is more recent than the output files.
 
 		Returns:
 			(dict): A dictionary with the indices of the SourceFile objects. The keys are the indices and the values None.
@@ -311,11 +288,6 @@ class SourceMaker(SourceNode):
 					if ext not in self._ext:
 						continue
 
-				if abort_if_before is not None:
-					tim = os.path.getmtime(fn)
-					if tim < abort_if_before:
-						return None
-
 				children[file_idx] = SourceState.FILE_NEEDS_UPDATE.value
 
 			return True
@@ -326,66 +298,136 @@ class SourceMaker(SourceNode):
 		return children
 
 
-	def _create_markdown_from_xml(self):
-		""" Creates the markdown files from the source XML file. It is used by build_indices() to create the output files for the
-		SourceMaker.
+	def _build_xml_indices(self):
+		""" Opens the output index of an "xml_stream" SourceMaker. When there is no complete and current build of the XML source, the
+		conversion runs first, and this waits until it has finished.
 
 		Returns:
-			(bool): True if the markdown files were successfully created, False otherwise.
+			(bool): True if the output index is ready, False otherwise.
 		"""
 
-		if not os.path.isdir(self._dst):
-			os.makedirs(self._dst, exist_ok = True)
+		if not os.path.isfile(self._src):
+			return False
 
-		# The file has 25,275,933 pages.
+		self._xml = open_xml_catalogue(self._src, self._dst, self._cl_size)
 
-		PAGE_TAG = '%shttp://www.mediawiki.org/xml/export-0.11/}page' % '{'
-		NS		 = {'mw': 'http://www.mediawiki.org/xml/export-0.11/'}
+		if self._xml is None:
+			if not build_xml_markdown(self._src, self._dst, self._cl_size):
+				return False
 
-		for event, elem in etree.iterparse(self._src, events = ('end',), tag = PAGE_TAG):
-			title = elem.findtext('mw:title', namespaces = NS)
+			self._xml = open_xml_catalogue(self._src, self._dst, self._cl_size)
 
-			idx = self._write_xml_page_as_md(title, elem)
+			if self._xml is None:
+				return False
 
-			elem.clear()	# Clear the element to free memory.
-
-			while elem.getprevious() is not None:	# Also clear the previous siblings of the element to free memory.
-				del elem.getparent()[0]
+		self.state = SourceState.MAKER_READY_OK.value
 
 		return True
 
 
-	def _write_xml_page_as_md(self, title, elem):
-		""" Writes a Wikipedia XML page as a Markdown file.
-
-		The XML export keeps the article contents as MediaWiki wikitext in the
-		``revision/text`` element. This method extracts that text, renders the
-		common document structures to Markdown, and adds the article title as the
-		level-one heading.
+	def _xml_parts(self, index):
+		""" Returns the parts of an index below this SourceMaker. Only used by "xml_stream" SourceMakers.
 
 		Args:
-			title (str): Article title from the XML page element.
-			elem (lxml.etree._Element): Completed MediaWiki ``page`` element.
+			index (str): An index of this SourceMaker.
 
 		Returns:
-			(str): Path of the written Markdown file.
+			(list of str): The parts after the SourceMaker index. None when the index does not belong to this SourceMaker, or when the
+				output index is not built.
 		"""
 
-		fn = self._safe_filename(self._dst, title)
+		parts = index.split('|')
 
-		page_text = ''
-		for child in elem.iter():
-			if type(child.tag) is str and etree.QName(child).localname == 'text':
-				page_text = child.text or ''
-				break
+		if parts.pop(0) != self._index or self._xml is None:
+			return None
 
-		body = WikiMarkdownWriter(page_text).render()
+		return parts
 
-		with open(fn, 'w', encoding = 'utf-8') as f:
-			f.write('# %s\n\n' % title)
-			f.write(body)
 
-		return fn
+	def _xml_children_idx(self, index):
+		""" Returns the children indices of an index of an "xml_stream" SourceMaker. Only the cluster that the index names is queried.
+
+		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
+		"""
+
+		parts = self._xml_parts(index)
+		located = None if parts is None else self._xml.locate(parts)
+
+		if located is None:
+			return None
+
+		numbers, name, consumed = located
+		if name is None:
+			return ['%s|%s' % (index, key) for key in self._xml.children(numbers)]
+
+		return self._xml_file_index(parts, consumed)
+
+
+	def _xml_child(self, index):
+		""" Returns the child of an index of an "xml_stream" SourceMaker. A SourceFile is only created when it is requested.
+
+		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
+		"""
+
+		parts = self._xml_parts(index)
+		located = None if parts is None else self._xml.locate(parts)
+
+		if located is None:
+			return None
+
+		numbers, name, consumed = located
+		if name is None:
+			return self
+
+		file_index = self._xml_file_index(parts, consumed)
+		if consumed < len(parts):	# The index is longer than the tree depth, we return the part that exists in this SourceNode.
+			return file_index
+
+		return self._xml_file(file_index, '%s/%s' % (self._dst, name))
+
+
+	def _xml_file_index(self, parts, consumed):
+		""" Returns the index of a file of an "xml_stream" SourceMaker.
+
+		Args:
+			parts (list of str): The parts of an index after the SourceMaker index.
+			consumed (int): The number of parts that belong to the file: its cluster keys and its name.
+
+		Returns:
+			(str): The index of the file.
+		"""
+
+		return '|'.join([self._index] + parts[0:consumed])
+
+
+	def _xml_file(self, index, path):
+		""" Returns the SourceFile of an output file of an "xml_stream" SourceMaker. The most recently used SourceFile objects are kept
+		in memory, so their number does not grow with the corpus.
+
+		Args:
+			index (str): The index of the file.
+			path (str): The path of the markdown file.
+
+		Returns:
+			(SourceFile): The SourceFile, or FILE_NEEDS_UPDATE when the file does not exist.
+		"""
+
+		if not os.path.isfile(path):
+			self.state = SourceState.ERR_MAKER_ACCESS.value
+			return SourceState.FILE_NEEDS_UPDATE.value
+
+		with self._files_lock:
+			if index in self._files:
+				self._files.move_to_end(index)
+				return self._files[index]
+
+			file = SourceFile(index, self, path)
+			self._files[index] = file
+
+			if len(self._files) > XML_FILE_CACHE:
+				self._files.popitem(last = False)
+
+			return file
 
 
 	def _build_child_at(self, index):

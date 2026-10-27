@@ -2,9 +2,9 @@ import os
 
 import pytest
 
-from lxml import etree
-
 from mercury.graph.evidence.source_parts import SourceNode, SourceMaker, SourceFile, SourceEntity
+from mercury.graph.evidence.source_parts import source_maker as source_maker_module
+from mercury.graph.evidence.source_parts import xml_build
 
 
 class DummySourceNode(SourceNode):
@@ -77,15 +77,7 @@ def test_source_maker(tmp_path, monkeypatch):
 	assert maker.get_children_idx('source|source.md') == 'source|source.md'
 	assert maker.get_children_idx('source|source.md|nested') == 'source|source.md'
 	assert maker.child('source|source.md|nested') == 'source|source.md'
-	maker._safe_filename(str(tmp_path), ' invalid ')
 	maker._recurse_tree(str(tmp_path / 'missing'))
-
-	tim = int(os.path.getmtime(str(tmp_path / 'folder' / 'nested.md')))
-
-	# Touch the file to update its modification time
-	os.utime(str(tmp_path / 'folder' / 'nested.md'), (tim - 60, tim - 60))
-
-	assert maker._recurse_tree(str(tmp_path), abort_if_before = tim - 2) is None
 
 	missing_tree = SourceMaker('missing_tree', 'markdown_tree', None, str(tmp_path / 'missing'), 10, None, None)
 	missing_tree.build_indices()
@@ -130,20 +122,34 @@ def test_source_maker(tmp_path, monkeypatch):
 	missing.build_indices()
 
 	xml = SourceMaker('xml', 'xml_stream', str(tmp_path / 'missing.xml'), str(tmp_path / 'xml_destination'), 10, None, None)
-	xml.build_indices()
+	assert xml.build_indices() is False
 
 	xml_path = tmp_path / 'source.xml'
 	xml_path.write_text('<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/"><page><title>One</title><revision><text>First</text></revision></page><page><title>Two</title><revision><text>Second</text></revision></page></mediawiki>')
 	xml_destination = tmp_path / 'xml_destination'
-	xml_destination.mkdir()
-	old_file = xml_destination / 'old.md'
-	old_file.write_text('Old\n')
-	os.utime(old_file, (1, 1))
 	xml = SourceMaker('xml', 'xml_stream', str(xml_path), str(xml_destination), 10, None, None)
-	xml.build_indices()
-	xml._create_markdown_from_xml()
-	xml_without_destination = SourceMaker('xml_without_destination', 'xml_stream', str(xml_path), str(tmp_path / 'new_xml_destination'), 10, None, None)
-	xml_without_destination._create_markdown_from_xml()
+	assert xml.build_indices() is True
+	assert xml.get_children_idx('xml') == ['xml|One.md', 'xml|Two.md']
+	assert xml.get_children_idx('xml|One.md') == 'xml|One.md'
+	assert type(xml.child('xml|One.md')) is SourceFile
+	assert xml.child('xml|Missing.md') is None
+
+	clustered_path = tmp_path / 'clustered.xml'
+	clustered_path.write_text('<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/">'
+		'<page><title>One</title><revision><text>First</text></revision></page>'
+		'<page><title>Two</title><revision><text>Second</text></revision></page>'
+		'<page><title>Three</title><revision><text>Third</text></revision></page></mediawiki>')
+	clustered = SourceMaker('clustered_xml', 'xml_stream', str(clustered_path), str(tmp_path / 'clustered_xml'), 2, None, None)
+	assert clustered.build_indices() is True
+	assert clustered.get_children_idx('clustered_xml') == ['clustered_xml|1:1', 'clustered_xml|1:2']
+	assert clustered.get_children_idx('clustered_xml|1:1') == ['clustered_xml|1:1|One.md', 'clustered_xml|1:1|Two.md']
+	assert type(clustered.child('clustered_xml|1:2|Three.md')) is SourceFile
+	assert clustered.child('clustered_xml|2:1') is None
+
+	monkeypatch.setattr(xml_build, 'convert_batch', lambda *args: pytest.fail('The XML export must not be converted again.'))
+	reused = SourceMaker('xml', 'xml_stream', str(xml_path), str(xml_destination), 10, None, None)
+	assert reused.build_indices() is True
+	assert reused.get_children_idx('xml') == ['xml|One.md', 'xml|Two.md']
 
 	failed_tree = SourceMaker('failed_tree', 'markdown_tree', None, str(tmp_path), 10, None, None)
 	failed_tree._recurse_tree = lambda: None
@@ -153,32 +159,15 @@ def test_source_maker(tmp_path, monkeypatch):
 	failed_pdf._recurse_tree = lambda root: None
 	failed_pdf.build_indices()
 
-	failed_xml = SourceMaker('failed_xml', 'xml_stream', str(xml_path), str(xml_destination), 10, None, None)
-	failed_xml._recurse_tree = lambda abort_if_before = None: None
-	failed_xml._create_markdown_from_xml = lambda: False
-	failed_xml.build_indices()
+	failed_xml = SourceMaker('failed_xml', 'xml_stream', str(xml_path), str(tmp_path / 'failed_xml'), 10, None, None)
+	monkeypatch.setattr(source_maker_module, 'build_xml_markdown', lambda *args: False)
+	assert failed_xml.build_indices() is False
+	assert failed_xml.get_children_idx('failed_xml') is None
 
-	def recurse_xml(abort_if_before = None):
-		if abort_if_before is not None:
-			return None
-
-		return {}
-
-	ready_xml = SourceMaker('ready_xml', 'xml_stream', str(xml_path), str(xml_destination), 10, None, None)
-	ready_xml._recurse_tree = recurse_xml
-	ready_xml._create_markdown_from_xml = lambda: True
-	ready_xml.build_indices()
-
-	failed_ready_xml = SourceMaker('failed_ready_xml', 'xml_stream', str(xml_path), str(xml_destination), 10, None, None)
-	failed_ready_xml._recurse_tree = lambda abort_if_before = None: None
-	failed_ready_xml._create_markdown_from_xml = lambda: True
-	failed_ready_xml.build_indices()
-
-	element = etree.Element('page')
-	monkeypatch.setattr(etree, 'iterparse', lambda source, events, tag: iter([('end', element)] * 25276))
-	xml_limit = SourceMaker('xml_limit', 'xml_stream', str(xml_path), str(tmp_path / 'xml_limit'), 10, None, None)
-	xml_limit._write_xml_page_as_md = lambda title, page: None
-	xml_limit._create_markdown_from_xml()
+	monkeypatch.setattr(source_maker_module, 'build_xml_markdown', lambda *args: True)
+	monkeypatch.setattr(source_maker_module, 'open_xml_catalogue', lambda *args: None)
+	no_index = SourceMaker('no_index', 'xml_stream', str(xml_path), str(tmp_path / 'no_index'), 10, None, None)
+	assert no_index.build_indices() is False
 
 	conversion_source = tmp_path / 'conversion_source'
 	conversion_destination = tmp_path / 'conversion_destination'

@@ -17,8 +17,8 @@
 			// The description will be exposed in the Sources's Agentic API. It can be a string or a list of strings.
 			"description": ["This example was created using a real MediaWiki export layout (<mediawiki>, <page>, <revision>, <text>).",
 							"The conversion works on real wikipedia exports such as enwiki-20260101-pages-articles-multistream.xml.",
-							"The xml is processed only when more recent than the existing markdown files. Touch the xml file to force",
-							"reprocessing.",
+							"The xml is processed only when it changed since the last conversion. Touch the xml file to force",
+							"reprocessing. It can also be converted in advance with cli/xml_to_markdown.py, using several processes.",
 							"Real wikipedia exports are huge. They require hundreds of processing hours (parallelizable) and hundreds",
 							"of gigabytes of storage."],
 
