@@ -270,13 +270,14 @@ class SourceMaker(SourceNode):
 		children = {}
 
 		def recurse(root, folder_file_idx):
+			""" Adds file indices from a directory and its subdirectories to the children dictionary. """
+
 			for name in os.listdir(root):
 				fn		 = '%s/%s' % (root, name)
 				file_idx = '%s/%s' % (folder_file_idx, name) if folder_file_idx is not None else name
 
 				if os.path.isdir(fn):
-					if recurse(fn, file_idx) is None:
-						return None
+					recurse(fn, file_idx)
 
 					continue
 
@@ -290,10 +291,7 @@ class SourceMaker(SourceNode):
 
 				children[file_idx] = SourceState.FILE_NEEDS_UPDATE.value
 
-			return True
-
-		if recurse(root, None) is None:
-			return None
+		recurse(root, None)
 
 		return children
 
