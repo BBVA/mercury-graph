@@ -210,6 +210,46 @@ def test_source_maker(tmp_path, monkeypatch):
 		{'class_name': 'Converter', 'path': str(converter_path), 'extra_args': None})
 
 
+def test_xml_source_navigation_and_file_cache(tmp_path, monkeypatch):
+	""" XML clusters delegate document indices, reuse recent files, and evict the least recently requested file. """
+
+	monkeypatch.setattr(source_maker_module, 'XML_FILE_CACHE', 2)
+	src = tmp_path / 'source.xml'
+	dst = tmp_path / 'markdown'
+	page = '<page><title>%s</title><revision><text>Body</text></revision></page>'
+	pages = ''.join(page % title for title in ['One', 'Two', 'Three'])
+	src.write_text('<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/">%s</mediawiki>' % pages, encoding = 'utf-8')
+	maker = SourceMaker('xml', 'xml_stream', str(src), str(dst), 2, None, None)
+
+	assert maker.build_indices()
+	assert maker.child('xml') is maker
+	assert maker.child('xml|1:1') is maker
+	assert maker.get_children_idx('xml|1:2') == ['xml|1:2|Three.md']
+
+	one_index = 'xml|1:1|One.md'
+	two_index = 'xml|1:1|Two.md'
+	three_index = 'xml|1:2|Three.md'
+	one = maker.child(one_index)
+	header_index = one.get_children_idx(one_index)[0]
+	assert maker.child(header_index) == one_index
+	assert maker.get_children_idx(header_index) == one_index
+	assert one.child(header_index).description == 'Title: One'
+
+	two = maker.child(two_index)
+	assert maker.child(one_index) is one
+	assert maker.child(three_index).index == three_index
+	assert maker.child(one_index) is one
+	reloaded = maker.child(two_index)
+	assert reloaded is not two
+	assert reloaded.index == two.index
+	assert reloaded.path == two.path
+
+	(dst / 'Three.md').unlink()
+	assert maker.child(three_index) == 404
+	assert maker.state == -3
+	maker._xml.close()
+
+
 def test_source_file(tmp_path):
 	path = tmp_path / 'source.md'
 	path.write_text('# Source\n')

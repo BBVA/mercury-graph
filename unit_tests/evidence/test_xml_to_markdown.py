@@ -1,4 +1,4 @@
-import os
+import os, runpy, sys
 
 import pytest
 
@@ -30,6 +30,25 @@ def test_cli_reports_a_build_that_is_not_ready(tmp_path):
 	""" A missing export is reported by the exit code, not by an exception. """
 
 	assert main(['--src', str(tmp_path / 'missing.xml'), '--dst', str(tmp_path / 'out')]) == 1
+
+
+def test_cli_module_entry_builds_ready_output(tmp_path, monkeypatch):
+	""" Executing the command entry point reads sys.argv, publishes its output, and exits successfully. """
+
+	src = tmp_path / 'export.xml'
+	src.write_text('<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/">'
+		'<page><title>Entry</title><revision><text>Body.</text></revision></page></mediawiki>', encoding = 'utf-8')
+	dst = tmp_path / 'out'
+	monkeypatch.setattr(sys, 'argv', ['xml_to_markdown.py', '--src', str(src), '--dst', str(dst), '--workers', '1'])
+
+	with pytest.raises(SystemExit) as exited:
+		runpy.run_path(main.__code__.co_filename, run_name = '__main__')
+
+	assert exited.value.code == 0
+	assert (dst / 'Entry.md').read_text(encoding = 'utf-8') == '# Entry\n\nBody.\n'
+	catalogue = xml_build.open_xml_catalogue(str(src), str(dst))
+	assert catalogue is not None
+	catalogue.close()
 
 
 def test_cli_rejects_invalid_options(tmp_path):

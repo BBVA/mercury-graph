@@ -1,4 +1,6 @@
 import json, os
+from concurrent.futures import Future
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
@@ -28,9 +30,7 @@ def _manifest(dst):
 def _forbid_conversion(monkeypatch):
 	""" Makes any conversion of a batch fail, to show that a build is reused. """
 
-	def forbidden(*args):
-		raise AssertionError('The XML export must not be converted again.')
-
+	forbidden = Mock(side_effect = AssertionError('The XML export must not be converted again.'))
 	monkeypatch.setattr(xml_build, 'convert_batch', forbidden)
 
 
@@ -68,8 +68,8 @@ def test_single_and_parallel_workers_write_the_same_markdown(tmp_path):
 	src = tmp_path / 'export.xml'
 	_write_export(src, ['One', 'Two', 'Three', 'Four', 'Five'])
 
-	assert build_xml_markdown(str(src), str(tmp_path / 'single'), 4, 2, 1)
-	assert build_xml_markdown(str(src), str(tmp_path / 'parallel'), 4, 2, 2)
+	assert build_xml_markdown(str(src), str(tmp_path / 'single'), 4, 1, 1)
+	assert build_xml_markdown(str(src), str(tmp_path / 'parallel'), 4, 1, 2)
 
 	names = sorted(os.listdir(str(tmp_path / 'single')))
 
@@ -114,8 +114,9 @@ def test_failed_batch_is_not_ready_and_the_next_run_resumes(tmp_path, monkeypatc
 	assert len(os.listdir(dst)) == 5
 
 
+@pytest.mark.parametrize('pages_per_batch', [2, 10])
 @pytest.mark.parametrize('titles', [['Alpha', 'Alpha '], ['Iphone', 'IPhone'], ['a/b', 'a%2Fb']])
-def test_colliding_file_names_stop_the_build_before_any_conversion(tmp_path, monkeypatch, titles):
+def test_colliding_file_names_stop_the_build_before_any_conversion(tmp_path, monkeypatch, titles, pages_per_batch):
 	""" Titles that would be written to the same file are found while indexing. No page is converted and nothing is published. """
 
 	src = tmp_path / 'export.xml'
@@ -124,7 +125,7 @@ def test_colliding_file_names_stop_the_build_before_any_conversion(tmp_path, mon
 	calls = []
 	monkeypatch.setattr(xml_build, 'convert_batch', lambda *args: calls.append(args))
 
-	assert not build_xml_markdown(str(src), dst, 4, 2, 1)
+	assert not build_xml_markdown(str(src), dst, 4, pages_per_batch, 1)
 	assert calls == []
 	assert os.listdir(dst) == []
 	assert open_xml_catalogue(str(src), dst, 4) is None
@@ -190,3 +191,117 @@ def test_completed_build_is_reused_and_regrouped_without_conversion(tmp_path, mo
 	catalogue.close()
 
 	assert open_xml_catalogue(str(src), dst, 1) is None
+
+
+def test_parallel_worker_failure_cancels_pending_batches_and_can_resume(tmp_path, monkeypatch):
+	""" A failed worker cancels queued work and leaves its batches available for a later successful build. """
+
+	src = tmp_path / 'export.xml'
+	_write_export(src, ['One', 'Two'])
+	dst = str(tmp_path / 'out')
+	failed = Future()
+	failed.set_exception(RuntimeError('Simulated worker failure.'))
+	pending = Future()
+	pool = MagicMock()
+	pool.__enter__.return_value = pool
+	pool.submit.side_effect = [failed, pending]
+
+	with monkeypatch.context() as patch:
+		patch.setattr(xml_build, 'ProcessPoolExecutor', Mock(return_value = pool))
+		patch.setattr(xml_build, 'wait', Mock(return_value = ({failed}, {pending})))
+		assert not build_xml_markdown(str(src), dst, 4, 1, 2)
+
+	assert pending.cancelled()
+	assert open_xml_catalogue(str(src), dst, 4) is None
+	assert build_xml_markdown(str(src), dst, 4, 1, 1)
+
+	catalogue = open_xml_catalogue(str(src), dst, 4)
+	assert catalogue.done_summary() == (2, 2)
+	catalogue.close()
+	assert sorted(os.listdir(dst)) == ['One.md', 'Two.md']
+
+
+def test_incorrect_worker_page_count_does_not_complete_the_batch(tmp_path, monkeypatch, caplog):
+	""" A worker reporting fewer pages than indexed cannot publish the build, and the next run retries that batch. """
+
+	src = tmp_path / 'export.xml'
+	_write_export(src, ['One'])
+	dst = str(tmp_path / 'out')
+
+	with monkeypatch.context() as patch:
+		patch.setattr(xml_build, 'convert_batch', Mock(return_value = 0))
+		assert not build_xml_markdown(str(src), dst, 4, 1, 1)
+
+	assert 'Batch 0 converted 0 pages, expected 1.' in caplog.text
+	assert open_xml_catalogue(str(src), dst, 4) is None
+	assert build_xml_markdown(str(src), dst, 4, 1, 1)
+	assert (tmp_path / 'out' / 'One.md').read_text(encoding = 'utf-8') == '# One\n\nText of One\n'
+
+
+@pytest.mark.parametrize('completed, indexed, changed, message', [
+	([], True, False, 'Only 0 of 1 batches are complete, with 0 of 1 pages.'),
+	([(0, 0)], True, False, 'Only 1 of 1 batches are complete, with 0 of 1 pages.'),
+	([(0, 1)], False, False, 'The index holds 0 pages, expected 1.'),
+	([(0, 1)], True, True, 'The XML source changed while it was converted.')
+])
+def test_publication_rejects_inconsistent_or_changed_builds(tmp_path, completed, indexed, changed, message):
+	""" Publication requires every batch and page, a matching catalogue count, and an unchanged XML source. """
+
+	src = tmp_path / 'export.xml'
+	_write_export(src, ['One'])
+	manifest = {'source': xml_build._stamp(str(src)), 'total_pages': 1, 'batches': [{'id': 0, 'pages': 1}]}
+	catalogue = xml_build.XmlCatalogue(str(tmp_path / 'catalogue.sqlite'))
+
+	try:
+		if indexed:
+			catalogue.add_pages([(0, 1, 'One.md', 'one.md')])
+		for batch, pages in completed:
+			catalogue.mark_done(batch, pages)
+		if changed:
+			_write_export(src, ['One', 'Two'])
+
+		with pytest.raises(xml_build.XmlBuildError) as error:
+			xml_build._publish(str(src), manifest, catalogue)
+
+		assert str(error.value) == message
+		assert not catalogue.is_ready()
+	finally:
+		catalogue.close()
+
+
+def test_indexer_flush_is_idempotent_without_pending_pages(tmp_path):
+	""" Flushing before indexing or after the final batch leaves the stored page count unchanged. """
+
+	src = tmp_path / 'export.xml'
+	_write_export(src, ['One'])
+	catalogue = xml_build.XmlCatalogue(str(tmp_path / 'catalogue.sqlite'))
+	indexer = xml_build._PageIndexer(catalogue, 4, 1)
+
+	try:
+		indexer._flush()
+		assert catalogue.count_pages() == 0
+		indexer.feed(src.read_bytes(), True)
+		indexer._flush()
+		assert catalogue.count_pages() == 1
+		assert catalogue.names(1) == ['One.md']
+	finally:
+		catalogue.close()
+
+
+def test_indexer_reports_constraint_failure_without_a_matching_file_name(tmp_path):
+	""" An index constraint violation still produces an XML build error when no filename collision explains it. """
+
+	src = tmp_path / 'export.xml'
+	_write_export(src, ['New'])
+	catalogue = xml_build.XmlCatalogue(str(tmp_path / 'catalogue.sqlite'))
+	catalogue.add_pages([(0, 1, 'Existing.md', 'existing.md')])
+	indexer = xml_build._PageIndexer(catalogue, 4, 1)
+
+	try:
+		with pytest.raises(xml_build.XmlBuildError, match = 'Two pages would be written to the same file.'):
+			indexer.feed(src.read_bytes(), True)
+
+		assert catalogue.count_pages() == 1
+		assert catalogue.names(1) == ['Existing.md']
+	finally:
+		catalogue.close()
