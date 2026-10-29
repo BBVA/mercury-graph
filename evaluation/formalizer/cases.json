@@ -129,7 +129,7 @@
    "entities": [
     {"mention": "Helios Solar Car", "id": "project|Helios Solar Car", "status": "known"},
     {"mention": "Brookdale Science Fair", "id": "event|Brookdale Science Fair", "status": "known"},
-    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known"},
+    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
     {"mention": "Helios project", "id": "project|Helios Solar Car", "status": "known"}
    ],
    "edges": [
@@ -142,9 +142,9 @@
    "source": "markdown/robotics_club.md",
    "text": "Noah Kim builds the car body. Priya Shah connects the battery. Elena Ruiz checks the safety plan.",
    "entities": [
-    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known"},
-    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known"},
-    {"mention": "Elena Ruiz", "id": "person|teacher|Elena Ruiz", "status": "known"}
+    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
+    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known", "text_type": "person"},
+    {"mention": "Elena Ruiz", "id": "person|teacher|Elena Ruiz", "status": "known", "text_type": "person"}
    ],
    "edges": [],
    "notes": "A list item per sentence in the document. Judgment call: no edge, because no project is named (works_on would be an inference from the context of the document, not stated by this text). Useful to check that nothing is invented."
@@ -165,7 +165,7 @@
    "source": "markdown/science_fair.md",
    "text": "Noah Kim presents the Helios Solar Car at the Brookdale Science Fair.",
    "entities": [
-    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known"},
+    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
     {"mention": "Helios Solar Car", "id": "project|Helios Solar Car", "status": "known"},
     {"mention": "Brookdale Science Fair", "id": "event|Brookdale Science Fair", "status": "known"}
    ],
@@ -179,7 +179,7 @@
    "source": "markdown/science_fair.md",
    "text": "Maya Singh gives the teamwork award to the Riverside Robotics Club.",
    "entities": [
-    {"mention": "Maya Singh", "id": "person|principal|Maya Singh", "status": "known"},
+    {"mention": "Maya Singh", "id": "person|principal|Maya Singh", "status": "known", "text_type": "person"},
     {"mention": "teamwork award", "id": "award|teamwork award", "status": "new"},
     {"mention": "Riverside Robotics Club", "id": "organization|club|Riverside Robotics Club", "status": "known"}
    ],
@@ -191,9 +191,9 @@
    "source": "markdown/science_fair.md",
    "text": "The award recognizes the work of Noah Kim, Priya Shah, and Elena Ruiz.",
    "entities": [
-    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known"},
-    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known"},
-    {"mention": "Elena Ruiz", "id": "person|teacher|Elena Ruiz", "status": "known"}
+    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
+    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known", "text_type": "person"},
+    {"mention": "Elena Ruiz", "id": "person|teacher|Elena Ruiz", "status": "known", "text_type": "person"}
    ],
    "edges": [],
    "notes": "Three known persons and nothing the ontology can relate."
@@ -205,7 +205,7 @@
    "entities": [
     {"mention": "Ms. Ruiz", "id": "person|teacher|Elena Ruiz", "status": "known"},
     {"mention": "Riverside High", "id": "organization|school|Riverside High School", "status": "known"},
-    {"mention": "Noah", "id": "person|student|Noah Kim", "status": "known"},
+    {"mention": "Noah", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
     {"mention": "Tom Baker", "id": "person|student|Tom Baker", "status": "new"},
     {"mention": "Helios project", "id": "project|Helios Solar Car", "status": "known"}
    ],
@@ -221,8 +221,8 @@
    "source": "synthetic",
    "text": "Kim and Shah tested the small motor in the lab.",
    "entities": [
-    {"mention": "Kim", "id": "person|student|Noah Kim", "status": "known"},
-    {"mention": "Shah", "id": "person|student|Priya Shah", "status": "known"}
+    {"mention": "Kim", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
+    {"mention": "Shah", "id": "person|student|Priya Shah", "status": "known", "text_type": "person"}
    ],
    "edges": [],
    "notes": "Only surnames. \"The lab\" is a generic mention (not named), so it is not expected as an entity."
@@ -233,7 +233,7 @@
    "extra_known_nodes": ["person|teacher|Noah Brown"],
    "text": "Noah fixed the battery of the Helios Solar Car.",
    "entities": [
-    {"mention": "Noah", "id": null, "status": "ambiguous", "candidates": ["person|student|Noah Kim", "person|teacher|Noah Brown"]},
+    {"mention": "Noah", "id": null, "status": "ambiguous", "candidates": ["person|student|Noah Kim", "person|teacher|Noah Brown"], "text_type": "person"},
     {"mention": "Helios Solar Car", "id": "project|Helios Solar Car", "status": "known"}
    ],
    "edges": [],
@@ -259,7 +259,7 @@
    "source": "synthetic",
    "text": "The principal, Noah Kim, opened the Brookdale Science Fair.",
    "entities": [
-    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known", "type_conflict": true},
+    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known", "type_conflict": true, "text_type": "person|principal"},
     {"mention": "Brookdale Science Fair", "id": "event|Brookdale Science Fair", "status": "known"}
    ],
    "edges": [],
@@ -336,7 +336,7 @@
    "context": "Elena Ruiz joined Riverside High School last year.",
    "text": "She now advises the Riverside Robotics Club.",
    "entities": [
-    {"mention": "She", "id": null, "status": "unresolved"},
+    {"mention": "She", "id": null, "status": "unresolved", "text_type": "person|teacher"},
     {"mention": "Riverside Robotics Club", "id": "organization|club|Riverside Robotics Club", "status": "known"}
    ],
    "edges": [],
@@ -357,7 +357,7 @@
    "context": "# Riverside Robotics Club\n\nThe Riverside Robotics Club meets every Tuesday after class.",
    "text": "The club is part of Riverside High School.",
    "entities": [
-    {"mention": "The club", "id": null, "status": "unresolved"},
+    {"mention": "The club", "id": null, "status": "unresolved", "text_type": "organization|club"},
     {"mention": "Riverside High School", "id": "organization|school|Riverside High School", "status": "known"}
    ],
    "edges": [],
@@ -379,7 +379,7 @@
    "context": "Noah Kim and Priya Shah stayed after class to work on the car.",
    "text": "Noah leads the Helios project.",
    "entities": [
-    {"mention": "Noah", "id": null, "status": "ambiguous", "candidates": ["person|student|Noah Kim", "person|teacher|Noah Brown"]},
+    {"mention": "Noah", "id": null, "status": "ambiguous", "candidates": ["person|student|Noah Kim", "person|teacher|Noah Brown"], "text_type": "person"},
     {"mention": "Helios project", "id": "project|Helios Solar Car", "status": "known"}
    ],
    "edges": [],
@@ -400,7 +400,7 @@
    "context": "Lucas Moreno is a new teacher at Riverside High School.",
    "text": "He advises the Riverside Robotics Club.",
    "entities": [
-    {"mention": "He", "id": null, "status": "unresolved"},
+    {"mention": "He", "id": null, "status": "unresolved", "text_type": "person|teacher"},
     {"mention": "Riverside Robotics Club", "id": "organization|club|Riverside Robotics Club", "status": "known"}
    ],
    "edges": [],
@@ -421,7 +421,7 @@
    "context": "The visitors arrived early in the morning.",
    "text": "She presents the Helios Solar Car.",
    "entities": [
-    {"mention": "She", "id": null, "status": "unresolved"},
+    {"mention": "She", "id": null, "status": "unresolved", "text_type": "person"},
     {"mention": "Helios Solar Car", "id": "project|Helios Solar Car", "status": "known"}
    ],
    "edges": [],
@@ -558,7 +558,7 @@
    "source": "synthetic",
    "text": "Priya Shah leads the Aurora Drone.",
    "entities": [
-    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known"},
+    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known", "text_type": "person"},
     {"mention": "Aurora Drone", "id": "project|Aurora Drone", "status": "new"}
    ],
    "edges": [
@@ -574,7 +574,7 @@
     {"mention": "Omar Haddad", "id": "person|Omar Haddad", "status": "new"},
     {"mention": "Lena Park", "id": "person|Lena Park", "status": "new"},
     {"mention": "Aurora Drone", "id": "project|Aurora Drone", "status": "new"},
-    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known"}
+    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known", "text_type": "person"}
    ],
    "edges": [
     {"src": "person|Omar Haddad", "relation": "works_on", "dst": "project|Aurora Drone"},
@@ -588,7 +588,7 @@
    "source": "synthetic",
    "text": "Noah Kim presents the Aurora Drone at the Regional Math Olympiad.",
    "entities": [
-    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known"},
+    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
     {"mention": "Aurora Drone", "id": "project|Aurora Drone", "status": "new"},
     {"mention": "Regional Math Olympiad", "id": "event|Regional Math Olympiad", "status": "new"}
    ],
@@ -602,7 +602,7 @@
    "source": "synthetic",
    "text": "Ms. Singh opened the science fair.",
    "entities": [
-    {"mention": "Ms. Singh", "id": "person|principal|Maya Singh", "status": "known"}
+    {"mention": "Ms. Singh", "id": "person|principal|Maya Singh", "status": "known", "text_type": "person"}
    ],
    "edges": [],
    "notes": "A title and a surname for a known person. \"The science fair\" is generic (not named), and opening an event is not a relationship of the ontology."
@@ -612,7 +612,7 @@
    "source": "synthetic",
    "text": "Kim presented the Helios Solar Car.",
    "entities": [
-    {"mention": "Kim", "id": "person|student|Noah Kim", "status": "known"},
+    {"mention": "Kim", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
     {"mention": "Helios Solar Car", "id": "project|Helios Solar Car", "status": "known"}
    ],
    "edges": [
@@ -625,7 +625,7 @@
    "source": "synthetic",
    "text": "Shah's team tested the battery.",
    "entities": [
-    {"mention": "Shah", "id": "person|student|Priya Shah", "status": "known"}
+    {"mention": "Shah", "id": "person|student|Priya Shah", "status": "known", "text_type": "person"}
    ],
    "edges": [],
    "notes": "A surname with a possessive. Neither \"the team\" nor \"the battery\" is named or an end of a relationship."
@@ -663,7 +663,7 @@
    "source": "synthetic",
    "text": "Ms. Ruiz advises the Riverside Robotics Club.",
    "entities": [
-    {"mention": "Ms. Ruiz", "id": null, "status": "ambiguous", "candidates": ["person|teacher|Elena Ruiz", "person|teacher|Marta Ruiz"]},
+    {"mention": "Ms. Ruiz", "id": null, "status": "ambiguous", "candidates": ["person|teacher|Elena Ruiz", "person|teacher|Marta Ruiz"], "text_type": "person|teacher"},
     {"mention": "Riverside Robotics Club", "id": "organization|club|Riverside Robotics Club", "status": "known"}
    ],
    "edges": [],
@@ -675,7 +675,7 @@
    "source": "synthetic",
    "text": "The student Maya Singh won the teamwork award.",
    "entities": [
-    {"mention": "Maya Singh", "id": "person|principal|Maya Singh", "status": "known", "type_conflict": true},
+    {"mention": "Maya Singh", "id": "person|principal|Maya Singh", "status": "known", "type_conflict": true, "text_type": "person|student"},
     {"mention": "teamwork award", "id": "award|teamwork award", "status": "new"}
    ],
    "edges": [],
@@ -686,7 +686,7 @@
    "source": "synthetic",
    "text": "Priya Shah teaches robotics at Riverside High School.",
    "entities": [
-    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known", "type_conflict": true},
+    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known", "type_conflict": true, "text_type": "person|teacher"},
     {"mention": "Riverside High School", "id": "organization|school|Riverside High School", "status": "known"}
    ],
    "edges": [],
@@ -697,7 +697,7 @@
    "source": "synthetic",
    "text": "Elena Ruiz drove to Brookdale on Saturday.",
    "entities": [
-    {"mention": "Elena Ruiz", "id": "person|teacher|Elena Ruiz", "status": "known"},
+    {"mention": "Elena Ruiz", "id": "person|teacher|Elena Ruiz", "status": "known", "text_type": "person"},
     {"mention": "Brookdale", "id": "place|Brookdale", "status": "new"}
    ],
    "edges": [],
@@ -708,7 +708,7 @@
    "source": "synthetic",
    "text": "Noah Kim admires the Riverside Robotics Club.",
    "entities": [
-    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known"},
+    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
     {"mention": "Riverside Robotics Club", "id": "organization|club|Riverside Robotics Club", "status": "known"}
    ],
    "edges": [],
@@ -770,7 +770,7 @@
    "text": "The Helios Solar Car was presented by Priya Shah.",
    "entities": [
     {"mention": "Helios Solar Car", "id": "project|Helios Solar Car", "status": "known"},
-    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known"}
+    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known", "text_type": "person"}
    ],
    "edges": [
     {"src": "person|student|Priya Shah", "relation": "presents", "dst": "project|Helios Solar Car"}
@@ -841,9 +841,9 @@
    "source": "synthetic",
    "text": "Noah Kim works on the Aurora Drone, but Priya Shah leads it.",
    "entities": [
-    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known"},
+    {"mention": "Noah Kim", "id": "person|student|Noah Kim", "status": "known", "text_type": "person"},
     {"mention": "Aurora Drone", "id": "project|Aurora Drone", "status": "new"},
-    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known"},
+    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known", "text_type": "person"},
     {"mention": "it", "id": "project|Aurora Drone", "status": "new"}
    ],
    "edges": [
@@ -919,7 +919,7 @@
    "source": "synthetic",
    "text": "Priya Shah leads the Riverside Robotics Club.",
    "entities": [
-    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known"},
+    {"mention": "Priya Shah", "id": "person|student|Priya Shah", "status": "known", "text_type": "person"},
     {"mention": "Riverside Robotics Club", "id": "organization|club|Riverside Robotics Club", "status": "known"}
    ],
    "edges": [],

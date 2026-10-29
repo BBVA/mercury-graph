@@ -12,6 +12,8 @@ Scores (micro-averaged precision, recall and F1 over all cases):
 
 - mentions: (mention), whatever its id, i.e., whether the text was found,
 - entities: (mention, id, status), i.e., whether it was also linked to the right instance,
+- types: (mention, type) of the mentions whose type the text gives (their text_type or, by default, the type of their id), i.e.,
+  whether the type chosen by hint_nodes is the right one, whatever the link,
 - edges: (src, relation, dst).
 
 Run it from the root of the repository: python evaluation/formalizer/run_eval.py [dataset] [-v]
@@ -24,8 +26,9 @@ import sys, time
 from dataclasses import dataclass, field
 
 from mercury.graph.evidence import AgenticGraph, Formalizer
+from mercury.graph.evidence.agentic_graph import parent_of
 
-from check_cases import Case, Output, get_dataset_name, load_context, load_dataset
+from check_cases import Case, Entity, Output, get_dataset_name, load_context, load_dataset
 
 
 MODEL	= {'library': 'gliner2', 'model': 'fastino/gliner2.5-base-v1'}
@@ -56,7 +59,7 @@ class Score:
 		return 2*p*r/(p + r) if p + r > 0 else 0.0
 
 
-METRICS = ('mentions', 'entities', 'edges')
+METRICS = ('mentions', 'entities', 'types', 'edges')
 
 
 def build_formalizer(ontology: AgenticGraph) -> Formalizer:
@@ -70,10 +73,10 @@ def build_formalizer(ontology: AgenticGraph) -> Formalizer:
 
 
 def formalize(text: str, formalizer: Formalizer, known_ids: set[str]) -> Output:
-	""" Returns the output of the Formalizer for a text in the format of the cases. """
+	""" Returns the output of the Formalizer for a text in the format of the cases, with the type chosen for every entity. """
 
 	nodes	 = formalizer.hint_nodes({'text': text, 'candidates': sorted(known_ids)})
-	entities = [formalizer.link_mention(node, text) for node in nodes]
+	entities = [{**formalizer.link_mention(node, text), 'type': node['type']} for node in nodes]
 	found	 = formalizer.hint_edges({'text': text, 'nodes': entities})
 	edges	 = [{'src': edge['src'], 'relation': edge['relation'], 'dst': edge['dst']} for edge in found]
 
@@ -92,6 +95,39 @@ def keys(output: Output, metric: str) -> set[tuple]:
 	return {(e['src'], e['relation'], e['dst']) for e in output['edges']}
 
 
+def text_type(entity: Entity) -> str | None:
+	""" Returns the type the text gives an entity: its text_type or, by default, the type of its id (None if it has no id or its
+	type conflicts with the known one). """
+
+	if 'text_type' in entity:
+		return entity['text_type']
+
+	if entity['id'] is None or entity.get('type_conflict', False):
+		return None
+
+	return parent_of(entity['id'])
+
+
+def expected_types(case: Case) -> set[tuple]:
+	""" Returns (mention, type) of the entities of a case whose type the text gives. """
+
+	typed  = [(e['mention'], text_type(e)) for e in case['entities']]
+	result = {(mention, concept) for mention, concept in typed if concept is not None}
+
+	return result
+
+
+def score_types(case: Case, predicted: Output) -> Score:
+	""" Returns the score of the types chosen for the mentions of a case whose type the text gives. Other mentions are left out. """
+
+	expected = expected_types(case)
+	mentions = {mention for mention, _ in expected}
+	found	 = {(e['mention'], e['type']) for e in predicted['entities'] if e['mention'] in mentions}
+	result	 = score(expected, found)
+
+	return result
+
+
 def score(expected: set[tuple], predicted: set[tuple]) -> Score:
 	""" Returns the hits, the misses and the extras of a prediction. """
 
@@ -102,7 +138,10 @@ def score(expected: set[tuple], predicted: set[tuple]) -> Score:
 def score_case(case: Case, predicted: Output) -> dict[str, Score]:
 	""" Returns the score of an output for every metric. """
 
-	return {metric: score(keys(case, metric), keys(predicted, metric)) for metric in METRICS}
+	result			= {metric: score(keys(case, metric), keys(predicted, metric)) for metric in METRICS if metric != 'types'}
+	result['types'] = score_types(case, predicted)
+
+	return result
 
 
 def print_case(case: Case, scores: dict[str, Score], verbose: bool) -> None:
@@ -112,7 +151,7 @@ def print_case(case: Case, scores: dict[str, Score], verbose: bool) -> None:
 	if not verbose:
 		return
 
-	for metric in ('entities', 'edges'):
+	for metric in ('entities', 'types', 'edges'):
 		for item in scores[metric].missing:
 			print('       missing %-8s %s' % (metric, item))
 
