@@ -15,7 +15,7 @@ import networkx as nx
 
 from mercury.graph.evidence import AgenticGraph
 from mercury.graph.evidence.agentic_graph import graph_from_files, parent_of
-from mercury.graph.evidence.formalizer import validate_initial_graph
+from mercury.graph.evidence.formalizer import validate_instances
 
 
 Status = Literal['known', 'new', 'ambiguous', 'unresolved']
@@ -159,7 +159,7 @@ def check_edges(output: Output, case: Case, ontology: AgenticGraph) -> list[str]
 		errors += ['edge %s: "%s" is not a known or new entity of the case' % (edge['relation'], edge[end]) for end in ('src', 'dst')
 				   if edge[end] not in ends]
 
-	return errors + validate_initial_graph(expected_graph(output, case['id']), ontology)
+	return errors + validate_instances(expected_graph(output, case['id']), ontology)
 
 
 def expected_graph(output: Output, case_id: str) -> nx.MultiDiGraph:

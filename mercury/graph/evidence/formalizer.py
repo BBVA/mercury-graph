@@ -58,13 +58,12 @@ def validate_ontology(ontology):
 
 
 def validate_initial_graph(ntx, ontology):
-	""" Checks that an initial graph of instances (such as the one an EvidenceGraph starts from) matches an ontology.
+	""" Checks that an initial graph of instances (such as the one an EvidenceGraph starts from) matches an ontology and describes
+	every instance.
 
-	The checks are:
+	The checks are those of [`validate_instances()`][mercury.graph.evidence.formalizer.validate_instances] and:
 
-	- Every instance is a name under a type of entity of the ontology (e.g., `person|student|Noah Kim` under `person|student`).
-	- Every edge has a `relation` that is a relationship of the ontology, and the types of the instances it connects are the `src` and
-	`dst` of that relationship or descendants of them (e.g., a `person|student` can be the `src` of a relationship from `person`).
+	- Every instance has a `description` that is not empty (e.g., "A science teacher at Riverside High School.").
 
 	Args:
 		ntx (networkx.MultiDiGraph): the initial graph, with the instances as nodes and their relationships as edges.
@@ -74,10 +73,53 @@ def validate_initial_graph(ntx, ontology):
 		(list): A list of strings, one for each problem found. It is empty if the initial graph is valid.
 	"""
 
+	errors	= validate_instances(ntx, ontology)
+	errors += _check_descriptions(ntx)
+
+	return errors
+
+
+def validate_instances(ntx, ontology):
+	""" Checks that a graph of instances matches an ontology.
+
+	The checks are:
+
+	- Every instance is a name under a type of entity of the ontology (e.g., `person|student|Noah Kim` under `person|student`).
+	- Every edge has a `relation` that is a relationship of the ontology, and the types of the instances it connects are the `src` and
+	`dst` of that relationship or descendants of them (e.g., a `person|student` can be the `src` of a relationship from `person`).
+
+	Args:
+		ntx (networkx.MultiDiGraph): the graph, with the instances as nodes and their relationships as edges.
+		ontology (AgenticGraph): the ontology. It must be loaded.
+
+	Returns:
+		(list): A list of strings, one for each problem found. It is empty if the graph matches the ontology.
+	"""
+
 	types	  = set(ontology._graph.networkx.nodes)
 	relations = _relation_ends(ontology._graph.networkx)
 
 	return _check_instances(ntx, types) + _check_instance_edges(ntx, relations)
+
+
+def _check_descriptions(ntx):
+	""" Returns an error for every instance in ntx without a description or with an empty one. """
+
+	errors = []
+	for index, description in sorted(ntx.nodes(data = 'description')):
+		if not _is_text(description):
+			errors.append('Instance "%s" has no description: the initial graph needs one for every instance.' % index)
+
+	return errors
+
+
+def _is_text(value):
+	""" Returns True if value is a string that is not empty or only spaces (an empty cell of a .csv file is read as NaN). """
+
+	if not isinstance(value, str):
+		return False
+
+	return value.strip() != ''
 
 
 def _check_instances(ntx, types):

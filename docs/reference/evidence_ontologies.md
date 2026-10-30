@@ -90,14 +90,15 @@ The initial graph holds the instances known beforehand. It is not part of the on
 [`EvidenceGraph`](evidence.md#mercury.graph.evidence.EvidenceGraph) builds, before reading any document.
 
 **Instances** are its nodes, listed in `initial_graph/nodes.csv`. The id of an instance is its type of entity followed by a name, so
-`person|student|Noah Kim` tells you, without looking anything up, that Noah Kim is a student and therefore a person:
+`person|student|Noah Kim` tells you, without looking anything up, that Noah Kim is a student and therefore a person. Every instance
+also has a `description`, which tells it apart from other instances of the same type when a mention is compared with it:
 
 ```
-id
-person|student|Noah Kim
-person|teacher|Elena Ruiz
-organization|school|Riverside High School
-project|Helios Solar Car
+id                                          description
+person|student|Noah Kim                     A student at Riverside High School who leads the Helios project of the Riverside Robotics Club.
+person|teacher|Elena Ruiz                   A science teacher at Riverside High School who advises the Riverside Robotics Club.
+organization|school|Riverside High School   A public high school in Brookdale.
+project|Helios Solar Car                    A solar car built by the Riverside Robotics Club for the Brookdale Science Fair.
 ```
 
 **Relationships between instances** are its edges, listed in `initial_graph/edges.csv`. Each edge has its own `id` and a `relation`
@@ -173,9 +174,9 @@ become ready.
    For example, `works_on|leads` from `organization` is rejected when `works_on` goes from `person`.
 3. **When the EvidenceGraph is piloted** with its initial graph (see
    [`validate_initial_graph()`](#mercury.graph.evidence.formalizer.validate_initial_graph)): every instance is of a type of entity of
-   the ontology, and every edge has a relationship of the ontology between instances of its types or of descendants of them. For
-   example, `person|student|Noah Kim` can be the `src` of `works_on|leads`, but not of `teaches_at`, which goes from `person|teacher`.
-   An initial graph that fails is not saved, so the next start checks it again.
+   the ontology, every instance has a `description` that is not empty, and every edge has a relationship of the ontology between
+   instances of its types or of descendants of them. For example, `person|student|Noah Kim` can be the `src` of `works_on|leads`, but
+   not of `teaches_at`, which goes from `person|teacher`. An initial graph that fails is not saved, so the next start checks it again.
 
 
 ## How agents explore the ontology
@@ -214,3 +215,5 @@ own, and every answer is limited to `max_results` entries and says when it has b
 ::: mercury.graph.evidence.formalizer.validate_ontology
 
 ::: mercury.graph.evidence.formalizer.validate_initial_graph
+
+::: mercury.graph.evidence.formalizer.validate_instances

@@ -864,10 +864,16 @@ def test_validate_ontology_requires_a_loaded_ontology():
 	assert errors == ['Ontology "ontology" is not loaded.']
 
 
-def _instances(nodes, edges = ()):
-	"""Return a NetworkX graph of instance ids and (src, dst, relation, id) edges, like an initial graph. None leaves the relation out."""
+def _instances(nodes, edges = (), descriptions = None):
+	"""Return a NetworkX graph of instance ids and (src, dst, relation, id) edges, like an initial graph. None leaves the relation out.
+
+	Every instance is described as "Description of <id>." unless descriptions ({id: description}) gives it another one.
+	"""
 	ntx = nx.MultiDiGraph()
-	ntx.add_nodes_from(nodes)
+	for index in nodes:
+		ntx.add_node(index, description = 'Description of %s.' % index)
+	for index, description in (descriptions or {}).items():
+		ntx.nodes[index]['description'] = description
 	for src, dst, relation, key in edges:
 		ntx.add_edge(src, dst, key = key, **({} if relation is None else {'relation': relation}))
 	return ntx
@@ -930,6 +936,30 @@ def test_validate_initial_graph_reports_every_error_at_once(tmp_path):
 	errors = _validate_instances(tmp_path, ['vehicle|Car', 'person|Ada', 'project|Helios'], [('person|Ada', 'project|Helios', 'drives', 'x')])
 
 	assert len(errors) == 2
+
+
+def test_validate_initial_graph_requires_a_description_of_every_instance(tmp_path):
+	"""An instance without a description, with an empty one or with an empty cell of a .csv file (NaN) is an error."""
+	from mercury.graph.evidence.formalizer import validate_initial_graph
+
+	nodes		 = ['person|Ada', 'person|Noah', 'project|Helios', 'project|Apollo']
+	descriptions = {'person|Ada': None, 'person|Noah': '  ', 'project|Helios': float('nan')}
+	errors		 = validate_initial_graph(_instances(nodes, descriptions = descriptions), _multigraph(tmp_path, SCHOOL_ENTITIES))
+
+	assert len(errors) == 3
+	assert _mentions(errors, 'person|Ada', 'no description')
+	assert _mentions(errors, 'person|Noah', 'no description')
+	assert _mentions(errors, 'project|Helios', 'no description')
+
+
+def test_validate_instances_does_not_require_descriptions(tmp_path):
+	"""validate_instances() only checks the types: a graph of instances without descriptions can match the ontology."""
+	from mercury.graph.evidence.formalizer import validate_instances
+
+	ntx = nx.MultiDiGraph()
+	ntx.add_edge('person|Ada', 'project|Helios', key = 'ada_helios', relation = 'works_on')
+
+	assert validate_instances(ntx, _multigraph(tmp_path, SCHOOL_ENTITIES, SCHOOL_RELATIONS)) == []
 
 
 def test_formalizer_pilot_fails_with_an_invalid_ontology(monkeypatch, tmp_path):

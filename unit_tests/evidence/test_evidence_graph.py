@@ -251,8 +251,9 @@ def _school_ontology(directory):
 
 
 def _seeded_graph(directory, nodes, edges, logger = None, persistence = None):
-	"""Returns an EvidenceGraph whose initial graph has the given node ids and (src, dst, relation, id) edges."""
-	initial_nodes = _csv(directory, 'initial_nodes', [{'id': i} for i in nodes])
+	"""Returns an EvidenceGraph whose initial graph has the given node ids, each one with a description, and (src, dst, relation, id)
+	edges."""
+	initial_nodes = _csv(directory, 'initial_nodes', [{'id': i, 'description': 'Description of %s.' % i} for i in nodes])
 	initial_edges = _csv(directory, 'initial_edges', [{'src': s, 'dst': d, 'relation': r, 'id': i} for s, d, r, i in edges])
 	graph, _, _ = _connected_graph(schema = 'seeded', persistence = persistence, ontology = _school_ontology(directory), logger = logger,
 								   initial_nodes = initial_nodes, initial_edges = initial_edges)
@@ -306,3 +307,17 @@ def test_evidence_graph_rejects_an_invalid_initial_graph_without_saving_it(tmp_p
 	assert len(errors) == 2
 	assert any('vehicle|Car' in error for error in errors) and any('drives' in error for error in errors)
 	assert not path.exists()
+
+
+def test_evidence_graph_rejects_an_initial_graph_without_descriptions(tmp_path):
+	"""An instance with an empty description in the .csv file of the initial graph leaves the EvidenceGraph in ERR_BUILDING."""
+	logger = []
+	rows   = [{'id': 'person|student|Noah', 'description': 'A student.'}, {'id': 'project|Helios', 'description': ''}]
+	graph, _, _ = _connected_graph(schema = 'seeded', ontology = _school_ontology(tmp_path), logger = logger,
+								   initial_nodes = _csv(tmp_path, 'initial_nodes', rows))
+
+	graph.pilot(graph.states.READY.value)
+
+	errors = [event['error'] for event in logger if event['type'] == 'error']
+	assert graph.meta['state'] == graph.states.ERR_BUILDING.value
+	assert len(errors) == 1 and 'project|Helios' in errors[0] and 'no description' in errors[0]
