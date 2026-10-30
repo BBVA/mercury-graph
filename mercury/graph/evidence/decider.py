@@ -92,8 +92,9 @@ class Decider(ABC):
 	- A mention: a dictionary with 'mention' (the text as it appears), 'type' (its type in the ontology), 'type_definition'
 	(the definition of its type in the ontology) and 'texts' (a list of the texts where it was found). A mention has no id: ids are
 	given by the EvidenceGraph.
-	- A node (a known instance): a dictionary with 'id' (its type followed by its name, e.g., `person|teacher|Elena Ruiz`) and
-	'type_definition' (the definition of its type in the ontology).
+	- A node (a known instance): a dictionary with 'id' (its type followed by its name, e.g., `person|teacher|Elena Ruiz`),
+	'type_definition' (the definition of its type in the ontology), 'description' (what tells it apart from other instances, e.g.,
+	"A science teacher at Riverside High School.") and 'names' (a list of its other names, besides the one in its id).
 
 	A Decider is created by the Formalizer while piloting, with the "decider" section of its configuration (without "type"), and the
 	Formalizer only uses it if `ready()` finds no problem. A Decider that needs an external library imports it in `ready()`.
@@ -153,7 +154,8 @@ class RulesDecider(Decider):
 	""" A [`Decider`][mercury.graph.evidence.Decider] based on rules, without any model.
 
 	- `is_same_node()` compares the name of the mention with that of the node, as `hint_nodes` does with its candidates: 0 if their
-	types have different roots and the share of significant words in common otherwise. The texts and the definitions are not used.
+	types have different roots and the share of significant words in common otherwise. The texts, the definitions, the descriptions
+	and the other names are not used.
 	- `choose_node()` never chooses: it returns None.
 
 	Its configuration accepts "ignored_words", the words left out of the names (titles by default), and "same_node_threshold" (0.3

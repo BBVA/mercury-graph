@@ -39,7 +39,8 @@ Unless a case says otherwise, the Formalizer works with:
 
 A case can add to that context:
 
-- `extra_known_nodes`: instances that are also known in that case (e.g., a second person called Noah).
+- `extra_known_nodes`: instances that are also known in that case, with their `id` and `description` (e.g., a second person called
+  Noah).
 
 ## What is expected for a text
 

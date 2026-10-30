@@ -517,14 +517,16 @@ class Formalizer(Agentic):
 			arguments (dict): A dictionary containing the following keys:
 				- 'text' (str): The text from which to identify nodes.
 				- 'concepts' (list): A list of concepts to identify in the text. If empty, all concepts will be considered.
-				- 'candidates' (list): The ids of the known instances a mention can be. If missing, no mention has candidates.
+				- 'candidates' (list): The known instances a mention can be, as {'id', 'description', 'names'}: its type followed by
+					its name (e.g., `person|teacher|Elena Ruiz`), what tells it apart from other instances and its other names
+					(optional). If missing, no mention has candidates.
 
 		Returns:
 			(list): One dictionary per mention with 'mention' (the text as it appears), 'type' (the most specific of the types found for
 				it that are compatible with the most confident one), 'confidence' (that of the type) and 'candidates'.
 
-				The candidates of a mention are those of its root type that share a word with it, as {'id', 'score'}, from the highest to
-				the lowest score. The score is the share of words in common (1.0 when all of them are), leaving out the words of both types,
+				The candidates of a mention are those of its root type that share a word with it, as {'id', 'score', 'description',
+				'names'}, from the highest to the lowest score. The score is the share of words in common (1.0 when all of them are), leaving out the words of both types,
 				possessives, accents and the "ignored_words" of the configuration (titles by default). A candidate whose type is neither
 				an ancestor nor a descendant of the type of the mention has 'type_conflict' True. The score measures how alike the names
 				are, not whether they are the same instance: that is decided by the caller.
@@ -616,13 +618,18 @@ class Formalizer(Agentic):
 
 
 	def _score_candidate(self, mention_id, candidate):
-		""" Returns {'id', 'score'} of a candidate for a mention, with 'type_conflict' if their types are in different branches. """
+		""" Returns {'id', 'score', 'description', 'names'} of a candidate for a mention, with 'type_conflict' if their types are in
+		different branches. """
 
+		index	   = candidate['id']
 		concept	   = parent_of(mention_id)
-		known_type = parent_of(candidate)
+		known_type = parent_of(index)
 		ignored	   = self.conf.get('ignored_words', IGNORED_WORDS)
-		score	   = compare_names(mention_id, candidate, ignored)
-		scored	   = {'id': candidate, 'score': score}
+		score	   = compare_names(mention_id, index, ignored)
+		scored	   = {'id': index, 'score': score}
+
+		scored['description'] = candidate.get('description', '')
+		scored['names']		  = candidate.get('names', [])
 
 		if known_type is not None and not (descends_from(concept, known_type) or descends_from(known_type, concept)):
 			scored['type_conflict'] = True
@@ -835,7 +842,8 @@ class Formalizer(Agentic):
 			arguments (dict): A dictionary containing the following keys:
 				- 'mention' (dict): A mention, with 'mention' (str, the text as it appears), 'type' (str, its type in the ontology) and
 					optionally 'texts' (list), the texts where it was found.
-				- 'node' (dict): A known instance, with 'id' (str, its type followed by its name, e.g., `person|teacher|Elena Ruiz`).
+				- 'node' (dict): A known instance, with 'id' (str, its type followed by its name, e.g., `person|teacher|Elena Ruiz`),
+					'description' (str) and optionally 'names' (list), its other names.
 
 		Returns:
 			(float): A score in [0..1], or None if the Formalizer is not ready or an argument is missing.
@@ -854,9 +862,8 @@ class Formalizer(Agentic):
 
 			return None
 
-		texts		  = mention.get('texts', [])
-		mention_found = self._mention_context(mention['mention'], mention['type'], texts)
-		known_node	  = self._node_context(node['id'])
+		mention_found = self._mention_context(mention)
+		known_node	  = self._node_context(node)
 
 		result = self._decider.is_same_node(mention_found, known_node)
 
@@ -883,7 +890,8 @@ class Formalizer(Agentic):
 		"""
 
 		texts	= [] if text is None else [text]
-		mention = self._mention_context(node['mention'], node['type'], texts)
+		found	= {'mention': node['mention'], 'type': node['type'], 'texts': texts}
+		mention = self._mention_context(found)
 
 		viable = [candidate for candidate in node['candidates'] if candidate['score'] == 1 or not candidate.get('type_conflict', False)]
 		whole  = [candidate for candidate in viable if candidate['score'] == 1]
@@ -900,7 +908,7 @@ class Formalizer(Agentic):
 
 		result = []
 		for candidate in candidate_nodes:
-			known_node = self._node_context(candidate['id'])
+			known_node = self._node_context(candidate)
 			score	   = self._decider.is_same_node(mention, known_node)
 			if score >= self._decider.threshold:
 				result.append(candidate)
@@ -915,7 +923,7 @@ class Formalizer(Agentic):
 		if len(accepted) < 2:
 			return accepted
 
-		known_nodes = [self._node_context(candidate['id']) for candidate in accepted]
+		known_nodes = [self._node_context(candidate) for candidate in accepted]
 		index		= self._decider.choose_node(mention, known_nodes)
 
 		result = []
@@ -929,43 +937,51 @@ class Formalizer(Agentic):
 		return result
 
 
-	def _mention_context(self, mention, concept, texts):
+	def _mention_context(self, mention):
 		""" Returns a mention as passed to the Decider: its text, its type, the definition of the type and the texts.
 
 		Args:
-			mention (str): The mention, as it appears in the text (e.g., "Ms. Ruiz").
-			concept (str): The type of the mention in the ontology (e.g., `person|teacher`).
-			texts (list): The texts where the mention was found.
+			mention (dict): The mention, with 'mention' (the text as it appears, e.g., "Ms. Ruiz"), 'type' (its type in the ontology,
+				e.g., `person|teacher`) and optionally 'texts' (the texts where it was found).
 
 		Returns:
-			(dict): The mention with 'mention', 'type', 'type_definition' and 'texts' (see
+			(dict): The mention with 'mention', 'type', 'type_definition' and 'texts' (empty if it has none) (see
 				[`Decider`][mercury.graph.evidence.Decider]).
 		"""
 
-		definition = self._definition_of(concept)
-		context	   = {'mention': mention, 'type': concept, 'type_definition': definition, 'texts': texts}
+		concept			   = mention['type']
+		concept_definition = self._concept_definition(concept)
+		texts			   = mention.get('texts', [])
+
+		context = {'mention': mention['mention'], 'type': concept, 'type_definition': concept_definition, 'texts': texts}
 
 		return context
 
 
-	def _node_context(self, index):
-		""" Returns a known instance as passed to the Decider: its id and the definition of its type.
+	def _node_context(self, node):
+		""" Returns a known instance as passed to the Decider: its id, the definition of its type, its description and its names.
 
 		Args:
-			index (str): The id of the known instance, its type followed by its name (e.g., `person|teacher|Elena Ruiz`).
+			node (dict): The known instance, with 'id' (its type followed by its name, e.g., `person|teacher|Elena Ruiz`) and
+				optionally 'description' and 'names' (its other names).
 
 		Returns:
-			(dict): The known instance with 'id' and 'type_definition' (see [`Decider`][mercury.graph.evidence.Decider]).
+			(dict): The known instance with 'id', 'type_definition', 'description' (empty if it has none) and 'names' (empty if
+				it has none) (see [`Decider`][mercury.graph.evidence.Decider]).
 		"""
 
-		concept	   = parent_of(index)
-		definition = self._definition_of(concept)
-		context	   = {'id': index, 'type_definition': definition}
+		index			   = node['id']
+		concept			   = parent_of(index)
+		concept_definition = self._concept_definition(concept)
+
+		context = {'id': index, 'type_definition': concept_definition}
+		context['description'] = node.get('description', '')
+		context['names']	   = node.get('names', [])
 
 		return context
 
 
-	def _definition_of(self, concept):
+	def _concept_definition(self, concept):
 		""" Returns the definition of a type of the ontology, or an empty string if it is not in the ontology. """
 
 		ntx = self._ontology._graph.networkx
@@ -1127,9 +1143,9 @@ class Formalizer(Agentic):
 							'candidates': {
 								'type': 'array',
 								'items': {
-									'type': 'string'
+									'type': 'object'
 								},
-								'description': 'Ids of the known instances a mention can be. If missing, no mention has candidates.'
+								'description': 'The known instances a mention can be: "id", "description" and optionally "names", its other names. If missing, no mention has candidates.'
 							}
 						},
 						'required': ['text']
@@ -1138,7 +1154,7 @@ class Formalizer(Agentic):
 						'type': 'array',
 						'items': {
 							'type': 'object',
-							'description': 'One node per mention, with "mention", "type", "confidence" and "candidates" ({"id", "score"}).'
+							'description': 'One node per mention, with "mention", "type", "confidence" and "candidates" ({"id", "score", "description", "names"}).'
 						}
 					}
 				}
@@ -1195,7 +1211,7 @@ class Formalizer(Agentic):
 							},
 							'node': {
 								'type': 'object',
-								'description': 'A known instance: "id".'
+								'description': 'A known instance: "id", "description" and optionally "names", its other names.'
 							}
 						},
 						'required': ['mention', 'node']

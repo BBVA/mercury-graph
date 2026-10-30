@@ -242,14 +242,30 @@ def _found(*matches):
 	return entities
 
 
+def _known_nodes(ids):
+	"""Return the known instances of the given ids as candidates of hint_nodes, each one described as "Description of <id>."."""
+	return [{'id': index, 'description': 'Description of %s.' % index} for index in ids]
+
+
+def _scores(candidates):
+	"""Return the candidates of hint_nodes without their description and names, to compare only their ids and scores."""
+	result = []
+	for candidate in candidates:
+		scored = dict(candidate)
+		del scored['description'], scored['names']
+		result.append(scored)
+	return result
+
+
 def _hint_nodes(monkeypatch, directory, found, candidates = None, **conf):
-	"""Return the output of hint_nodes on a ready Formalizer whose model finds the given entities, optionally given candidates."""
+	"""Return the output of hint_nodes on a ready Formalizer whose model finds the given entities, optionally given the ids of the
+	known instances as candidates."""
 	formalizer = _ready_formalizer(monkeypatch, directory)
 	formalizer.conf.update(conf)
 	DummyModel.entities = found
 	arguments = {'text': 'Some text.'}
 	if candidates is not None:
-		arguments['candidates'] = candidates
+		arguments['candidates'] = _known_nodes(candidates)
 	return formalizer.hint_nodes(arguments)
 
 
@@ -296,17 +312,29 @@ def _candidates_of(monkeypatch, directory, concept, mention, candidates = KNOWN,
 	"""Return the candidates hint_nodes gives to a single mention of a type."""
 	nodes = _hint_nodes(monkeypatch, directory, _found((concept, mention, 0.9)), candidates, **conf)
 	assert len(nodes) == 1
-	return nodes[0]['candidates']
+	return _scores(nodes[0]['candidates'])
 
 
 def test_hint_nodes_gives_known_mentions_their_candidates(monkeypatch, tmp_path):
-	"""Case 2: the mentions of known instances, found with their types, have them as candidates with score 1."""
-	found = _found(('person|teacher', 'Elena Ruiz', 0.9), ('organization|school', 'Riverside School', 0.8))
+	"""Case 2: the mentions of known instances, found with their types, have them as candidates with score 1, their description and
+	their names (empty if they have none)."""
+	found	 = _found(('person|teacher', 'Elena Ruiz', 0.9), ('organization|school', 'Riverside School', 0.8))
+	elena	 = {'id': 'person|teacher|Elena Ruiz', 'score': 1.0, 'description': 'Description of person|teacher|Elena Ruiz.', 'names': []}
+	school	 = {'id': 'organization|school|Riverside School', 'score': 1.0, 'description': 'Description of organization|school|Riverside School.',
+				'names': []}
 	assert _hint_nodes(monkeypatch, tmp_path, found, KNOWN) == [
-		{'mention': 'Elena Ruiz', 'type': 'person|teacher', 'confidence': 0.9, 'candidates': [{'id': 'person|teacher|Elena Ruiz', 'score': 1.0}]},
-		{'mention': 'Riverside School', 'type': 'organization|school', 'confidence': 0.8,
-		 'candidates': [{'id': 'organization|school|Riverside School', 'score': 1.0}]}
+		{'mention': 'Elena Ruiz', 'type': 'person|teacher', 'confidence': 0.9, 'candidates': [elena]},
+		{'mention': 'Riverside School', 'type': 'organization|school', 'confidence': 0.8, 'candidates': [school]}
 	]
+
+
+def test_hint_nodes_gives_the_candidates_their_names(monkeypatch, tmp_path):
+	"""The names of a known instance given as candidate are kept in the candidates of hint_nodes."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path)
+	DummyModel.entities = _found(('person|teacher', 'Elena Ruiz', 0.9))
+	known = [{'id': 'person|teacher|Elena Ruiz', 'description': 'A teacher.', 'names': ['Ms. Ruiz']}]
+	nodes = formalizer.hint_nodes({'text': 'Some text.', 'candidates': known})
+	assert nodes[0]['candidates'] == [{'id': 'person|teacher|Elena Ruiz', 'score': 1.0, 'description': 'A teacher.', 'names': ['Ms. Ruiz']}]
 
 
 def test_hint_nodes_accepts_ancestors_and_descendants_of_the_known_type(monkeypatch, tmp_path):
@@ -427,8 +455,10 @@ def test_formalizer_logs_every_problem_of_the_decider(monkeypatch, tmp_path, fak
 
 
 def _is_same_node(formalizer, concept, mention, index, texts = ()):
-	"""Return the score of is_same_node for a mention of a type, with the given texts, and the id of a known instance."""
-	return formalizer.is_same_node({'mention': {'mention': mention, 'type': concept, 'texts': list(texts)}, 'node': {'id': index}})
+	"""Return the score of is_same_node for a mention of a type, with the given texts, and the id of a known instance, described as
+	"Description of <id>."."""
+	known = {'id': index, 'description': 'Description of %s.' % index}
+	return formalizer.is_same_node({'mention': {'mention': mention, 'type': concept, 'texts': list(texts)}, 'node': known})
 
 
 def test_is_same_node_scores_the_names_of_nodes_of_the_same_root(monkeypatch, tmp_path):
@@ -457,15 +487,19 @@ def test_the_rules_decider_takes_its_own_ignored_words(monkeypatch, tmp_path):
 
 
 def test_is_same_node_gives_the_decider_the_definitions_and_the_texts(monkeypatch, tmp_path, fake_decider):
-	"""The Decider is given the mention with the definition of its type and the texts, and the node with that of its type."""
+	"""The Decider is given the mention with the definition of its type and the texts, and the node with that of its type, its
+	description and its names (empty if they are not given)."""
 	entities   = ('person', 'person|teacher', 'place')
 	formalizer = _ready_formalizer(monkeypatch, tmp_path, entities, decider = {'type': 'fake', 'scores': {'person|teacher|Elena Ruiz': 0.7}})
-	assert _is_same_node(formalizer, 'person', 'Ms. Ruiz', 'person|teacher|Elena Ruiz', ['Ms. Ruiz teaches.']) == 0.7
-	assert _is_same_node(formalizer, 'animal', 'Ms. Ruiz', 'robot|Elena Ruiz') == 0
+	elena	   = {'id': 'person|teacher|Elena Ruiz', 'description': 'A teacher.', 'names': ['Ms. Ruiz']}
+	mention	   = {'mention': 'Ms. Ruiz', 'type': 'person', 'texts': ['Ms. Ruiz teaches.']}
+	assert formalizer.is_same_node({'mention': mention, 'node': elena}) == 0.7
+	assert formalizer.is_same_node({'mention': {'mention': 'Ms. Ruiz', 'type': 'animal'}, 'node': {'id': 'robot|Elena Ruiz'}}) == 0
 	assert formalizer._decider.asked == [
 		('is_same_node', {'mention': 'Ms. Ruiz', 'type': 'person', 'type_definition': 'Definition of person.', 'texts': ['Ms. Ruiz teaches.']},
-		 {'id': 'person|teacher|Elena Ruiz', 'type_definition': 'Definition of person|teacher.'}),
-		('is_same_node', {'mention': 'Ms. Ruiz', 'type': 'animal', 'type_definition': '', 'texts': []}, {'id': 'robot|Elena Ruiz', 'type_definition': ''})
+		 {'id': 'person|teacher|Elena Ruiz', 'type_definition': 'Definition of person|teacher.', 'description': 'A teacher.', 'names': ['Ms. Ruiz']}),
+		('is_same_node', {'mention': 'Ms. Ruiz', 'type': 'animal', 'type_definition': '', 'texts': []},
+		 {'id': 'robot|Elena Ruiz', 'type_definition': '', 'description': '', 'names': []})
 	]
 
 
@@ -481,7 +515,7 @@ def _linked(monkeypatch, directory, concept, mention, candidates = KNOWN, **conf
 	found by the model."""
 	formalizer = _ready_formalizer(monkeypatch, directory, **conf)
 	DummyModel.entities = _found((concept, mention, 0.9))
-	nodes = formalizer.hint_nodes({'text': 'Some text.', 'candidates': candidates})
+	nodes = formalizer.hint_nodes({'text': 'Some text.', 'candidates': _known_nodes(candidates)})
 	return formalizer, formalizer.link_mention(nodes[0], 'Some text.')
 
 
@@ -561,7 +595,8 @@ def test_link_mention_asks_the_decider_to_choose_between_several_candidates(monk
 	formalizer, link = _linked(monkeypatch, tmp_path, 'person', 'Noah', decider = decider)
 	assert link == {'mention': 'Noah', 'id': 'person|teacher|Noah Brown', 'status': 'known'}
 	mention = {'mention': 'Noah', 'type': 'person', 'type_definition': 'Definition of person.', 'texts': ['Some text.']}
-	nodes	= [{'id': 'person|student|Noah Kim', 'type_definition': ''}, {'id': 'person|teacher|Noah Brown', 'type_definition': ''}]
+	nodes	= [{'id': 'person|student|Noah Kim', 'type_definition': '', 'description': 'Description of person|student|Noah Kim.', 'names': []},
+			   {'id': 'person|teacher|Noah Brown', 'type_definition': '', 'description': 'Description of person|teacher|Noah Brown.', 'names': []}]
 	assert formalizer._decider.asked[-1] == ('choose_node', mention, nodes)
 
 
@@ -869,11 +904,11 @@ def _instances(nodes, edges = (), descriptions = None):
 
 	Every instance is described as "Description of <id>." unless descriptions ({id: description}) gives it another one.
 	"""
-	ntx = nx.MultiDiGraph()
+	given = descriptions or {}
+	ntx	  = nx.MultiDiGraph()
 	for index in nodes:
-		ntx.add_node(index, description = 'Description of %s.' % index)
-	for index, description in (descriptions or {}).items():
-		ntx.nodes[index]['description'] = description
+		description = given.get(index, 'Description of %s.' % index)
+		ntx.add_node(index, description = description)
 	for src, dst, relation, key in edges:
 		ntx.add_edge(src, dst, key = key, **({} if relation is None else {'relation': relation}))
 	return ntx

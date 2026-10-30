@@ -40,12 +40,17 @@ class Output(TypedDict):
 	edges	 : list[Edge]
 
 
+class KnownNode(TypedDict):
+	id			: str
+	description : str
+
+
 class Case(Output):
 	id				  : str
 	source			  : str
 	text			  : str
 	notes			  : str
-	extra_known_nodes : NotRequired[list[str]]
+	extra_known_nodes : NotRequired[list[KnownNode]]
 	context			  : NotRequired[str]
 	with_context	  : NotRequired[Output]
 
@@ -91,7 +96,7 @@ def check_case(case: Case, ontology: AgenticGraph, known: nx.MultiDiGraph) -> li
 def check_output(output: Output, case: Case, ontology: AgenticGraph, known: nx.MultiDiGraph) -> list[str]:
 	""" Returns the problems of one expected output (its entities and edges) of a case. """
 
-	known_ids = set(known.nodes) | set(case.get('extra_known_nodes', []))
+	known_ids = set(known.nodes) | {node['id'] for node in case.get('extra_known_nodes', [])}
 	types	  = set(ontology._graph.networkx.nodes)
 	errors	  = []
 
