@@ -896,12 +896,12 @@ class Formalizer(Agentic):
 			texts (list): The texts where the mention was found.
 
 		Returns:
-			(dict): The mention with 'mention', 'type', 'definition' and 'texts' (see
+			(dict): The mention with 'mention', 'type', 'type_definition' and 'texts' (see
 				[`Decider`][mercury.graph.evidence.Decider]).
 		"""
 
 		definition = self._definition_of(concept)
-		context	   = {'mention': mention, 'type': concept, 'definition': definition, 'texts': texts}
+		context	   = {'mention': mention, 'type': concept, 'type_definition': definition, 'texts': texts}
 
 		return context
 
@@ -913,12 +913,12 @@ class Formalizer(Agentic):
 			index (str): The id of the known instance, its type followed by its name (e.g., `person|teacher|Elena Ruiz`).
 
 		Returns:
-			(dict): The known instance with 'id' and 'definition' (see [`Decider`][mercury.graph.evidence.Decider]).
+			(dict): The known instance with 'id' and 'type_definition' (see [`Decider`][mercury.graph.evidence.Decider]).
 		"""
 
 		concept	   = parent_of(index)
 		definition = self._definition_of(concept)
-		context	   = {'id': index, 'definition': definition}
+		context	   = {'id': index, 'type_definition': definition}
 
 		return context
 

@@ -89,10 +89,11 @@ class Decider(ABC):
 
 	The arguments are:
 
-	- A mention: a dictionary with 'mention' (the text as it appears), 'type' (its type in the ontology), 'definition' (that of its type)
-	and 'texts' (a list of the texts where it was found). A mention has no id: ids are given by the EvidenceGraph.
+	- A mention: a dictionary with 'mention' (the text as it appears), 'type' (its type in the ontology), 'type_definition'
+	(the definition of its type in the ontology) and 'texts' (a list of the texts where it was found). A mention has no id: ids are
+	given by the EvidenceGraph.
 	- A node (a known instance): a dictionary with 'id' (its type followed by its name, e.g., `person|teacher|Elena Ruiz`) and
-	'definition' (that of its type).
+	'type_definition' (the definition of its type in the ontology).
 
 	A Decider is created by the Formalizer while piloting, with the "decider" section of its configuration (without "type"), and the
 	Formalizer only uses it if `ready()` finds no problem. A Decider that needs an external library imports it in `ready()`.

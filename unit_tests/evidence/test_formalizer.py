@@ -463,9 +463,9 @@ def test_is_same_node_gives_the_decider_the_definitions_and_the_texts(monkeypatc
 	assert _is_same_node(formalizer, 'person', 'Ms. Ruiz', 'person|teacher|Elena Ruiz', ['Ms. Ruiz teaches.']) == 0.7
 	assert _is_same_node(formalizer, 'animal', 'Ms. Ruiz', 'robot|Elena Ruiz') == 0
 	assert formalizer._decider.asked == [
-		('is_same_node', {'mention': 'Ms. Ruiz', 'type': 'person', 'definition': 'Definition of person.', 'texts': ['Ms. Ruiz teaches.']},
-		 {'id': 'person|teacher|Elena Ruiz', 'definition': 'Definition of person|teacher.'}),
-		('is_same_node', {'mention': 'Ms. Ruiz', 'type': 'animal', 'definition': '', 'texts': []}, {'id': 'robot|Elena Ruiz', 'definition': ''})
+		('is_same_node', {'mention': 'Ms. Ruiz', 'type': 'person', 'type_definition': 'Definition of person.', 'texts': ['Ms. Ruiz teaches.']},
+		 {'id': 'person|teacher|Elena Ruiz', 'type_definition': 'Definition of person|teacher.'}),
+		('is_same_node', {'mention': 'Ms. Ruiz', 'type': 'animal', 'type_definition': '', 'texts': []}, {'id': 'robot|Elena Ruiz', 'type_definition': ''})
 	]
 
 
@@ -560,8 +560,8 @@ def test_link_mention_asks_the_decider_to_choose_between_several_candidates(monk
 	decider = {'type': 'fake', 'scores': BOTH_NOAHS, 'choice': 'person|teacher|Noah Brown'}
 	formalizer, link = _linked(monkeypatch, tmp_path, 'person', 'Noah', decider = decider)
 	assert link == {'mention': 'Noah', 'id': 'person|teacher|Noah Brown', 'status': 'known'}
-	mention = {'mention': 'Noah', 'type': 'person', 'definition': 'Definition of person.', 'texts': ['Some text.']}
-	nodes	= [{'id': 'person|student|Noah Kim', 'definition': ''}, {'id': 'person|teacher|Noah Brown', 'definition': ''}]
+	mention = {'mention': 'Noah', 'type': 'person', 'type_definition': 'Definition of person.', 'texts': ['Some text.']}
+	nodes	= [{'id': 'person|student|Noah Kim', 'type_definition': ''}, {'id': 'person|teacher|Noah Brown', 'type_definition': ''}]
 	assert formalizer._decider.asked[-1] == ('choose_node', mention, nodes)
 
 
