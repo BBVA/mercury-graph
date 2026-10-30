@@ -27,6 +27,8 @@ class Entity(TypedDict):
 	status		  : Status
 	candidates	  : NotRequired[list[str]]
 	type_conflict : NotRequired[bool]
+	text_type	  : NotRequired[str]	# The type the text gives, when it is not the type of the id.
+	type		  : NotRequired[str]	# The type chosen by the Formalizer: only in its output.
 
 
 class Edge(TypedDict):
@@ -116,6 +118,8 @@ def check_entity(entity: Entity, case: Case, known_ids: set[str], types: set[str
 	if entity['status'] not in STATUSES:
 		errors.append('unknown status "%s"' % entity['status'])
 
+	errors += check_text_type(entity, types)
+
 	if entity['status'] == 'ambiguous':
 		return errors + check_ambiguous(entity, known_ids)
 
@@ -128,6 +132,18 @@ def check_entity(entity: Entity, case: Case, known_ids: set[str], types: set[str
 	errors += check_status(entity, known_ids)
 
 	return errors
+
+
+def check_text_type(entity: Entity, types: set[str]) -> list[str]:
+	""" Returns the problems of the text_type of an entity: it is a type of the ontology and a type_conflict needs it. """
+
+	if 'text_type' not in entity:
+		return ['a type_conflict needs a text_type'] if entity.get('type_conflict', False) else []
+
+	if entity['text_type'] not in types:
+		return ['text_type "%s" is not a type of entity of the ontology' % entity['text_type']]
+
+	return []
 
 
 def check_ambiguous(entity: Entity, known_ids: set[str]) -> list[str]:

@@ -28,6 +28,9 @@ Precision, recall and F1, micro-averaged over all cases, of:
 
 - `mentions`: the mention, whatever its id, i.e., whether the text was found,
 - `entities`: (mention, id, status), i.e., whether it was also linked to the right instance,
+- `types`: (mention, type) of the mentions whose type the text gives (their `text_type` or, by default, the type of their `id`), i.e.,
+  whether the type chosen by `hint_nodes` is the right one, whatever the link. Other mentions are left out, so a mention found with a
+  wrong type is both a miss and an extra, and a mention not found is a miss,
 - `edges`: (src, relation, dst).
 
 ## Context of every case
@@ -55,6 +58,11 @@ A case can add to that context:
   - `unresolved`: a pronoun or a generic mention that is an end of a relationship the text states, but the text does not say who
     or what it is (`id` is null),
 - `type_conflict` (optional, true): the text gives the instance a type that contradicts the known one.
+- `text_type` (optional): the type the text gives the mention, when it is not the type of its `id`: a known instance whose role the
+  text does not state (e.g., "Maya Singh gives the award" gives `person`, not `person|principal`), a `type_conflict` (the type that
+  contradicts the known one), or a mention with no id (e.g., "She" gives `person`). It is required with `type_conflict`. The text
+  gives a type also through the relationships of the ontology it states: "She advises the club" gives `person|teacher`, because only
+  teachers advise clubs.
 
 Named mentions are always listed. Pronouns ("She") and generic mentions ("the team", "the club" when it is not named) are listed only
 when they are an end of a relationship the text states: with their id if the text says who they are, as `unresolved` otherwise.
