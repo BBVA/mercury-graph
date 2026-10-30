@@ -10,6 +10,7 @@ import pytest
 
 from mercury.graph.evidence import AgenticGraph, Endpoint, Formalizer
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest
+from mercury.graph.evidence.decider import DECIDERS, Decider
 from mercury.graph.evidence.formalizer import FormalizerState
 
 
@@ -115,15 +116,16 @@ def _configuration(**extra):
 	return conf
 
 
-def _ready_formalizer(monkeypatch, directory, entities = ('person', 'place'), relations = (('located', 'person', 'place'),)):
-	"""Build a ready Formalizer with a deterministic model and an ontology (by default, two entities and one relationship)."""
+def _ready_formalizer(monkeypatch, directory, entities = ('person', 'place'), relations = (('located', 'person', 'place'),), **conf):
+	"""Build a ready Formalizer with a deterministic model and an ontology (by default, two entities and one relationship), with the
+	configuration extended by conf."""
 	set_gliner_extractor(monkeypatch, DummyModel)
 	DummyModel.loaded = []
 	DummyModel.fail_loading = False
 	DummyModel.entities = {}
 	DummyModel.structures = {}
 	DummyModel.pairs = {}
-	formalizer = Formalizer(schema = 'test', extra_args = _configuration())
+	formalizer = Formalizer(schema = 'test', extra_args = _configuration(**conf), logger = [])
 	formalizer.tools['formalizer_test/agentic_graph_ontology'] = _multigraph(directory, entities, relations)
 	formalizer.pilot(FormalizerState.READY.value)
 	return formalizer
@@ -200,7 +202,7 @@ def test_formalizer_pilot_ready_exposes_every_capability(monkeypatch, tmp_path):
 
 
 def test_formalizer_pilot_just_once_reaches_each_stage(monkeypatch, tmp_path):
-	"""Stop after model, ontology, and ready transitions when requested."""
+	"""Stop after model, ontology, decider and ready transitions when requested."""
 	set_gliner_extractor(monkeypatch, DummyModel)
 	DummyModel.fail_loading = False
 	formalizer = Formalizer(schema = 'staged', extra_args = _configuration())
@@ -209,6 +211,8 @@ def test_formalizer_pilot_just_once_reaches_each_stage(monkeypatch, tmp_path):
 	assert formalizer.meta['state'] == FormalizerState.MODEL_LOADED_OK.value
 	formalizer.pilot(FormalizerState.READY.value, just_once = True)
 	assert formalizer.meta['state'] == FormalizerState.ONTOLOGY_LOADED_OK.value
+	formalizer.pilot(FormalizerState.READY.value, just_once = True)
+	assert formalizer.meta['state'] == FormalizerState.DECIDER_LOADED_OK.value
 	formalizer.pilot(FormalizerState.READY.value, just_once = True)
 	assert formalizer.meta['state'] == FormalizerState.READY.value
 
@@ -238,14 +242,30 @@ def _found(*matches):
 	return entities
 
 
+def _known_nodes(ids):
+	"""Return the known instances of the given ids as candidates of hint_nodes, each one described as "Description of <id>."."""
+	return [{'id': index, 'description': 'Description of %s.' % index} for index in ids]
+
+
+def _scores(candidates):
+	"""Return the candidates of hint_nodes without their description and names, to compare only their ids and scores."""
+	result = []
+	for candidate in candidates:
+		scored = dict(candidate)
+		del scored['description'], scored['names']
+		result.append(scored)
+	return result
+
+
 def _hint_nodes(monkeypatch, directory, found, candidates = None, **conf):
-	"""Return the output of hint_nodes on a ready Formalizer whose model finds the given entities, optionally given candidates."""
+	"""Return the output of hint_nodes on a ready Formalizer whose model finds the given entities, optionally given the ids of the
+	known instances as candidates."""
 	formalizer = _ready_formalizer(monkeypatch, directory)
 	formalizer.conf.update(conf)
 	DummyModel.entities = found
 	arguments = {'text': 'Some text.'}
 	if candidates is not None:
-		arguments['candidates'] = candidates
+		arguments['candidates'] = _known_nodes(candidates)
 	return formalizer.hint_nodes(arguments)
 
 
@@ -292,17 +312,29 @@ def _candidates_of(monkeypatch, directory, concept, mention, candidates = KNOWN,
 	"""Return the candidates hint_nodes gives to a single mention of a type."""
 	nodes = _hint_nodes(monkeypatch, directory, _found((concept, mention, 0.9)), candidates, **conf)
 	assert len(nodes) == 1
-	return nodes[0]['candidates']
+	return _scores(nodes[0]['candidates'])
 
 
 def test_hint_nodes_gives_known_mentions_their_candidates(monkeypatch, tmp_path):
-	"""Case 2: the mentions of known instances, found with their types, have them as candidates with score 1."""
-	found = _found(('person|teacher', 'Elena Ruiz', 0.9), ('organization|school', 'Riverside School', 0.8))
+	"""Case 2: the mentions of known instances, found with their types, have them as candidates with score 1, their description and
+	their names (empty if they have none)."""
+	found	 = _found(('person|teacher', 'Elena Ruiz', 0.9), ('organization|school', 'Riverside School', 0.8))
+	elena	 = {'id': 'person|teacher|Elena Ruiz', 'score': 1.0, 'description': 'Description of person|teacher|Elena Ruiz.', 'names': []}
+	school	 = {'id': 'organization|school|Riverside School', 'score': 1.0, 'description': 'Description of organization|school|Riverside School.',
+				'names': []}
 	assert _hint_nodes(monkeypatch, tmp_path, found, KNOWN) == [
-		{'mention': 'Elena Ruiz', 'type': 'person|teacher', 'confidence': 0.9, 'candidates': [{'id': 'person|teacher|Elena Ruiz', 'score': 1.0}]},
-		{'mention': 'Riverside School', 'type': 'organization|school', 'confidence': 0.8,
-		 'candidates': [{'id': 'organization|school|Riverside School', 'score': 1.0}]}
+		{'mention': 'Elena Ruiz', 'type': 'person|teacher', 'confidence': 0.9, 'candidates': [elena]},
+		{'mention': 'Riverside School', 'type': 'organization|school', 'confidence': 0.8, 'candidates': [school]}
 	]
+
+
+def test_hint_nodes_gives_the_candidates_their_names(monkeypatch, tmp_path):
+	"""The names of a known instance given as candidate are kept in the candidates of hint_nodes."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path)
+	DummyModel.entities = _found(('person|teacher', 'Elena Ruiz', 0.9))
+	known = [{'id': 'person|teacher|Elena Ruiz', 'description': 'A teacher.', 'names': ['Ms. Ruiz']}]
+	nodes = formalizer.hint_nodes({'text': 'Some text.', 'candidates': known})
+	assert nodes[0]['candidates'] == [{'id': 'person|teacher|Elena Ruiz', 'score': 1.0, 'description': 'A teacher.', 'names': ['Ms. Ruiz']}]
 
 
 def test_hint_nodes_accepts_ancestors_and_descendants_of_the_known_type(monkeypatch, tmp_path):
@@ -352,43 +384,144 @@ def test_hint_nodes_only_gives_candidates_of_the_same_root_type(monkeypatch, tmp
 	assert _candidates_of(monkeypatch, tmp_path, 'place', 'Riverside School', KNOWN + ['Riverside School']) == []
 
 
-def _is_same_node(formalizer, index, other, texts = ()):
-	"""Return the score of is_same_node for two ids, the first one with the given texts."""
-	return formalizer.is_same_node({'node': {'id': index, 'texts': list(texts)}, 'other': {'id': other}})
+class FakeDecider(Decider):
+	"""A Decider with the answers of its configuration, which records the questions it is asked."""
+
+	SAME_NODE_THRESHOLD = 0.6
+
+	def __init__(self, conf):
+		"""Fail if the configuration says so, as a Decider that cannot be created."""
+		if conf.get('fail', False):
+			raise RuntimeError('cannot create')
+		super().__init__(conf)
+		self.asked = []
+
+	def ready(self):
+		"""Return the problems of the configuration."""
+		return self.conf.get('problems', [])
+
+	def is_same_node(self, mention, node):
+		"""Return the score of the configuration for the id of the node (0 by default)."""
+		self.asked.append(('is_same_node', mention, node))
+		return self.conf.get('scores', {}).get(node['id'], 0)
+
+	def choose_node(self, mention, nodes):
+		"""Return the choice of the configuration (None by default)."""
+		self.asked.append(('choose_node', mention, nodes))
+		return self.conf.get('choice', None)
+
+
+@pytest.fixture
+def fake_decider(monkeypatch):
+	"""Register FakeDecider as the "fake" type of Decider."""
+	monkeypatch.setitem(DECIDERS, 'fake', FakeDecider)
+
+
+def test_formalizer_uses_the_rules_decider_by_default(monkeypatch, tmp_path):
+	"""Without a "decider" section, the Decider is RulesDecider, with its threshold."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path)
+	assert type(formalizer._decider).__name__ == 'RulesDecider'
+	assert formalizer._decider.threshold == 0.3
+
+
+def test_formalizer_gives_the_decider_its_configuration_without_the_type(monkeypatch, tmp_path, fake_decider):
+	"""The "decider" section, without "type", is the configuration of the Decider."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path, decider = {'type': 'fake', 'choice': 'person|Ada'})
+	assert formalizer.meta['state'] == FormalizerState.READY.value
+	assert formalizer._decider.conf == {'choice': 'person|Ada'}
+	assert formalizer.conf['decider'] == {'type': 'fake', 'choice': 'person|Ada'}
+
+
+@pytest.mark.parametrize('decider, error', [
+	({'type': 'unknown'}, 'Unknown decider type "unknown"'),
+	({'type': 'fake', 'fail': True}, 'cannot create'),
+	({'type': 'fake', 'problems': ['no model', 'no key']}, 'no model')
+])
+def test_formalizer_pilot_fails_without_a_ready_decider(monkeypatch, tmp_path, fake_decider, decider, error):
+	"""An unknown type, a Decider that cannot be created or one with problems stop the Formalizer in ERR_DECIDER_INIT."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path, decider = decider)
+	assert formalizer.meta['state'] == FormalizerState.ERR_DECIDER_INIT.value
+	assert formalizer._decider is None
+	logged = [event['error'] for event in formalizer.logger]
+	assert any(error in event for event in logged)
+
+
+def test_formalizer_logs_every_problem_of_the_decider(monkeypatch, tmp_path, fake_decider):
+	"""Every problem found by ready() is logged."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path, decider = {'type': 'fake', 'problems': ['no model', 'no key']})
+	logged = [event['error'] for event in formalizer.logger]
+	assert _mentions(logged, 'no model')
+	assert _mentions(logged, 'no key')
+
+
+def _is_same_node(formalizer, concept, mention, index, texts = ()):
+	"""Return the score of is_same_node for a mention of a type, with the given texts, and the id of a known instance, described as
+	"Description of <id>."."""
+	known = {'id': index, 'description': 'Description of %s.' % index}
+	return formalizer.is_same_node({'mention': {'mention': mention, 'type': concept, 'texts': list(texts)}, 'node': known})
 
 
 def test_is_same_node_scores_the_names_of_nodes_of_the_same_root(monkeypatch, tmp_path):
-	"""The score is the share of words in common of the names, whatever the branch, and 0 for another root type."""
+	"""With the rules decider, the score is the share of words in common of the names, whatever the branch, and 0 for another root."""
 	formalizer = _ready_formalizer(monkeypatch, tmp_path)
-	assert _is_same_node(formalizer, 'person|Elena Ruiz', 'person|teacher|Elena Ruiz') == 1.0
-	assert _is_same_node(formalizer, 'person|teacher|Ms. Ruiz', 'person|teacher|Elena Ruiz') == 0.5
-	assert _is_same_node(formalizer, 'person|student|Elena Ruiz', 'person|teacher|Elena Ruiz') == 1.0
-	assert _is_same_node(formalizer, 'place|Elena Ruiz', 'person|teacher|Elena Ruiz') == 0
-	assert _is_same_node(formalizer, 'person|Person', 'person|teacher|Teacher') == 0
+	assert _is_same_node(formalizer, 'person', 'Elena Ruiz', 'person|teacher|Elena Ruiz') == 1.0
+	assert _is_same_node(formalizer, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz') == 0.5
+	assert _is_same_node(formalizer, 'person|student', 'Elena Ruiz', 'person|teacher|Elena Ruiz') == 1.0
+	assert _is_same_node(formalizer, 'place', 'Elena Ruiz', 'person|teacher|Elena Ruiz') == 0
+	assert _is_same_node(formalizer, 'person', 'Person', 'person|teacher|Teacher') == 0
 
 
-def test_is_same_node_is_symmetric_and_ignores_the_texts(monkeypatch, tmp_path):
-	"""Swapping the nodes gives the same score, and the texts do not change it in this Formalizer."""
+def test_is_same_node_ignores_the_texts_with_the_rules_decider(monkeypatch, tmp_path):
+	"""The texts do not change the score of the rules decider."""
 	formalizer = _ready_formalizer(monkeypatch, tmp_path)
-	score = _is_same_node(formalizer, 'person|teacher|Ms. Ruiz', 'person|teacher|Elena Ruiz')
-	assert _is_same_node(formalizer, 'person|teacher|Elena Ruiz', 'person|teacher|Ms. Ruiz') == score
-	assert _is_same_node(formalizer, 'person|teacher|Ms. Ruiz', 'person|teacher|Elena Ruiz', ['Ms. Ruiz teaches science.']) == score
+	score = _is_same_node(formalizer, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz')
+	assert _is_same_node(formalizer, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz', ['Ms. Ruiz teaches science.']) == score
+
+
+def test_the_rules_decider_takes_its_own_ignored_words(monkeypatch, tmp_path):
+	"""The "ignored_words" of the decider change is_same_node, and those of the Formalizer only the candidates of hint_nodes."""
+	formalizer = _ready_formalizer(monkeypatch, tmp_path, decider = {'type': 'rules', 'ignored_words': []})
+	assert _is_same_node(formalizer, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz') == pytest.approx(1/3)
+	formalizer = _ready_formalizer(monkeypatch, tmp_path, ignored_words = [])
+	assert _is_same_node(formalizer, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz') == 0.5
+
+
+def test_is_same_node_gives_the_decider_the_definitions_and_the_texts(monkeypatch, tmp_path, fake_decider):
+	"""The Decider is given the mention with the definition of its type and the texts, and the node with that of its type, its
+	description and its names (empty if they are not given)."""
+	entities   = ('person', 'person|teacher', 'place')
+	formalizer = _ready_formalizer(monkeypatch, tmp_path, entities, decider = {'type': 'fake', 'scores': {'person|teacher|Elena Ruiz': 0.7}})
+	elena	   = {'id': 'person|teacher|Elena Ruiz', 'description': 'A teacher.', 'names': ['Ms. Ruiz']}
+	mention	   = {'mention': 'Ms. Ruiz', 'type': 'person', 'texts': ['Ms. Ruiz teaches.']}
+	assert formalizer.is_same_node({'mention': mention, 'node': elena}) == 0.7
+	assert formalizer.is_same_node({'mention': {'mention': 'Ms. Ruiz', 'type': 'animal'}, 'node': {'id': 'robot|Elena Ruiz'}}) == 0
+	assert formalizer._decider.asked == [
+		('is_same_node', {'mention': 'Ms. Ruiz', 'type': 'person', 'type_definition': 'Definition of person.', 'texts': ['Ms. Ruiz teaches.']},
+		 {'id': 'person|teacher|Elena Ruiz', 'type_definition': 'Definition of person|teacher.', 'description': 'A teacher.', 'names': ['Ms. Ruiz']}),
+		('is_same_node', {'mention': 'Ms. Ruiz', 'type': 'animal', 'type_definition': '', 'texts': []},
+		 {'id': 'robot|Elena Ruiz', 'type_definition': '', 'description': '', 'names': []})
+	]
 
 
 def test_is_same_node_is_a_capability(monkeypatch, tmp_path):
 	"""is_same_node can be run by its capability name."""
 	formalizer = _ready_formalizer(monkeypatch, tmp_path)
-	arguments  = {'node': {'id': 'person|Ada'}, 'other': {'id': 'person|Ada Lovelace'}}
+	arguments  = {'mention': {'mention': 'Ada', 'type': 'person'}, 'node': {'id': 'person|Ada Lovelace'}}
 	assert formalizer.run({'name': 'is_same_node_test', 'arguments': arguments}) == {'finish_reason': 'stop', 'message': 0.5}
+
+
+def _linked(monkeypatch, directory, concept, mention, candidates = KNOWN, **conf):
+	"""Return a Formalizer with the configuration extended by conf and its decision of link_mention for a single mention of a type
+	found by the model."""
+	formalizer = _ready_formalizer(monkeypatch, directory, **conf)
+	DummyModel.entities = _found((concept, mention, 0.9))
+	nodes = formalizer.hint_nodes({'text': 'Some text.', 'candidates': _known_nodes(candidates)})
+	return formalizer, formalizer.link_mention(nodes[0], 'Some text.')
 
 
 def _link(monkeypatch, directory, concept, mention, candidates = KNOWN, **conf):
 	"""Return the decision of link_mention for a single mention of a type found by the model."""
-	formalizer = _ready_formalizer(monkeypatch, directory)
-	formalizer.conf.update(conf)
-	DummyModel.entities = _found((concept, mention, 0.9))
-	nodes = formalizer.hint_nodes({'text': 'Some text.', 'candidates': candidates})
-	return formalizer.link_mention(nodes[0], 'Some text.')
+	return _linked(monkeypatch, directory, concept, mention, candidates, **conf)[1]
 
 
 def test_link_mention_creates_a_mention_with_no_candidates(monkeypatch, tmp_path):
@@ -415,7 +548,7 @@ def test_link_mention_links_the_whole_name_despite_a_type_conflict(monkeypatch, 
 def test_link_mention_links_a_partial_name_from_the_threshold_on(monkeypatch, tmp_path):
 	"""Case 5: a partial name is linked if is_same_node scores it from the threshold on, and new otherwise."""
 	assert _link(monkeypatch, tmp_path, 'person|teacher', 'Ms. Ruiz') == {'mention': 'Ms. Ruiz', 'id': 'person|teacher|Elena Ruiz', 'status': 'known'}
-	assert _link(monkeypatch, tmp_path, 'person|teacher', 'Ms. Ruiz', same_node_threshold = 0.6) == {
+	assert _link(monkeypatch, tmp_path, 'person|teacher', 'Ms. Ruiz', decider = {'type': 'rules', 'same_node_threshold': 0.6}) == {
 		'mention': 'Ms. Ruiz', 'id': 'person|teacher|Ms. Ruiz', 'status': 'new'
 	}
 
@@ -441,6 +574,48 @@ def test_link_mention_prefers_the_only_whole_name(monkeypatch, tmp_path):
 	assert _link(monkeypatch, tmp_path, 'person|teacher', 'Noah Brown') == {
 		'mention': 'Noah Brown', 'id': 'person|teacher|Noah Brown', 'status': 'known'
 	}
+
+
+BOTH_NOAHS = {'person|student|Noah Kim': 0.9, 'person|teacher|Noah Brown': 0.8}
+
+
+def test_link_mention_uses_the_threshold_of_the_decider(monkeypatch, tmp_path, fake_decider):
+	"""The candidates are accepted from the "same_node_threshold" of the Decider on and, without it, from its default."""
+	decider = {'type': 'fake', 'scores': {'person|student|Noah Kim': 0.5}}
+	assert _link(monkeypatch, tmp_path, 'person', 'Noah', decider = decider) == {'mention': 'Noah', 'id': 'person|Noah', 'status': 'new'}
+	decider['same_node_threshold'] = 0.4
+	assert _link(monkeypatch, tmp_path, 'person', 'Noah', decider = decider) == {
+		'mention': 'Noah', 'id': 'person|student|Noah Kim', 'status': 'known'
+	}
+
+
+def test_link_mention_asks_the_decider_to_choose_between_several_candidates(monkeypatch, tmp_path, fake_decider):
+	"""With more than one candidate accepted, the one the Decider chooses is the instance."""
+	decider = {'type': 'fake', 'scores': BOTH_NOAHS, 'choice': 'person|teacher|Noah Brown'}
+	formalizer, link = _linked(monkeypatch, tmp_path, 'person', 'Noah', decider = decider)
+	assert link == {'mention': 'Noah', 'id': 'person|teacher|Noah Brown', 'status': 'known'}
+	mention = {'mention': 'Noah', 'type': 'person', 'type_definition': 'Definition of person.', 'texts': ['Some text.']}
+	nodes	= [{'id': 'person|student|Noah Kim', 'type_definition': '', 'description': 'Description of person|student|Noah Kim.', 'names': []},
+			   {'id': 'person|teacher|Noah Brown', 'type_definition': '', 'description': 'Description of person|teacher|Noah Brown.', 'names': []}]
+	assert formalizer._decider.asked[-1] == ('choose_node', mention, nodes)
+
+
+@pytest.mark.parametrize('choice', [None, 'person|Ada'])
+def test_link_mention_is_ambiguous_if_the_decider_does_not_choose_a_candidate(monkeypatch, tmp_path, fake_decider, choice):
+	"""If the Decider chooses none of the candidates accepted (or one that is not among them), the mention is ambiguous."""
+	decider = {'type': 'fake', 'scores': BOTH_NOAHS, 'choice': choice}
+	assert _link(monkeypatch, tmp_path, 'person', 'Noah', decider = decider) == {
+		'mention': 'Noah', 'id': None, 'status': 'ambiguous', 'candidates': ['person|student|Noah Kim', 'person|teacher|Noah Brown']
+	}
+
+
+def test_link_mention_does_not_ask_the_decider_to_choose_a_single_candidate(monkeypatch, tmp_path, fake_decider):
+	"""A single candidate accepted is the instance without asking choose_node."""
+	decider = {'type': 'fake', 'scores': {'person|student|Noah Kim': 0.9}}
+	formalizer, link = _linked(monkeypatch, tmp_path, 'person', 'Noah', decider = decider)
+	assert link == {'mention': 'Noah', 'id': 'person|student|Noah Kim', 'status': 'known'}
+	asked = [question for question, _, _ in formalizer._decider.asked]
+	assert asked == ['is_same_node', 'is_same_node']
 
 
 EDGE_ENTITIES  = ('person', 'person|teacher', 'person|student', 'organization', 'organization|school', 'place')
@@ -567,9 +742,11 @@ def test_formalizer_request_state_errors_and_close():
 	assert formalizer.is_same_node({'node': {'id': 'person|Ada'}}) is None
 	formalizer._ontology = object()
 	formalizer._model = object()
+	formalizer._decider = object()
 	formalizer.close(False)
 	assert formalizer._ontology is None
 	assert formalizer._model is None
+	assert formalizer._decider is None
 	assert len(formalizer.logger) == 6
 
 
@@ -722,10 +899,16 @@ def test_validate_ontology_requires_a_loaded_ontology():
 	assert errors == ['Ontology "ontology" is not loaded.']
 
 
-def _instances(nodes, edges = ()):
-	"""Return a NetworkX graph of instance ids and (src, dst, relation, id) edges, like an initial graph. None leaves the relation out."""
-	ntx = nx.MultiDiGraph()
-	ntx.add_nodes_from(nodes)
+def _instances(nodes, edges = (), descriptions = None):
+	"""Return a NetworkX graph of instance ids and (src, dst, relation, id) edges, like an initial graph. None leaves the relation out.
+
+	Every instance is described as "Description of <id>." unless descriptions ({id: description}) gives it another one.
+	"""
+	given = descriptions or {}
+	ntx	  = nx.MultiDiGraph()
+	for index in nodes:
+		description = given.get(index, 'Description of %s.' % index)
+		ntx.add_node(index, description = description)
 	for src, dst, relation, key in edges:
 		ntx.add_edge(src, dst, key = key, **({} if relation is None else {'relation': relation}))
 	return ntx
@@ -788,6 +971,30 @@ def test_validate_initial_graph_reports_every_error_at_once(tmp_path):
 	errors = _validate_instances(tmp_path, ['vehicle|Car', 'person|Ada', 'project|Helios'], [('person|Ada', 'project|Helios', 'drives', 'x')])
 
 	assert len(errors) == 2
+
+
+def test_validate_initial_graph_requires_a_description_of_every_instance(tmp_path):
+	"""An instance without a description, with an empty one or with an empty cell of a .csv file (NaN) is an error."""
+	from mercury.graph.evidence.formalizer import validate_initial_graph
+
+	nodes		 = ['person|Ada', 'person|Noah', 'project|Helios', 'project|Apollo']
+	descriptions = {'person|Ada': None, 'person|Noah': '  ', 'project|Helios': float('nan')}
+	errors		 = validate_initial_graph(_instances(nodes, descriptions = descriptions), _multigraph(tmp_path, SCHOOL_ENTITIES))
+
+	assert len(errors) == 3
+	assert _mentions(errors, 'person|Ada', 'no description')
+	assert _mentions(errors, 'person|Noah', 'no description')
+	assert _mentions(errors, 'project|Helios', 'no description')
+
+
+def test_validate_instances_does_not_require_descriptions(tmp_path):
+	"""validate_instances() only checks the types: a graph of instances without descriptions can match the ontology."""
+	from mercury.graph.evidence.formalizer import validate_instances
+
+	ntx = nx.MultiDiGraph()
+	ntx.add_edge('person|Ada', 'project|Helios', key = 'ada_helios', relation = 'works_on')
+
+	assert validate_instances(ntx, _multigraph(tmp_path, SCHOOL_ENTITIES, SCHOOL_RELATIONS)) == []
 
 
 def test_formalizer_pilot_fails_with_an_invalid_ontology(monkeypatch, tmp_path):

@@ -1,10 +1,10 @@
-id
-organization|school|Riverside High School
-organization|club|Riverside Robotics Club
-person|principal|Maya Singh
-person|teacher|Elena Ruiz
-person|student|Noah Kim
-person|student|Priya Shah
-event|Brookdale Science Fair
-project|Helios Solar Car
-place|room|laboratory|science laboratory
+id	description
+organization|school|Riverside High School	A public high school in Brookdale.
+organization|club|Riverside Robotics Club	A student club at Riverside High School.
+person|principal|Maya Singh	The principal of Riverside High School.
+person|teacher|Elena Ruiz	A science teacher at Riverside High School who advises the Riverside Robotics Club.
+person|student|Noah Kim	A student at Riverside High School who leads the Helios project of the Riverside Robotics Club.
+person|student|Priya Shah	A student at Riverside High School in the team of the Helios Solar Car.
+event|Brookdale Science Fair	A science fair that Riverside High School hosts every spring.
+project|Helios Solar Car	A solar car built by the Riverside Robotics Club for the Brookdale Science Fair.
+place|room|laboratory|science laboratory	The science laboratory inside Riverside High School, next to the school library.

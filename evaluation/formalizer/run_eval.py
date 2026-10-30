@@ -25,6 +25,8 @@ case.
 import sys, time
 from dataclasses import dataclass, field
 
+import networkx as nx
+
 from mercury.graph.evidence import AgenticGraph, Formalizer
 from mercury.graph.evidence.agentic_graph import parent_of
 
@@ -72,10 +74,20 @@ def build_formalizer(ontology: AgenticGraph) -> Formalizer:
 	return formalizer
 
 
-def formalize(text: str, formalizer: Formalizer, known_ids: set[str]) -> Output:
-	""" Returns the output of the Formalizer for a text in the format of the cases, with the type chosen for every entity. """
+def known_nodes(known: nx.MultiDiGraph, case: Case) -> list[dict]:
+	""" Returns the known instances of a case (the known graph and extra_known_nodes), with their descriptions, sorted by id. """
 
-	nodes	 = formalizer.hint_nodes({'text': text, 'candidates': sorted(known_ids)})
+	nodes  = [{'id': index, 'description': description} for index, description in known.nodes(data = 'description')]
+	nodes += case.get('extra_known_nodes', [])
+
+	return sorted(nodes, key = lambda node: node['id'])
+
+
+def formalize(text: str, formalizer: Formalizer, candidates: list[dict]) -> Output:
+	""" Returns the output of the Formalizer for a text in the format of the cases, given the known instances as candidates, with the type
+	chosen for every entity. """
+
+	nodes	 = formalizer.hint_nodes({'text': text, 'candidates': candidates})
 	entities = [{**formalizer.link_mention(node, text), 'type': node['type']} for node in nodes]
 	found	 = formalizer.hint_edges({'text': text, 'nodes': entities})
 	edges	 = [{'src': edge['src'], 'relation': edge['relation'], 'dst': edge['dst']} for edge in found]
@@ -179,8 +191,8 @@ def main() -> int:
 
 	print('case  hits/miss/extra')
 	for case in dataset['cases']:
-		known_ids = set(known.nodes) | set(case.get('extra_known_nodes', []))
-		predicted = formalize(case['text'], formalizer, known_ids)
+		candidates = known_nodes(known, case)
+		predicted  = formalize(case['text'], formalizer, candidates)
 		scores	  = score_case(case, predicted)
 		print_case(case, scores, verbose)
 		for metric in METRICS:
