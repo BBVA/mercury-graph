@@ -258,6 +258,12 @@ class Formalizer(Agentic):
 
 	The Formalizer gathers the context (the mention, its type, the definitions of the ontology and the texts) and the Decider decides.
 
+	## Types and concepts
+
+	A type of the ontology (of entity or of relationship) is called a *concept* in the code of the Formalizer (e.g., `_choose_concept()`
+	or `concept_definition`) and a *type* in what its capabilities return and in the context given to the Decider (e.g., the 'type' of
+	the nodes of `hint_nodes` and the 'type_definition' of a mention). The types to look for are given in the argument 'concepts'.
+
 	## Ontology validation
 
 	While piloting, the Formalizer checks that its ontology is coherent using

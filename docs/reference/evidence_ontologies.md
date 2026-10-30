@@ -60,6 +60,13 @@ place|room|laboratory   A room equipped for scientific work.
 The definitions are not just documentation. The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) gives every type of
 entity and its definition to the extraction model, so a clear definition directly improves what is found in the text.
 
+### Types and concepts
+
+A type of the ontology, of entity or of relationship, is also called a **concept**: both words name the same thing. The code and the
+files of the ontology (`entities_concepts.csv`, `relationships_concepts.csv`) say *concept*. The capabilities say *type* in what they
+return and in the context they give to a [`Decider`](evidence.md#mercury.graph.evidence.Decider) (e.g., the `type` of a mention and
+its `type_definition`), but they take the types to look for in an argument named `concepts`.
+
 
 ## Relationships: the edges of the ontology
 
