@@ -202,8 +202,9 @@ own, and every answer is limited to `max_results` entries and says when it has b
 - There is no graph query language: agents explore the ontology through the capabilities above, one question at a time.
 - The initial graph is loaded into the EvidenceGraph, but it cannot be explored through capabilities yet.
 - The ontology cannot be edited at runtime: it is defined by its .csv files (deleting its pickle to apply changes).
-- [`Formalizer.is_same_node()`](evidence.md#mercury.graph.evidence.Formalizer.is_same_node), which scores whether two nodes are the
-  same instance, only compares their names: it does not read the texts that mention them yet.
+- [`Formalizer.is_same_node()`](evidence.md#mercury.graph.evidence.Formalizer.is_same_node), which scores whether a mention is a
+  known instance, is answered by [`RulesDecider`](evidence.md#mercury.graph.evidence.RulesDecider), the only Decider so far: it only
+  compares their names and does not read the texts that mention them.
 
 
 ## Reference

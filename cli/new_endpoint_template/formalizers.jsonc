@@ -43,13 +43,23 @@
 			// AgenticGraph in ontologies.jsonc (both happen to be "ontology" in this template). It must also be in "tools".
 			"ontology": "ontology",
 
-			// Words left out when the name of a mention is compared with that of a known instance (e.g., "Ms. Ruiz" with "Elena Ruiz").
-			// These are the defaults: titles in English. Change them for documents in other languages.
+			// Words left out when the name of a mention is compared with those of the known instances to find its candidates (e.g., "Ms.
+			// Ruiz" with "Elena Ruiz"). These are the defaults: titles in English. Change them for documents in other languages.
 			"ignored_words": ["mr", "mrs", "ms", "miss", "dr", "prof"],
 
-			// The score (0..1) of is_same_node from which a mention that is only part of the name of a known instance is linked to it
-			// (e.g., "Ms. Ruiz" has 0.5 with "Elena Ruiz"). This is the default.
-			"same_node_threshold": 0.3
+			// The Decider answers whether a mention is a known instance and which one of several candidates it is. "type" chooses it
+			// and the rest of this section is its configuration. "rules" (the default) compares names and never chooses between
+			// several candidates.
+			"decider": {
+				"type": "rules",
+
+				// Words the rules decider leaves out when it compares names. These are the defaults, as in "ignored_words" above.
+				"ignored_words": ["mr", "mrs", "ms", "miss", "dr", "prof"],
+
+				// The score (0..1) of is_same_node from which a mention that is only part of the name of a known instance is linked
+				// to it (e.g., "Ms. Ruiz" has 0.5 with "Elena Ruiz"). Each Decider has its own default: this is that of "rules".
+				"same_node_threshold": 0.3
+			}
 		},
 
 		// "tools" is an argument for the Endpoint to serve these tools to the Formalizer. This must include the name in "ontology".

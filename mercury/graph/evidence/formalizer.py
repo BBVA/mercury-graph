@@ -1,20 +1,23 @@
-import os, re, unicodedata, logging, warnings
+import os, logging, warnings
 
 from enum import Enum
 
 from .agentic import Agentic, AgenticRunInvalidRequest
 from .agentic_graph import AgenticGraph, descends_from, parent_of
+from .decider import DECIDERS, IGNORED_WORDS, compare_names
 
 
 class FormalizerState(Enum):
 	""" The `FormalizerState` is an enumeration that defines all possible states of a Formalizer. """
 
+	ERR_DECIDER_INIT	= -3	# Something failed loading the decider.
 	ERR_ONTOLOGY_INIT	= -2	# Something failed loading the ontology.
 	ERR_MODEL_INIT		= -1	# Something failed loading the model.
 
 	INITIAL				=  0	# The initial state of the formalizer.
 	MODEL_LOADED_OK		=  1	# The model was loaded successfully.
 	ONTOLOGY_LOADED_OK	=  2	# The ontology was loaded successfully.
+	DECIDER_LOADED_OK	=  3	# The decider was loaded successfully.
 
 	READY				=  100	# The formalizer is ready to be queried.
 
@@ -202,14 +205,23 @@ class Formalizer(Agentic):
 	of both the relationship and its elements from the Ontology.
 	- **AutoExtractor** (Relation Extraction): `extract_relations()` gives (head, tail) pairs. It is only asked for the relationships
 	with the same type at both ends, whose structure cannot tell one end from the other.
-	Whether two nodes are the same instance ([`is_same_node()`][mercury.graph.evidence.Formalizer.is_same_node]) is not asked to
-	GLiNER2: it is scored comparing their names.
+	Whether a mention is a known instance is not asked to GLiNER2: it is decided by the Decider.
+
+	## The Decider
+
+	The questions about the nodes found (whether a mention is a known instance and which one of several candidates it is) are answered
+	by a [`Decider`][mercury.graph.evidence.Decider], chosen by the "type" of the "decider" section of the configuration. The
+	rest of that section is the configuration of the Decider. Without it, the Decider is
+	[`RulesDecider`][mercury.graph.evidence.RulesDecider], which compares names.
+
+	The Formalizer gathers the context (the mention, its type, the definitions of the ontology and the texts) and the Decider decides.
 
 	## Ontology validation
 
 	While piloting, the Formalizer checks that its ontology is coherent using
 	[`validate_ontology()`][mercury.graph.evidence.formalizer.validate_ontology]. If any problem is found, every problem is logged
-	and the Formalizer stops in the `ERR_ONTOLOGY_INIT` state.
+	and the Formalizer stops in the `ERR_ONTOLOGY_INIT` state. Then it creates its Decider: if its type is unknown or `ready()` finds
+	any problem, every problem is logged and the Formalizer stops in the `ERR_DECIDER_INIT` state.
 
 	## Capabilities exposed by the Formalizer
 
@@ -217,12 +229,12 @@ class Formalizer(Agentic):
 
 	1. Entity Extraction (`hint_nodes`): every mention of a type of the ontology, with the known instances it can be.
 	2. Relationship Extraction (`hint_edges`): every edge of a relationship of the ontology between the nodes found in a text.
-	3. Node comparison (`is_same_node`): how likely two nodes (known instances or mentions) are the same instance.
+	3. Node comparison (`is_same_node`): how likely a mention is a known instance, as decided by the Decider.
 
 	## Linking mentions to known instances
 
 	[`link_mention()`][mercury.graph.evidence.Formalizer.link_mention] decides whether a mention found by `hint_nodes` is a known
-	instance, a new one or ambiguous, asking `is_same_node` when the name alone is not enough. It is not a capability: those rules
+	instance, a new one or ambiguous, asking the Decider when the name alone is not enough. It is not a capability: those rules
 	belong to the caller (the EvidenceGraph) and are here until it uses them.
 
 	## Known Limitations
@@ -233,7 +245,7 @@ class Formalizer(Agentic):
 	- The key 'definition' is hardcoded, it should be included in the config to make it easier to find and modify.
 	- Mentions are compared with known instances by the words of their names, so synonyms, abbreviations and scientific names (e.g.,
 	"Cuculus canorus" for the Common Cuckoo) are not linked.
-	- is_same_node() only compares the names in the ids: it ignores the texts of the nodes.
+	- The only Decider is RulesDecider: it only compares names (it ignores the texts) and never chooses between several candidates.
 	- Pronouns and generic mentions ("she", "the club") are not resolved.
 	- The direction of the edges of a relationship with the same type at both ends depends on `extract_relations()`, which finds
 	few of them.
@@ -251,9 +263,6 @@ class Formalizer(Agentic):
 		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
 
-	IGNORED_WORDS		= ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof']	# Default "ignored_words": titles left out when comparing names.
-	SAME_NODE_THRESHOLD = 0.3	# Default "same_node_threshold": the is_same_node() score from which link_mention() accepts a candidate.
-
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'formalizer', schema = schema, endpoint = endpoint, logger = logger)
 
@@ -267,6 +276,7 @@ class Formalizer(Agentic):
 
 		self._ontology = None
 		self._model	   = None
+		self._decider  = None
 
 		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
@@ -423,6 +433,18 @@ class Formalizer(Agentic):
 					break
 
 			if self._meta_['state'] == self.states.ONTOLOGY_LOADED_OK.value:
+				self._decider = self._load_decider()
+
+				if self._decider is None:
+					self._meta_['state'] = self.states.ERR_DECIDER_INIT.value
+					break
+
+				self._meta_['state'] = self.states.DECIDER_LOADED_OK.value
+
+				if just_once:
+					break
+
+			if self._meta_['state'] == self.states.DECIDER_LOADED_OK.value:
 				self._meta_['state'] = self.states.READY.value
 
 				if just_once:
@@ -517,14 +539,14 @@ class Formalizer(Agentic):
 	def _resolve_mention(self, mention, candidate_types, candidate_nodes):
 		""" Returns the node of a mention: its text, its chosen type, the confidence of that type and its candidate nodes. """
 
-		inferred_type = self._choose_type(candidate_types)
+		inferred_type = self._choose_concept(candidate_types)
 		found		  = self._find_candidates(mention, inferred_type, candidate_nodes)
 		node		  = {'mention': mention, 'type': inferred_type, 'confidence': candidate_types[inferred_type], 'candidates': found}
 
 		return node
 
 
-	def _choose_type(self, candidate_types):
+	def _choose_concept(self, candidate_types):
 		""" Returns the most specific candidate type compatible with the most confident one (it, its ancestors or its descendants).
 
 		Among equally specific types, the most confident is chosen. Types of other branches are discarded.
@@ -556,74 +578,14 @@ class Formalizer(Agentic):
 
 		concept	   = parent_of(mention_id)
 		known_type = parent_of(candidate)
-		score	   = self._compare_names(mention_id, candidate)
+		ignored	   = self.conf.get('ignored_words', IGNORED_WORDS)
+		score	   = compare_names(mention_id, candidate, ignored)
 		scored	   = {'id': candidate, 'score': score}
 
 		if known_type is not None and not (descends_from(concept, known_type) or descends_from(known_type, concept)):
 			scored['type_conflict'] = True
 
 		return scored
-
-
-	def _compare_names(self, index, other):
-		""" Returns the share of significant words in common between the names of two ids, or 0 if their types have different roots. """
-
-		concept		  = parent_of(index)
-		other_concept = parent_of(other)
-		if not self._have_same_root(concept, other_concept):
-			return 0
-
-		generic		= self._get_words(concept) | self._get_words(other_concept)
-		words		= self._get_significant_words(index.rsplit('|', 1)[1], generic)
-		other_words = self._get_significant_words(other.rsplit('|', 1)[1], generic)
-
-		result = self._jaccard(words, other_words)
-
-		return result
-
-
-	def _have_same_root(self, concept, other_concept):
-		""" Returns True if both types are under the same root type (person|teacher and person|student are). """
-
-		if concept is None or other_concept is None:
-			return False
-
-		return concept.split('|')[0] == other_concept.split('|')[0]
-
-
-	def _get_significant_words(self, name, generic):
-		""" Returns the words of a name without possessives, the generic words (those of the types) and the ignored words. """
-
-		without_possessives = re.sub("['’]s\\b", '', name)
-		ignored = set(self.conf.get('ignored_words', self.IGNORED_WORDS))
-
-		result = self._get_words(without_possessives) - generic - ignored
-
-		return result
-
-
-	def _get_words(self, text):
-		""" Returns the set of lowercase words of a text, without accents (`|` and `_` separate words). """
-
-		decomposed = unicodedata.normalize('NFKD', text.lower())
-		plain	   = ''.join(char for char in decomposed if not unicodedata.combining(char))
-
-		result = set(re.findall('[^\\W_]+', plain))
-
-		return result
-
-
-	def _jaccard(self, words, other_words):
-		""" Returns the share of words in common between two sets of words (0 if both are empty). """
-
-		every = words | other_words
-
-		if len(every) == 0:
-			return 0
-
-		result = len(words & other_words)/len(every)
-
-		return result
 
 
 	def hint_edges(self, arguments):
@@ -822,19 +784,19 @@ class Formalizer(Agentic):
 
 
 	def is_same_node(self, arguments):
-		""" Scores how likely two nodes are the same instance. It is symmetric.
+		""" Scores how likely a mention is a known instance, as decided by the Decider of the Formalizer.
 
-		A node is a known instance or a mention, whose id is its type followed by the mention (e.g., `person|teacher|Ms. Ruiz`). This
-		Formalizer only compares the names in the ids, as `hint_nodes` does with its candidates: 0 if their types have different roots
-		and the share of significant words in common otherwise. The texts are accepted for Formalizers that read them.
+		The definitions of the types of the mention and the node are taken from the ontology and passed to the Decider (see
+		[`Decider`][mercury.graph.evidence.Decider]).
 
 		Args:
 			arguments (dict): A dictionary containing the following keys:
-				- 'node' (dict): A node, with 'id' (str) and optionally 'texts' (list), the texts that mention it.
-				- 'other' (dict): The other node, in the same format.
+				- 'mention' (dict): A mention, with 'mention' (str, the text as it appears), 'type' (str, its type in the ontology) and
+					optionally 'texts' (list), the texts where it was found.
+				- 'node' (dict): A known instance, with 'id' (str, its type followed by its name, e.g., `person|teacher|Elena Ruiz`).
 
 		Returns:
-			(float): A score in [0..1], or None if the Formalizer is not ready or a node is missing.
+			(float): A score in [0..1], or None if the Formalizer is not ready or an argument is missing.
 		"""
 
 		if self._meta_['state'] != self.states.READY.value:
@@ -842,15 +804,19 @@ class Formalizer(Agentic):
 
 			return None
 
-		node  = arguments.get('node', None)
-		other = arguments.get('other', None)
+		mention = arguments.get('mention', None)
+		node	= arguments.get('node', None)
 
-		if node is None or other is None:
-			self.log_error('Formalizer.is_same_node() %s called without "node" and "other" arguments.' % self.id)
+		if mention is None or node is None:
+			self.log_error('Formalizer.is_same_node() %s called without "mention" and "node" arguments.' % self.id)
 
 			return None
 
-		result = self._compare_names(node['id'], other['id'])
+		texts		  = mention.get('texts', [])
+		mention_found = self._mention_context(mention['mention'], mention['type'], texts)
+		known_node	  = self._node_context(node['id'])
+
+		result = self._decider.is_same_node(mention_found, known_node)
 
 		return result
 
@@ -860,12 +826,13 @@ class Formalizer(Agentic):
 
 		1. Candidates with `type_conflict` are discarded unless their score is 1 (the whole name).
 		2. A single candidate with score 1 is the instance.
-		3. Otherwise, `is_same_node` scores the mention (with the text) against every candidate left, and those from the configured
-		"same_node_threshold" on are kept.
+		3. Otherwise, the Decider scores the mention (with the text) against every candidate left (as `is_same_node` does), and those
+		from the threshold of the Decider on are kept.
+		4. If more than one is kept, the Decider is asked to choose one of them. If it does not, the mention is ambiguous.
 
 		Args:
 			node (dict): A node returned by `hint_nodes`.
-			text (str): The text where the mention was found, passed to `is_same_node`.
+			text (str): The text where the mention was found, passed to the Decider.
 
 		Returns:
 			(dict): The 'mention' with its 'id' and 'status': 'known' (with 'type_conflict' True if the type found contradicts the known
@@ -873,27 +840,98 @@ class Formalizer(Agentic):
 				'candidates').
 		"""
 
+		texts	= [] if text is None else [text]
+		mention = self._mention_context(node['mention'], node['type'], texts)
+
 		viable = [candidate for candidate in node['candidates'] if candidate['score'] == 1 or not candidate.get('type_conflict', False)]
 		whole  = [candidate for candidate in viable if candidate['score'] == 1]
 
-		accepted = whole if len(whole) == 1 else self._confirm_candidates(node, viable, text)
-		result	 = self._build_link(node, accepted)
+		accepted = whole if len(whole) == 1 else self._confirm_candidates(mention, viable)
+		chosen	 = self._choose_candidate(mention, accepted)
+		result	 = self._build_link(node, chosen)
 
 		return result
 
 
-	def _confirm_candidates(self, node, candidate_nodes, text):
-		""" Returns the candidate nodes that is_same_node scores from the configured threshold on as the same instance as the mention. """
-
-		threshold = self.conf.get('same_node_threshold', self.SAME_NODE_THRESHOLD)
-		texts	  = [] if text is None else [text]
-		mention	  = {'id': '%s|%s' % (node['type'], node['mention']), 'texts': texts}
+	def _confirm_candidates(self, mention, candidate_nodes):
+		""" Returns the candidate nodes that the Decider scores from the threshold on as the same instance as the mention. """
 
 		result = []
 		for candidate in candidate_nodes:
-			score = self.is_same_node({'node': mention, 'other': candidate})
-			if score >= threshold:
+			known_node = self._node_context(candidate['id'])
+			score	   = self._decider.is_same_node(mention, known_node)
+			if score >= self._decider.threshold:
 				result.append(candidate)
+
+		return result
+
+
+	def _choose_candidate(self, mention, accepted):
+		""" Returns the candidate the Decider chooses as a list of one, or all the accepted ones if there are not several or it does not
+		choose one of them. """
+
+		if len(accepted) < 2:
+			return accepted
+
+		known_nodes = [self._node_context(candidate['id']) for candidate in accepted]
+		index		= self._decider.choose_node(mention, known_nodes)
+
+		result = []
+		for candidate in accepted:
+			if candidate['id'] == index:
+				result.append(candidate)
+
+		if len(result) == 0:
+			return accepted
+
+		return result
+
+
+	def _mention_context(self, mention, concept, texts):
+		""" Returns a mention as passed to the Decider: its text, its type, the definition of the type and the texts.
+
+		Args:
+			mention (str): The mention, as it appears in the text (e.g., "Ms. Ruiz").
+			concept (str): The type of the mention in the ontology (e.g., `person|teacher`).
+			texts (list): The texts where the mention was found.
+
+		Returns:
+			(dict): The mention with 'mention', 'type', 'definition' and 'texts' (see
+				[`Decider`][mercury.graph.evidence.Decider]).
+		"""
+
+		definition = self._definition_of(concept)
+		context	   = {'mention': mention, 'type': concept, 'definition': definition, 'texts': texts}
+
+		return context
+
+
+	def _node_context(self, index):
+		""" Returns a known instance as passed to the Decider: its id and the definition of its type.
+
+		Args:
+			index (str): The id of the known instance, its type followed by its name (e.g., `person|teacher|Elena Ruiz`).
+
+		Returns:
+			(dict): The known instance with 'id' and 'definition' (see [`Decider`][mercury.graph.evidence.Decider]).
+		"""
+
+		concept	   = parent_of(index)
+		definition = self._definition_of(concept)
+		context	   = {'id': index, 'definition': definition}
+
+		return context
+
+
+	def _definition_of(self, concept):
+		""" Returns the definition of a type of the ontology, or an empty string if it is not in the ontology. """
+
+		ntx = self._ontology._graph.networkx
+
+		if concept not in ntx.nodes:
+			return ''
+
+		result = ntx.nodes[concept].get('definition', '')
 
 		return result
 
@@ -924,6 +962,7 @@ class Formalizer(Agentic):
 		# There is no state to persist, just freeing resources.
 		self._ontology = None
 		self._model	   = None
+		self._decider  = None
 
 
 	def _find_ontology(self):
@@ -957,6 +996,47 @@ class Formalizer(Agentic):
 			self.log_error('Invalid ontology in Formalizer %s: %s' % (self.id, error))
 
 		self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
+
+
+	def _load_decider(self):
+		""" Returns the Decider of the "decider" section of the configuration (rules by default), or None (logging why) if its type is
+		unknown, it cannot be created or it is not ready. """
+
+		conf = dict(self.conf.get('decider', {'type': 'rules'}))
+		kind = conf.pop('type', None)
+
+		decider_class = DECIDERS.get(kind, None)
+		if decider_class is None:
+			self.log_error('Unknown decider type "%s" while piloting Formalizer %s.' % (kind, self.id))
+
+			return None
+
+		decider = self._create_decider(decider_class, conf)
+		if decider is None:
+			return None
+
+		problems = decider.ready()
+		for problem in problems:
+			self.log_error('Decider "%s" is not ready in Formalizer %s: %s' % (kind, self.id, problem))
+
+		if len(problems) > 0:
+			return None
+
+		return decider
+
+
+	def _create_decider(self, decider_class, conf):
+		""" Returns a Decider of decider_class with conf, or None (logging why) if creating it fails. """
+
+		try:
+			decider = decider_class(conf)
+
+		except Exception as e:
+			self.log_error('Failed to create the decider while piloting Formalizer %s: %s' % (self.id, str(e)))
+
+			return None
+
+		return decider
 
 
 	def _capabilities(self):
@@ -1063,24 +1143,24 @@ class Formalizer(Agentic):
 				'type': 'function',
 				'function': {
 					'name': name_is_same,
-					'description': 'Score how likely two nodes (known instances or mentions, as "type|name" ids) are the same instance.',
+					'description': 'Score how likely a mention is a known instance (a node, as a "type|name" id).',
 					'parameters': {
 						'type': 'object',
 						'properties': {
+							'mention': {
+								'type': 'object',
+								'description': 'A mention: "mention" (the text as it appears), "type" and optionally "texts", a list of texts where it was found.'
+							},
 							'node': {
 								'type': 'object',
-								'description': 'A node: "id" and optionally "texts", a list of texts that mention it.'
-							},
-							'other': {
-								'type': 'object',
-								'description': 'The other node, in the same format.'
+								'description': 'A known instance: "id".'
 							}
 						},
-						'required': ['node', 'other']
+						'required': ['mention', 'node']
 					},
 					'returns': {
 						'type': 'number',
-						'description': 'A score (0..1): how likely both nodes are the same instance.'
+						'description': 'A score (0..1): how likely the mention is the known instance.'
 					}
 				}
 			}
