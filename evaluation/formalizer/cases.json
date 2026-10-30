@@ -230,7 +230,7 @@
   {
    "id": "S03",
    "source": "synthetic",
-   "extra_known_nodes": ["person|teacher|Noah Brown"],
+   "extra_known_nodes": [{"id": "person|teacher|Noah Brown", "description": "A chemistry teacher at Riverside High School."}],
    "text": "Noah fixed the battery of the Helios Solar Car.",
    "entities": [
     {"mention": "Noah", "id": null, "status": "ambiguous", "candidates": ["person|student|Noah Kim", "person|teacher|Noah Brown"], "text_type": "person"},
@@ -375,7 +375,7 @@
   {
    "id": "C03",
    "source": "synthetic",
-   "extra_known_nodes": ["person|teacher|Noah Brown"],
+   "extra_known_nodes": [{"id": "person|teacher|Noah Brown", "description": "A chemistry teacher at Riverside High School."}],
    "context": "Noah Kim and Priya Shah stayed after class to work on the car.",
    "text": "Noah leads the Helios project.",
    "entities": [
@@ -642,7 +642,7 @@
     {"src": "person|student|Noah Kim", "relation": "studies_at", "dst": "organization|school|Riverside High School"}
    ],
    "notes": "Judgment call: with a second known Noah (a teacher), the first name alone is ambiguous, but studying at a school makes him a student, and Noah Kim is the only known student called Noah.",
-   "extra_known_nodes": ["person|teacher|Noah Brown"]
+   "extra_known_nodes": [{"id": "person|teacher|Noah Brown", "description": "A chemistry teacher at Riverside High School."}]
   },
   {
    "id": "N17",
@@ -656,7 +656,7 @@
     {"src": "person|teacher|Noah Brown", "relation": "teaches_at", "dst": "organization|school|Riverside High School"}
    ],
    "notes": "The whole name of a known instance that is only known in this case, next to another known Noah.",
-   "extra_known_nodes": ["person|teacher|Noah Brown"]
+   "extra_known_nodes": [{"id": "person|teacher|Noah Brown", "description": "A chemistry teacher at Riverside High School."}]
   },
   {
    "id": "N18",
@@ -668,7 +668,7 @@
    ],
    "edges": [],
    "notes": "With two known teachers called Ruiz, the text does not say which one: ambiguous, and no edge, since one of its ends is not resolved.",
-   "extra_known_nodes": ["person|teacher|Marta Ruiz"]
+   "extra_known_nodes": [{"id": "person|teacher|Marta Ruiz", "description": "A teacher at Riverside High School."}]
   },
   {
    "id": "N19",
