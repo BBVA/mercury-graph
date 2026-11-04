@@ -358,7 +358,15 @@ class AgenticGraph(Agentic):
 
 
 	def _missing_arguments(self, name, arguments):
-		""" Returns the required arguments of the capability called name (as declared in its definition) that are missing or None. """
+		""" Returns the required arguments of the capability called name (as declared in its definition) that are missing or None.
+
+		Args:
+			name (str): The full name of the capability, including the name of the graph.
+			arguments (dict): The arguments supplied to the capability.
+
+		Returns:
+			(list): The names of required arguments that are missing or None; empty if none are missing or the capability is unknown.
+		"""
 
 		for capability in self._meta_['capabilities']:
 			if capability['function']['name'] == name:
@@ -459,6 +467,12 @@ class AgenticGraph(Agentic):
 		front. None or an empty string is the root.
 
 		(See [`SourceNode.get_children_idx()`][mercury.graph.evidence.source_parts.SourceNode.get_children_idx].)
+
+		Args:
+			index (str or None): The hierarchical id of the parent; None or an empty string selects the root.
+
+		Returns:
+			(list or None): The child ids, or None if the graph is not ready, the id does not exist or it is a leaf.
 		"""
 
 		if not self._is_ready('get_children_idx'):
@@ -474,6 +488,12 @@ class AgenticGraph(Agentic):
 		front.
 
 		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
+
+		Args:
+			index (str): The exact hierarchical id of the node.
+
+		Returns:
+			(dict or None): A copy of the node properties, or None if the graph is not ready or the id has no properties.
 		"""
 
 		if not self._is_ready('child') or index is None or index == '':
@@ -483,7 +503,15 @@ class AgenticGraph(Agentic):
 
 
 	def _children_entities_by_idx(self, arguments):
-		""" Runs the children_entities_by_idx capability (see `NavigableTree.children_by_idx()`). """
+		""" Runs the children_entities_by_idx capability (see `NavigableTree.children_by_idx()`).
+
+		Args:
+			arguments (dict): The parent 'index' (str, empty for the root) and optional 'depth' (int, default 1).
+
+		Returns:
+			(list or None): The children with their summaries and nested children, ending with TRUNCATED if limited; None if not ready
+				or the id does not exist.
+		"""
 
 		if not self._is_ready('children_entities_by_idx'):
 			return None
@@ -492,7 +520,14 @@ class AgenticGraph(Agentic):
 
 
 	def _entity_by_idx(self, arguments):
-		""" Runs the entity_by_idx capability (see `NavigableTree.by_idx()`). """
+		""" Runs the entity_by_idx capability (see `NavigableTree.by_idx()`).
+
+		Args:
+			arguments (dict): The exact entity id as 'index' (str).
+
+		Returns:
+			(dict or None): The entity 'id', 'properties' and 'ancestors', or None if not ready or the id has no properties.
+		"""
 
 		if not self._is_ready('entity_by_idx'):
 			return None
@@ -501,7 +536,14 @@ class AgenticGraph(Agentic):
 
 
 	def _search_entities(self, arguments):
-		""" Runs the search_entities capability (see `NavigableTree.search()`). """
+		""" Runs the search_entities capability (see `NavigableTree.search()`).
+
+		Args:
+			arguments (dict): The search 'text' (str) and optional 'limit' (int, default 20, capped by max_results).
+
+		Returns:
+			(list or None): Matching entities with their summaries, ending with TRUNCATED if limited, or None if not ready.
+		"""
 
 		if not self._is_ready('search_entities'):
 			return None
@@ -510,7 +552,15 @@ class AgenticGraph(Agentic):
 
 
 	def _children_relationships_by_idx(self, arguments):
-		""" Runs the children_relationships_by_idx capability (see `NavigableTree.children_by_idx()`). """
+		""" Runs the children_relationships_by_idx capability (see `NavigableTree.children_by_idx()`).
+
+		Args:
+			arguments (dict): The parent 'index' (str, empty for the root) and optional 'depth' (int, default 1).
+
+		Returns:
+			(list or None): The children with their summaries and nested children, ending with TRUNCATED if limited; None if not ready
+				or the id does not exist.
+		"""
 
 		if not self._is_ready('children_relationships_by_idx'):
 			return None
@@ -519,7 +569,14 @@ class AgenticGraph(Agentic):
 
 
 	def _relationship_by_idx(self, arguments):
-		""" Runs the relationship_by_idx capability (see `NavigableTree.by_idx()`). """
+		""" Runs the relationship_by_idx capability (see `NavigableTree.by_idx()`).
+
+		Args:
+			arguments (dict): The exact relationship id as 'index' (str).
+
+		Returns:
+			(dict or None): The relationship 'id', 'properties' and 'ancestors', or None if not ready or the id has no properties.
+		"""
 
 		if not self._is_ready('relationship_by_idx'):
 			return None
@@ -528,7 +585,14 @@ class AgenticGraph(Agentic):
 
 
 	def _search_relationships(self, arguments):
-		""" Runs the search_relationships capability (see `NavigableTree.search()`). """
+		""" Runs the search_relationships capability (see `NavigableTree.search()`).
+
+		Args:
+			arguments (dict): The search 'text' (str) and optional 'limit' (int, default 20, capped by max_results).
+
+		Returns:
+			(list or None): Matching relationships with their summaries, ending with TRUNCATED if limited, or None if not ready.
+		"""
 
 		if not self._is_ready('search_relationships'):
 			return None
@@ -537,7 +601,15 @@ class AgenticGraph(Agentic):
 
 
 	def _relations_for(self, arguments):
-		""" Runs the relations_for capability: the relationships a type of entity takes part in (by inheritance by default), sorted by id. """
+		""" Runs the relations_for capability: the relationships a type of entity takes part in (by inheritance by default), sorted by id.
+
+		Args:
+			arguments (dict): The entity type as 'concept' (str) and optional 'inherited' (bool, default True) to include ancestors.
+
+		Returns:
+			(list or None): Relationships with their summaries and the entity type's role, ending with TRUNCATED if limited; None if
+				not ready.
+		"""
 
 		if not self._is_ready('relations_for'):
 			return None
@@ -550,7 +622,16 @@ class AgenticGraph(Agentic):
 
 
 	def _relation_entry(self, index, concept, inherited):
-		""" Returns the entry of a relationship with the role of a type of entity in it, or None if it takes no part in it. """
+		""" Returns the entry of a relationship with the role of a type of entity in it, or None if it takes no part in it.
+
+		Args:
+			index (str): The exact id of the relationship.
+			concept (str): The hierarchical id of the entity type.
+			inherited (bool): Whether the entity type also takes part where its ancestors do.
+
+		Returns:
+			(dict or None): The relationship 'id', 'src', 'dst', summary and role ('as'), or None if the entity type takes no part.
+		"""
 
 		attr = self._relationships.properties(index)
 		role = self._role(attr, concept, inherited)
@@ -562,7 +643,14 @@ class AgenticGraph(Agentic):
 
 
 	def _is_ready(self, function):
-		""" Returns True if the AgenticGraph is ready, logging an error naming the calling function if it is not. """
+		""" Returns True if the AgenticGraph is ready, logging an error naming the calling function if it is not.
+
+		Args:
+			function (str): The name of the calling function, included in the error message.
+
+		Returns:
+			(bool): True if the graph is ready, False otherwise.
+		"""
 
 		if self._meta_['state'] != self.states.READY.value:
 			self.log_error('AgenticGraph is not ready for %s.' % function)
@@ -587,7 +675,11 @@ class AgenticGraph(Agentic):
 
 
 	def _graph_from_files(self):
-		""" Returns the graph built from the files of nodes and edges in the configuration. """
+		""" Returns the graph built from the files of nodes and edges in the configuration.
+
+		Returns:
+			(MultiGraph): The graph loaded from the configured files, or an empty graph if no files are configured.
+		"""
 
 		return self.graph_from_files(self.conf.get('nodes', None), self.conf.get('edges', None), self.conf.get('file_format', None))
 
@@ -648,28 +740,55 @@ class AgenticGraph(Agentic):
 
 
 	def _has_edges(self):
-		""" Returns True if the graph is loaded and has edges. """
+		""" Returns True if the graph is loaded and has edges.
+
+		Returns:
+			(bool): True if the graph is loaded and contains at least one edge, False otherwise.
+		"""
 
 		return self._graph is not None and self._graph.networkx.number_of_edges() > 0
 
 
 	@staticmethod
 	def parent_of(index):
-		""" Returns the parent of a hierarchical id (the id without its last `|` level) or None if it has a single level. """
+		""" Returns the parent of a hierarchical id (the id without its last `|` level) or None if it has a single level.
+
+		Args:
+			index (str): The hierarchical id, with levels separated by '|'.
+
+		Returns:
+			(str or None): The id without its last level, or None if it has a single level.
+		"""
 
 		return index.rsplit('|', 1)[0] if '|' in index else None
 
 
 	@staticmethod
 	def descends_from(concept, ancestor):
-		""" Returns True if concept is ancestor or one of its descendants in the `|` hierarchy (person_group does not descend from person). """
+		""" Returns True if concept is ancestor or one of its descendants in the `|` hierarchy (person_group does not descend from person).
+
+		Args:
+			concept (str): The hierarchical id to check.
+			ancestor (str): The hierarchical id of the possible ancestor.
+
+		Returns:
+			(bool): True if concept equals ancestor or starts with ancestor followed by '|', False otherwise.
+		"""
 
 		return concept == ancestor or concept.startswith(ancestor + '|')
 
 
 	@staticmethod
 	def _positive_int(value, default):
-		""" Returns value as an integer if it is (or is text for) a number greater than zero and default otherwise. """
+		""" Returns value as an integer if it is (or is text for) a number greater than zero and default otherwise.
+
+		Args:
+			value (object): The value to convert to an integer.
+			default (int): The fallback when conversion raises TypeError or ValueError, or the converted value is not positive.
+
+		Returns:
+			(int): The positive converted integer, or default.
+		"""
 
 		try:
 			return int(value) if int(value) > 0 else default
@@ -680,7 +799,14 @@ class AgenticGraph(Agentic):
 
 	@staticmethod
 	def _as_bool(value):
-		""" Returns False for False or a text such as "false", "no" or "0" and True for anything else. """
+		""" Returns False for False or a text such as "false", "no" or "0" and True for anything else.
+
+		Args:
+			value (object): The value whose stripped, lowercase string representation is checked.
+
+		Returns:
+			(bool): False for 'false', 'no' or '0' after normalization, True otherwise.
+		"""
 
 		return str(value).strip().lower() not in ('false', 'no', '0')
 
@@ -689,6 +815,14 @@ class AgenticGraph(Agentic):
 	def _role(attr, concept, inherited):
 		""" Returns the role ('src', 'dst' or 'both') of a type of entity in a relationship given its attributes, or None if it takes no part.
 		With inherited, a type of entity also takes part where one of its ancestors does.
+
+		Args:
+			attr (dict): The relationship attributes, including 'src' and 'dst' entity type ids.
+			concept (str): The hierarchical id of the entity type.
+			inherited (bool): Whether matching an ancestor of concept also counts as taking part.
+
+		Returns:
+			(str or None): 'src', 'dst' or 'both' for the matching ends, or None if neither end matches.
 		"""
 
 		roles = [end for end in ('src', 'dst') if (AgenticGraph.descends_from(concept, attr[end]) if inherited else concept == attr[end])]
@@ -701,14 +835,30 @@ class AgenticGraph(Agentic):
 
 	@staticmethod
 	def _parameters(required, **properties):
-		""" Returns the JSON schema of the parameters of a capability. """
+		""" Returns the JSON schema of the parameters of a capability.
+
+		Args:
+			required (list): The names of the required parameters.
+			**properties (dict): Parameter names mapped to their JSON schema definitions.
+
+		Returns:
+			(dict): An object schema with 'type', 'properties' and 'required'.
+		"""
 
 		return {'type': 'object', 'properties': properties, 'required': required}
 
 
 	@staticmethod
 	def _named(value, name):
-		""" Returns a copy of a capability definition with {name} replaced by the name of the AgenticGraph in every text. """
+		""" Returns a copy of a capability definition with {name} replaced by the name of the AgenticGraph in every text.
+
+		Args:
+			value (object): A capability definition or nested value; dictionaries and lists are traversed recursively.
+			name (str): The graph name to substitute for '{name}' in string values.
+
+		Returns:
+			(object): A copied dictionary or list, a substituted string, or the original value for other types.
+		"""
 
 		if isinstance(value, dict):
 			return {key: AgenticGraph._named(item, name) for key, item in value.items()}
@@ -754,7 +904,15 @@ class AgenticGraph(Agentic):
 
 	@staticmethod
 	def _read_table(spec, sep):
-		""" Returns the pandas DataFrame described by spec (a "type" and a "path"), or None if there is no spec. """
+		""" Returns the pandas DataFrame described by spec (a "type" and a "path"), or None if there is no spec.
+
+		Args:
+			spec (dict or None): The file 'type' ('csv' or 'pickle') and 'path', or None when no file is specified.
+			sep (str): The separator to use when reading a CSV file; ignored for pickle files.
+
+		Returns:
+			(pandas.DataFrame or None): The loaded table, or None if spec is None.
+		"""
 
 		if spec is None:
 			return None
@@ -773,6 +931,11 @@ class AgenticGraph(Agentic):
 		""" Raises a ValueError listing every id that is repeated in table (the nodes or the edges, as named by kind).
 
 		Without this check, NetworkX would silently merge repeated nodes (and edges with the same ends), keeping the last attributes.
+
+		Args:
+			table (pandas.DataFrame): The table of nodes or edges to check.
+			keys (dict): The file format mapping whose 'id' value names the identifier column.
+			kind (str): The name of the table, such as 'Nodes' or 'Edges', used in the error message.
 		"""
 
 		ids		 = table[keys['id']]
@@ -787,6 +950,11 @@ class AgenticGraph(Agentic):
 		""" Raises a ValueError if there are no nodes or if any src or dst of the edges is not one of them (all are listed at once).
 
 		Without this check, NetworkX would silently create a node, without any attributes, for every undeclared src or dst.
+
+		Args:
+			nodes (pandas.DataFrame or None): The declared nodes, or None when no file of nodes was supplied.
+			edges (pandas.DataFrame): The edges whose ends must be declared nodes.
+			keys (dict): The file format mapping naming the 'id', 'src' and 'dst' columns.
 		"""
 
 		if nodes is None:
@@ -800,7 +968,16 @@ class AgenticGraph(Agentic):
 
 	@staticmethod
 	def _undeclared_ends(declared, edges, keys):
-		""" Returns a description of every src or dst of the edges that is not in declared, e.g. '"c" (dst of "e1")'. """
+		""" Returns a description of every src or dst of the edges that is not in declared, e.g. '"c" (dst of "e1")'.
+
+		Args:
+			declared (set): The ids of the declared nodes.
+			edges (pandas.DataFrame): The edges to check.
+			keys (dict): The file format mapping naming the 'id', 'src' and 'dst' columns.
+
+		Returns:
+			(list): Descriptions of undeclared ends, each naming the missing node, its role and its edge id.
+		"""
 
 		undeclared = []
 		for _, row in edges.iterrows():
@@ -813,7 +990,14 @@ class AgenticGraph(Agentic):
 
 	@staticmethod
 	def _no_edges(keys):
-		""" Returns an empty DataFrame of edges with just the column headers required by a graph. """
+		""" Returns an empty DataFrame of edges with just the column headers required by a graph.
+
+		Args:
+			keys (dict): The file format mapping naming the 'src' and 'dst' columns.
+
+		Returns:
+			(pandas.DataFrame): An empty table with string-typed source and destination columns.
+		"""
 
 		return pd.DataFrame({keys['src']: pd.Series(dtype = 'str'), keys['dst']: pd.Series(dtype = 'str')})
 
@@ -822,6 +1006,12 @@ class AgenticGraph(Agentic):
 	def _tree(ids):
 		""" Returns the tree of nested dictionaries of hierarchical ids: every level is a key whose value is the dictionary of its children,
 		or None if it has none.
+
+		Args:
+			ids (iterable): The hierarchical string ids, with levels separated by '|'.
+
+		Returns:
+			(dict): The nested dictionaries of id levels, with None for leaves.
 		"""
 
 		tree = {}
@@ -833,7 +1023,12 @@ class AgenticGraph(Agentic):
 
 	@staticmethod
 	def _add_to_tree(tree, levels):
-		""" Adds the levels of an id to a tree, creating the dictionaries it needs. A parent added after its children keeps them. """
+		""" Adds the levels of an id to a tree, creating the dictionaries it needs. A parent added after its children keeps them.
+
+		Args:
+			tree (dict): The tree to update in place.
+			levels (list): The nonempty list of string levels of an id.
+		"""
 
 		for level in levels[:-1]:
 			if tree.get(level, None) is None:
@@ -847,7 +1042,15 @@ class AgenticGraph(Agentic):
 
 	@staticmethod
 	def _limited(entries, limit):
-		""" Returns at most limit entries, followed by TRUNCATED if some were left out. """
+		""" Returns at most limit entries, followed by TRUNCATED if some were left out.
+
+		Args:
+			entries (list): The entries to return in their current order.
+			limit (int): The maximum number of entries to keep before the optional truncation marker.
+
+		Returns:
+			(list): The entries, or their first limit items followed by TRUNCATED when some were left out.
+		"""
 
 		return entries[:limit] + [TRUNCATED] if len(entries) > limit else entries
 
