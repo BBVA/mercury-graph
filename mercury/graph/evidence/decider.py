@@ -2,7 +2,7 @@ import re, unicodedata
 
 from abc import ABC, abstractmethod
 
-from .agentic_graph import parent_of
+from .agentic_graph import AgenticGraph
 
 
 IGNORED_WORDS = ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof']	# Default "ignored_words": titles left out when comparing names.
@@ -22,8 +22,8 @@ def compare_names(index, other, ignored_words):
 		(float): A score in [0..1], 1.0 when all the significant words are in common.
 	"""
 
-	concept		  = parent_of(index)
-	other_concept = parent_of(other)
+	concept		  = AgenticGraph.parent_of(index)
+	other_concept = AgenticGraph.parent_of(other)
 	if not _have_same_root(concept, other_concept):
 		return 0
 

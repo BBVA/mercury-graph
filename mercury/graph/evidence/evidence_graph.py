@@ -2,7 +2,7 @@ import os, pickle
 
 from .agentic import Agentic, AgenticRunInvalidRequest, AgenticRunFailed
 from .source import Source
-from .agentic_graph import GraphState, MultiGraph, graph_from_files
+from .agentic_graph import AgenticGraph, GraphState, MultiGraph
 from .formalizer import Formalizer, validate_initial_graph
 from .crawl import Crawl
 from .agent import Agent
@@ -278,7 +278,8 @@ class EvidenceGraph(Agentic):
 
 		self._from_initial_graph = self.conf.get('initial_nodes', None) is not None
 
-		return graph_from_files(self.conf.get('initial_nodes', None), self.conf.get('initial_edges', None), self.conf.get('file_format', None))
+		file_format = self.conf.get('file_format', None)
+		return AgenticGraph.graph_from_files(self.conf.get('initial_nodes', None), self.conf.get('initial_edges', None), file_format)
 
 
 	def _initial_graph_is_valid(self):
