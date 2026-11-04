@@ -267,7 +267,7 @@ class Formalizer(Agentic):
 	## Ontology validation
 
 	While piloting, the Formalizer checks that its ontology is coherent using
-	[`validate_ontology()`][mercury.graph.evidence.formalizer.validate_ontology]. If any problem is found, every problem is logged
+	[`validate_ontology()`](evidence_ontologies.md#validation). If any problem is found, every problem is logged
 	and the Formalizer stops in the `ERR_ONTOLOGY_INIT` state. Then it creates its Decider: if its type is unknown or `ready()` finds
 	any problem, every problem is logged and the Formalizer stops in the `ERR_DECIDER_INIT` state.
 

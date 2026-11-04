@@ -55,7 +55,7 @@ class EvidenceGraph(Agentic):
 	The graph can start from an initial graph: the instances known beforehand and the relationships between them, given as
 	`"initial_nodes"` and `"initial_edges"` files in the configuration. They are only loaded when there is no persisted graph. Once the
 	Formalizer is connected, the initial graph is checked against its ontology with
-	[`validate_initial_graph()`][mercury.graph.evidence.formalizer.validate_initial_graph]. If any problem is found, every problem is
+	[`validate_initial_graph()`](evidence_ontologies.md#validation). If any problem is found, every problem is
 	logged, the EvidenceGraph stops in the `ERR_BUILDING` state and the graph is discarded, so that it is not persisted and is checked
 	again on the next start.
 
