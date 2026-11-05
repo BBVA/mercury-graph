@@ -2,7 +2,7 @@ import os, pickle
 
 from .agentic import Agentic, AgenticRunInvalidRequest, AgenticRunFailed
 from .source import Source
-from .agentic_graph import GraphState, MultiGraph, graph_from_files
+from .agentic_graph import AgenticGraph, GraphState, MultiGraph
 from .formalizer import Formalizer, validate_initial_graph
 from .crawl import Crawl
 from .agent import Agent
@@ -55,7 +55,7 @@ class EvidenceGraph(Agentic):
 	The graph can start from an initial graph: the instances known beforehand and the relationships between them, given as
 	`"initial_nodes"` and `"initial_edges"` files in the configuration. They are only loaded when there is no persisted graph. Once the
 	Formalizer is connected, the initial graph is checked against its ontology with
-	[`validate_initial_graph()`][mercury.graph.evidence.formalizer.validate_initial_graph]. If any problem is found, every problem is
+	[`validate_initial_graph()`](evidence_ontologies.md#validation). If any problem is found, every problem is
 	logged, the EvidenceGraph stops in the `ERR_BUILDING` state and the graph is discarded, so that it is not persisted and is checked
 	again on the next start.
 
@@ -278,7 +278,8 @@ class EvidenceGraph(Agentic):
 
 		self._from_initial_graph = self.conf.get('initial_nodes', None) is not None
 
-		return graph_from_files(self.conf.get('initial_nodes', None), self.conf.get('initial_edges', None), self.conf.get('file_format', None))
+		file_format = self.conf.get('file_format', None)
+		return AgenticGraph.graph_from_files(self.conf.get('initial_nodes', None), self.conf.get('initial_edges', None), file_format)
 
 
 	def _initial_graph_is_valid(self):

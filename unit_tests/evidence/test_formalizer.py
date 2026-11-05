@@ -806,7 +806,6 @@ def test_the_template_ontology_is_configured_and_valid(tmp_path):
 
 def test_the_template_initial_graph_is_configured_and_valid(tmp_path):
 	"""The EvidenceGraph of the endpoint created by `mge` starts from an initial graph that matches the template ontology."""
-	from mercury.graph.evidence.agentic_graph import graph_from_files
 	from mercury.graph.evidence.formalizer import validate_initial_graph
 
 	shutil.copytree(TEMPLATE_ONTOLOGIES.parent, tmp_path / 'endpoint')
@@ -816,7 +815,7 @@ def test_the_template_initial_graph_is_configured_and_valid(tmp_path):
 	ontology = AgenticGraph(schema = 'ontology', extra_args = {kind: files(ontology_args, kind) for kind in ('nodes', 'edges')})
 	ontology.pilot(100)
 
-	initial = graph_from_files(files(e_graph_args, 'initial_nodes'), files(e_graph_args, 'initial_edges'))
+	initial = AgenticGraph.graph_from_files(files(e_graph_args, 'initial_nodes'), files(e_graph_args, 'initial_edges'))
 
 	assert initial.networkx.number_of_nodes() > 0 and initial.networkx.number_of_edges() > 0
 	assert validate_initial_graph(initial.networkx, ontology) == []

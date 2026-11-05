@@ -173,14 +173,15 @@ the starting point of a graph that grows. Both are only read when their pickle d
 The ontology and the initial graph are checked at three moments. If anything is wrong, every problem is logged and the object does not
 become ready.
 
-1. **When any graph is loaded** from its files (see [`graph_from_files()`](#mercury.graph.evidence.agentic_graph.graph_from_files)):
+1. **When any graph is loaded** from its files (see
+  [`AgenticGraph.graph_from_files()`][mercury.graph.evidence.AgenticGraph.graph_from_files]):
    ids are unique, edges cannot be loaded without a file of nodes, and the `src` and `dst` of every edge are declared nodes. A typo
    such as `projec` as the `dst` of a relationship is reported instead of becoming a new node.
-2. **When the Formalizer is piloted** (see [`validate_ontology()`](#mercury.graph.evidence.formalizer.validate_ontology)): every type
+2. **When the Formalizer is piloted** (see [`Formalizer.pilot()`][mercury.graph.evidence.Formalizer.pilot]): every type
    of entity and relationship has its parent defined, and every relationship connects the types of its parent or descendants of them.
    For example, `works_on|leads` from `organization` is rejected when `works_on` goes from `person`.
 3. **When the EvidenceGraph is piloted** with its initial graph (see
-   [`validate_initial_graph()`](#mercury.graph.evidence.formalizer.validate_initial_graph)): every instance is of a type of entity of
+  [`EvidenceGraph.pilot()`][mercury.graph.evidence.EvidenceGraph.pilot]): every instance is of a type of entity of
    the ontology, every instance has a `description` that is not empty, and every edge has a relationship of the ontology between
    instances of its types or of descendants of them. For example, `person|student|Noah Kim` can be the `src` of `works_on|leads`, but
    not of `teaches_at`, which goes from `person|teacher`. An initial graph that fails is not saved, so the next start checks it again.
@@ -213,14 +214,3 @@ own, and every answer is limited to `max_results` entries and says when it has b
 - [`Formalizer.is_same_node()`](evidence.md#mercury.graph.evidence.Formalizer.is_same_node), which scores whether a mention is a
   known instance, is answered by [`RulesDecider`](evidence.md#mercury.graph.evidence.RulesDecider), the only Decider so far: it only
   compares their names and does not read the texts that mention them.
-
-
-## Reference
-
-::: mercury.graph.evidence.agentic_graph.graph_from_files
-
-::: mercury.graph.evidence.formalizer.validate_ontology
-
-::: mercury.graph.evidence.formalizer.validate_initial_graph
-
-::: mercury.graph.evidence.formalizer.validate_instances

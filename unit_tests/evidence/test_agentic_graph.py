@@ -6,7 +6,6 @@ import networkx as nx
 
 from mercury.graph.evidence import AgenticGraph, MultiGraph
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest
-from mercury.graph.evidence.agentic_graph import graph_from_files
 
 
 def test_multi_graph_builds_directed_multigraph():
@@ -40,7 +39,7 @@ def test_multi_graph_rejects_undirected_graphs():
 
 
 def _files(directory, nodes, edges = None, sep = '\t'):
-	""" Writes nodes and edges (lists of dicts) as .csv files in directory and returns them as the arguments of graph_from_files(). """
+	""" Writes nodes and edges as .csv files in directory and returns them as the arguments of AgenticGraph.graph_from_files(). """
 	conf = {}
 	for kind, rows in (('nodes', nodes), ('edges', edges)):
 		if rows is not None:
@@ -55,7 +54,7 @@ def test_graph_from_files_loads_nodes_and_edges(tmp_path):
 	""" Nodes and edges keep their attributes and the id of an edge becomes its key. """
 	conf = _files(tmp_path, [{'id': 'a', 'kind': 'person'}, {'id': 'b', 'kind': 'company'}], [{'src': 'a', 'dst': 'b', 'id': 'e1', 'relation': 'owns'}])
 
-	ntx = graph_from_files(**conf).networkx
+	ntx = AgenticGraph.graph_from_files(**conf).networkx
 
 	assert dict(ntx.nodes(data = True)) == {'a': {'kind': 'person'}, 'b': {'kind': 'company'}}
 	assert list(ntx.edges(keys = True, data = True)) == [('a', 'b', 'e1', {'relation': 'owns'})]
@@ -66,7 +65,7 @@ def test_graph_from_files_uses_the_file_format(tmp_path):
 	conf = _files(tmp_path, [{'name': 'a'}, {'name': 'b'}], [{'from': 'a', 'to': 'b', 'name': 'e1'}], sep = ';')
 	conf['file_format'] = {'src': 'from', 'dst': 'to', 'id': 'name', 'directed': True, 'sep': ';'}
 
-	assert list(graph_from_files(**conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
+	assert list(AgenticGraph.graph_from_files(**conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
 
 
 def test_graph_from_files_completes_a_partial_file_format(tmp_path):
@@ -74,7 +73,7 @@ def test_graph_from_files_completes_a_partial_file_format(tmp_path):
 	conf = _files(tmp_path, [{'id': 'a'}, {'id': 'b'}], [{'from': 'a', 'to': 'b', 'id': 'e1'}])
 	conf['file_format'] = {'src': 'from', 'dst': 'to'}
 
-	assert list(graph_from_files(**conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
+	assert list(AgenticGraph.graph_from_files(**conf).networkx.edges(keys = True)) == [('a', 'b', 'e1')]
 
 
 def test_graph_from_files_requires_nodes_for_edges(tmp_path):
@@ -82,7 +81,7 @@ def test_graph_from_files_requires_nodes_for_edges(tmp_path):
 	conf = _files(tmp_path, None, [{'src': 'a', 'dst': 'b', 'id': 'e1'}])
 
 	with pytest.raises(ValueError, match = 'file of nodes'):
-		graph_from_files(**conf)
+		AgenticGraph.graph_from_files(**conf)
 
 
 def test_graph_from_files_requires_declared_edge_ends(tmp_path):
@@ -90,7 +89,7 @@ def test_graph_from_files_requires_declared_edge_ends(tmp_path):
 	conf = _files(tmp_path, [{'id': 'a'}, {'id': 'b'}], [{'src': 'a', 'dst': 'c', 'id': 'e1'}, {'src': 'd', 'dst': 'b', 'id': 'e2'}])
 
 	with pytest.raises(ValueError) as error:
-		graph_from_files(**conf)
+		AgenticGraph.graph_from_files(**conf)
 
 	assert '"c" (dst of "e1")' in str(error.value)
 	assert '"d" (src of "e2")' in str(error.value)
@@ -101,7 +100,7 @@ def test_graph_from_files_requires_unique_node_ids(tmp_path):
 	conf = _files(tmp_path, [{'id': 'a', 'kind': 'x'}, {'id': 'a', 'kind': 'y'}, {'id': 'b'}, {'id': 'b'}, {'id': 'c'}])
 
 	with pytest.raises(ValueError) as error:
-		graph_from_files(**conf)
+		AgenticGraph.graph_from_files(**conf)
 
 	assert 'Nodes have repeated ids: "a", "b".' in str(error.value)
 
@@ -113,14 +112,14 @@ def test_graph_from_files_requires_unique_edge_ids(tmp_path):
 	conf = _files(tmp_path, [{'id': 'a'}, {'id': 'b'}], edges)
 
 	with pytest.raises(ValueError) as error:
-		graph_from_files(**conf)
+		AgenticGraph.graph_from_files(**conf)
 
 	assert 'Edges have repeated ids: "e1", "e2".' in str(error.value)
 
 
 def test_graph_from_files_accepts_nodes_without_edges(tmp_path):
 	""" A graph can have nodes and no edges. """
-	ntx = graph_from_files(**_files(tmp_path, [{'id': 'a'}, {'id': 'b'}])).networkx
+	ntx = AgenticGraph.graph_from_files(**_files(tmp_path, [{'id': 'a'}, {'id': 'b'}])).networkx
 
 	assert set(ntx.nodes) == {'a', 'b'}
 	assert ntx.number_of_edges() == 0
@@ -128,7 +127,7 @@ def test_graph_from_files_accepts_nodes_without_edges(tmp_path):
 
 def test_graph_from_files_without_files_is_empty():
 	""" Without nodes and edges the graph is empty. """
-	ntx = graph_from_files().networkx
+	ntx = AgenticGraph.graph_from_files().networkx
 
 	assert ntx.number_of_nodes() == 0
 	assert ntx.number_of_edges() == 0
@@ -141,7 +140,7 @@ def test_graph_from_files_reads_pickles(tmp_path):
 	conf = {'nodes': {'type': 'pickle', 'path': str(tmp_path / 'nodes.pickle')},
 			'edges': {'type': 'pickle', 'path': str(tmp_path / 'edges.pickle')}}
 
-	ntx = graph_from_files(**conf).networkx
+	ntx = AgenticGraph.graph_from_files(**conf).networkx
 
 	assert set(ntx.nodes) == {'a', 'b'}
 	assert list(ntx.edges(keys = True)) == [('a', 'b', 'e1')]
@@ -150,7 +149,7 @@ def test_graph_from_files_reads_pickles(tmp_path):
 def test_graph_from_files_rejects_unknown_file_types():
 	""" A file type other than "csv" or "pickle" is an error. """
 	with pytest.raises(ValueError):
-		graph_from_files(nodes = {'type': 'parquet', 'path': 'nodes.parquet'})
+		AgenticGraph.graph_from_files(nodes = {'type': 'parquet', 'path': 'nodes.parquet'})
 
 
 def test_agentic_graph_metadata_and_requests():

@@ -3,7 +3,7 @@ import os, logging, warnings
 from enum import Enum
 
 from .agentic import Agentic, AgenticRunInvalidRequest
-from .agentic_graph import AgenticGraph, descends_from, parent_of
+from .agentic_graph import AgenticGraph
 from .decider import DECIDERS, IGNORED_WORDS, compare_names
 
 
@@ -34,7 +34,7 @@ def validate_ontology(ontology):
 
 	That ids are unique and that the `src` and `dst` of every relationship are entities of the ontology is already checked when it is
 	loaded (see
-	[`graph_from_files()`][mercury.graph.evidence.agentic_graph.graph_from_files]).
+	[`AgenticGraph.graph_from_files()`][mercury.graph.evidence.AgenticGraph.graph_from_files]).
 
 	Args:
 		ontology (AgenticGraph): the ontology. It must be loaded (piloted) before being validated, otherwise that is the only problem
@@ -127,10 +127,10 @@ def _check_instances(ntx, types):
 
 	errors = []
 	for index in sorted(ntx.nodes):
-		if parent_of(index) is None:
+		if AgenticGraph.parent_of(index) is None:
 			errors.append('Instance "%s" has no type: its id must start with a type of entity of the ontology.' % index)
-		elif parent_of(index) not in types:
-			errors.append('Instance "%s" is of type "%s", which is not in the ontology.' % (index, parent_of(index)))
+		elif AgenticGraph.parent_of(index) not in types:
+			errors.append('Instance "%s" is of type "%s", which is not in the ontology.' % (index, AgenticGraph.parent_of(index)))
 
 	return errors
 
@@ -156,7 +156,7 @@ def _check_instance_edge(src, dst, key, relation, relations):
 
 	errors = []
 	for end, instance, expected in zip(('src', 'dst'), (src, dst), relations[relation]):
-		if parent_of(instance) is not None and not descends_from(parent_of(instance), expected):
+		if AgenticGraph.parent_of(instance) is not None and not AgenticGraph.descends_from(AgenticGraph.parent_of(instance), expected):
 			errors.append('Edge "%s": its %s "%s" is not a "%s" as required by "%s".' % (key, end, instance, expected, relation))
 
 	return errors
@@ -173,7 +173,7 @@ def _check_relation_inheritance(relations):
 
 	errors = []
 	for index, ends in sorted(relations.items()):
-		parent = parent_of(index)
+		parent = AgenticGraph.parent_of(index)
 		if parent in relations:
 			errors += _check_inherited_ends(index, ends, parent, relations[parent])
 
@@ -185,7 +185,7 @@ def _check_inherited_ends(index, ends, parent, parent_ends):
 
 	errors = []
 	for end, concept, expected in zip(('src', 'dst'), ends, parent_ends):
-		if not descends_from(concept, expected):
+		if not AgenticGraph.descends_from(concept, expected):
 			errors.append('Relationship "%s" has %s "%s", which is not a "%s" as required by its parent "%s".' % (index, end, concept, expected, parent))
 
 	return errors
@@ -196,8 +196,8 @@ def _check_parents(indices, kind, ontology):
 
 	errors = []
 	for index in sorted(indices):
-		if parent_of(index) is not None and parent_of(index) not in indices:
-			errors.append('%s "%s" has no parent "%s" in %s.' % (kind, index, parent_of(index), ontology))
+		if AgenticGraph.parent_of(index) is not None and AgenticGraph.parent_of(index) not in indices:
+			errors.append('%s "%s" has no parent "%s" in %s.' % (kind, index, AgenticGraph.parent_of(index), ontology))
 
 	return errors
 
@@ -267,7 +267,7 @@ class Formalizer(Agentic):
 	## Ontology validation
 
 	While piloting, the Formalizer checks that its ontology is coherent using
-	[`validate_ontology()`][mercury.graph.evidence.formalizer.validate_ontology]. If any problem is found, every problem is logged
+	[`validate_ontology()`](evidence_ontologies.md#validation). If any problem is found, every problem is logged
 	and the Formalizer stops in the `ERR_ONTOLOGY_INIT` state. Then it creates its Decider: if its type is unknown or `ready()` finds
 	any problem, every problem is logged and the Formalizer stops in the `ERR_DECIDER_INIT` state.
 
@@ -603,7 +603,8 @@ class Formalizer(Agentic):
 		"""
 
 		anchor	   = max(candidate_types, key = candidate_types.get)
-		compatible = [concept for concept in candidate_types if descends_from(concept, anchor) or descends_from(anchor, concept)]
+		compatible = [concept for concept in candidate_types
+					  if AgenticGraph.descends_from(concept, anchor) or AgenticGraph.descends_from(anchor, concept)]
 
 		result = max(compatible, key = lambda concept: (concept.count('|'), candidate_types[concept]))
 
@@ -628,8 +629,8 @@ class Formalizer(Agentic):
 		different branches. """
 
 		index	   = candidate['id']
-		concept	   = parent_of(mention_id)
-		known_type = parent_of(index)
+		concept	   = AgenticGraph.parent_of(mention_id)
+		known_type = AgenticGraph.parent_of(index)
 		ignored	   = self.conf.get('ignored_words', IGNORED_WORDS)
 		score	   = compare_names(mention_id, index, ignored)
 		scored	   = {'id': index, 'score': score}
@@ -637,7 +638,8 @@ class Formalizer(Agentic):
 		scored['description'] = candidate.get('description', '')
 		scored['names']		  = candidate.get('names', [])
 
-		if known_type is not None and not (descends_from(concept, known_type) or descends_from(known_type, concept)):
+		if known_type is not None and not (AgenticGraph.descends_from(concept, known_type)
+										 or AgenticGraph.descends_from(known_type, concept)):
 			scored['type_conflict'] = True
 
 		return scored
@@ -815,7 +817,8 @@ class Formalizer(Agentic):
 		if src is None or dst is None:
 			return False
 
-		return descends_from(parent_of(src), src_type) and descends_from(parent_of(dst), dst_type)
+		src_valid = AgenticGraph.descends_from(AgenticGraph.parent_of(src), src_type)
+		return src_valid and AgenticGraph.descends_from(AgenticGraph.parent_of(dst), dst_type)
 
 
 	def _keep_highest_confidence(self, triples):
@@ -832,7 +835,7 @@ class Formalizer(Agentic):
 		""" Returns True if the same pair has an edge of a relationship that descends from index. """
 
 		for other_src, other_index, other_dst in edges:
-			if (other_src, other_dst) == (src, dst) and other_index != index and descends_from(other_index, index):
+			if (other_src, other_dst) == (src, dst) and other_index != index and AgenticGraph.descends_from(other_index, index):
 				return True
 
 		return False
@@ -977,7 +980,7 @@ class Formalizer(Agentic):
 		"""
 
 		index			   = node['id']
-		concept			   = parent_of(index)
+		concept			   = AgenticGraph.parent_of(index)
 		concept_definition = self._concept_definition(concept)
 
 		context = {'id': index, 'type_definition': concept_definition}

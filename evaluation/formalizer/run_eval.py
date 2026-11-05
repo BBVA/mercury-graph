@@ -28,7 +28,6 @@ from dataclasses import dataclass, field
 import networkx as nx
 
 from mercury.graph.evidence import AgenticGraph, Formalizer
-from mercury.graph.evidence.agentic_graph import parent_of
 
 from check_cases import Case, Entity, Output, get_dataset_name, load_context, load_dataset
 
@@ -117,7 +116,7 @@ def text_type(entity: Entity) -> str | None:
 	if entity['id'] is None or entity.get('type_conflict', False):
 		return None
 
-	return parent_of(entity['id'])
+	return AgenticGraph.parent_of(entity['id'])
 
 
 def expected_types(case: Case) -> set[tuple]:

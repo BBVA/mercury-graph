@@ -14,7 +14,6 @@ from typing import Literal, NotRequired, TypedDict
 import networkx as nx
 
 from mercury.graph.evidence import AgenticGraph
-from mercury.graph.evidence.agentic_graph import graph_from_files, parent_of
 from mercury.graph.evidence.formalizer import validate_instances
 
 
@@ -77,7 +76,7 @@ def load_context(context: Context) -> tuple[AgenticGraph, nx.MultiDiGraph]:
 
 	ontology = AgenticGraph(schema = 'ontology', extra_args = {'nodes': csv(context['ontology'][0]), 'edges': csv(context['ontology'][1])})
 	ontology.pilot(100)
-	known = graph_from_files(csv(context['known'][0]), csv(context['known'][1])).networkx
+	known = AgenticGraph.graph_from_files(csv(context['known'][0]), csv(context['known'][1])).networkx
 
 	return ontology, known
 
@@ -126,7 +125,7 @@ def check_entity(entity: Entity, case: Case, known_ids: set[str], types: set[str
 	if entity['status'] == 'unresolved':
 		return errors + check_unresolved(entity)
 
-	if parent_of(entity['id']) not in types:
+	if AgenticGraph.parent_of(entity['id']) not in types:
 		errors.append('"%s" is not under a type of entity of the ontology' % entity['id'])
 
 	errors += check_status(entity, known_ids)
