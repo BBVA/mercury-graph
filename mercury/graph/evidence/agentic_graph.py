@@ -101,7 +101,7 @@ class NavigableTree:
 		self._properties  = properties
 		self._max_results = max_results
 		self._summary	  = summary
-		self._tree		  = AgenticGraph._tree(properties.keys())
+		self._tree		  = AgenticGraph.tree(properties.keys())
 
 
 	def children(self, index):
@@ -140,7 +140,7 @@ class NavigableTree:
 			return None
 
 		budget	= {'left': self._max_results, 'truncated': False}
-		entries = self._entries(index, AgenticGraph._positive_int(arguments.get('depth', 1), 1), budget)
+		entries = self._entries(index, AgenticGraph.positive_int(arguments.get('depth', 1), 1), budget)
 
 		return entries + [TRUNCATED] if budget['truncated'] else entries
 
@@ -165,9 +165,9 @@ class NavigableTree:
 		if text == '':
 			return []
 
-		limit = min(AgenticGraph._positive_int(arguments.get('limit', 20), 20), self._max_results)
+		limit = min(AgenticGraph.positive_int(arguments.get('limit', 20), 20), self._max_results)
 
-		return AgenticGraph._limited([self.described(index) for index in self._matching(text)], limit)
+		return AgenticGraph.limited([self.described(index) for index in self._matching(text)], limit)
 
 
 	def described(self, index):
@@ -490,7 +490,7 @@ class AgenticGraph(Agentic):
 		(See [`SourceNode.child()`][mercury.graph.evidence.source_parts.SourceNode.child].)
 
 		Args:
-			index (str): The exact hierarchical id of the node.
+			index (str or None): The exact hierarchical id of the node.
 
 		Returns:
 			(dict or None): A copy of the node properties, or None if the graph is not ready or the id has no properties.
@@ -604,7 +604,8 @@ class AgenticGraph(Agentic):
 		""" Runs the relations_for capability: the relationships a type of entity takes part in (by inheritance by default), sorted by id.
 
 		Args:
-			arguments (dict): The entity type as 'concept' (str) and optional 'inherited' (bool, default True) to include ancestors.
+			arguments (dict): The entity type as 'concept' (str) and optional 'inherited' (bool or str, default True): include the relationships
+				declared for its ancestors.
 
 		Returns:
 			(list or None): Relationships with their summaries and the entity type's role, ending with TRUNCATED if limited; None if
@@ -618,7 +619,7 @@ class AgenticGraph(Agentic):
 		inherited = self._as_bool(arguments.get('inherited', True))
 		entries	  = [self._relation_entry(index, concept, inherited) for index in self._relationships.ids()]
 
-		return self._limited([entry for entry in entries if entry is not None], self.conf.get('max_results', MAX_RESULTS))
+		return self.limited([entry for entry in entries if entry is not None], self.conf.get('max_results', MAX_RESULTS))
 
 
 	def _relation_entry(self, index, concept, inherited):
@@ -779,7 +780,7 @@ class AgenticGraph(Agentic):
 
 
 	@staticmethod
-	def _positive_int(value, default):
+	def positive_int(value, default):
 		""" Returns value as an integer if it is (or is text for) a number greater than zero and default otherwise.
 
 		Args:
@@ -834,7 +835,7 @@ class AgenticGraph(Agentic):
 
 
 	@staticmethod
-	def _parameters(required, **properties):
+	def parameters(required, **properties):
 		""" Returns the JSON schema of the parameters of a capability.
 
 		Args:
@@ -1003,7 +1004,7 @@ class AgenticGraph(Agentic):
 
 
 	@staticmethod
-	def _tree(ids):
+	def tree(ids):
 		""" Returns the tree of nested dictionaries of hierarchical ids: every level is a key whose value is the dictionary of its children,
 		or None if it has none.
 
@@ -1041,7 +1042,7 @@ class AgenticGraph(Agentic):
 
 
 	@staticmethod
-	def _limited(entries, limit):
+	def limited(entries, limit):
 		""" Returns at most limit entries, followed by TRUNCATED if some were left out.
 
 		Args:
@@ -1060,7 +1061,7 @@ CAPABILITIES = {
 		'description': 'List the types of entity under an id in the ontology "{name}", with their definitions. Ids are hierarchical, with '
 					   'levels separated by "|" (e.g., "parent|child"). Use "" to list the top level and depth to see several levels at once. '
 					   'Entries with "more": true have children of their own.',
-		'parameters': AgenticGraph._parameters(
+		'parameters': AgenticGraph.parameters(
 			['index'],
 			index = {'type': 'string', 'description': 'Exact id, with levels separated by "|" (e.g., "parent|child"). Use "" for the top level.'},
 			depth = {'type': 'integer', 'description': 'Number of levels to go down. Defaults to 1.'}
@@ -1071,7 +1072,7 @@ CAPABILITIES = {
 		'description': 'Read a type of entity of the ontology "{name}" by its exact id: its properties, such as its definition, and its '
 					   'ancestors, which tell what kind of thing it is. Returns null if the id is not a type of entity; use '
 					   'search_entities_{name} to find ids.',
-		'parameters': AgenticGraph._parameters(
+		'parameters': AgenticGraph.parameters(
 			['index'],
 			index = {'type': 'string', 'description': 'Exact id of the type of entity, with levels separated by "|" (e.g., "parent|child").'}
 		),
@@ -1080,7 +1081,7 @@ CAPABILITIES = {
 	'search_entities': {
 		'description': 'Find the types of entity of the ontology "{name}" whose id or definition contains a text, ignoring case. Use it '
 					   'first when you do not know the exact id.',
-		'parameters': AgenticGraph._parameters(
+		'parameters': AgenticGraph.parameters(
 			['text'],
 			text  = {'type': 'string', 'description': 'Text to find, such as a name or a word of a definition.'},
 			limit = {'type': 'integer', 'description': 'Maximum number of results. Defaults to 20.'}
@@ -1091,7 +1092,7 @@ CAPABILITIES = {
 		'description': 'List the types of relationship under an id in the ontology "{name}", with their definitions and the types of entity '
 					   'they connect (src and dst). Ids are hierarchical, with levels separated by "|" (e.g., "parent|child"). Use "" to '
 					   'list the top level and depth to see several levels at once. Entries with "more": true have children of their own.',
-		'parameters': AgenticGraph._parameters(
+		'parameters': AgenticGraph.parameters(
 			['index'],
 			index = {'type': 'string', 'description': 'Exact id, with levels separated by "|" (e.g., "parent|child"). Use "" for the top level.'},
 			depth = {'type': 'integer', 'description': 'Number of levels to go down. Defaults to 1.'}
@@ -1102,7 +1103,7 @@ CAPABILITIES = {
 		'description': 'Read a type of relationship of the ontology "{name}" by its exact id: its properties (the types of entity it '
 					   'connects, src and dst, and its definition) and its ancestors. Returns null if the id is not a type of relationship; '
 					   'use search_relationships_{name} to find ids.',
-		'parameters': AgenticGraph._parameters(
+		'parameters': AgenticGraph.parameters(
 			['index'],
 			index = {'type': 'string', 'description': 'Exact id of the type of relationship, with levels separated by "|" (e.g., '
 													  '"parent|child").'}
@@ -1112,7 +1113,7 @@ CAPABILITIES = {
 	'search_relationships': {
 		'description': 'Find the types of relationship of the ontology "{name}" whose id or definition contains a text, ignoring case. Use '
 					   'it first when you do not know the exact id.',
-		'parameters': AgenticGraph._parameters(
+		'parameters': AgenticGraph.parameters(
 			['text'],
 			text  = {'type': 'string', 'description': 'Text to find, such as a verb or a word of a definition.'},
 			limit = {'type': 'integer', 'description': 'Maximum number of results. Defaults to 20.'}
@@ -1123,7 +1124,7 @@ CAPABILITIES = {
 		'description': 'Get the types of relationship that a type of entity can take part in according to the ontology "{name}", and '
 					   'whether it is their source (src), destination (dst) or both. Includes those of its ancestors unless inherited is '
 					   'false.',
-		'parameters': AgenticGraph._parameters(
+		'parameters': AgenticGraph.parameters(
 			['concept'],
 			concept	  = {'type': 'string', 'description': 'Exact id of a type of entity, with levels separated by "|" (e.g., "parent|child").'},
 			inherited = {'type': 'boolean', 'description': 'Include the relationships declared for the ancestors of the type of entity. '
