@@ -22,6 +22,88 @@ class FormalizerState(Enum):
 	READY				=  100	# The formalizer is ready to be queried.
 
 
+class Question(Enum):
+	EXTRACT_NODES = {
+					'type': 'function',
+					'function': {
+						'name': 'extract_nodes_%s',
+						'description': 'Identify nodes in a text from the ontology or some concepts in it.',
+						'parameters': {
+							'type': 'object',
+							'properties': {
+								'text': {
+									'type': 'string',
+									'description': 'Text from which to identify nodes.'
+								},
+								'concepts': {
+									'type': 'array',
+									'items': {
+										'type': 'string'
+									},
+									'description': 'List of concepts to identify in the text. If empty, all concepts will be considered.'
+								},
+								'candidates': {
+									'type': 'array',
+									'items': {
+										'type': 'object'
+									},
+									'description': 'The known instances a mention can be: "id", "description" and optionally "names", its other names. If missing, no mention has candidates.'
+								}
+							},
+							'required': ['text']
+						},
+						'returns': {
+							'type': 'array',
+							'items': {
+								'type': 'object',
+								'description': 'One node per mention, with "mention", "type", "confidence" and "candidates" ({"id", "score", "description", "names"}).'
+							}
+						}
+					}
+				}
+	EXTRACT_EDGES = {
+					'type': 'function',
+					'function': {
+						'name': 'extract_edges_%s',
+						'description': 'Identify edges of the ontology, or of some relationships in it, between the nodes of a text.',
+						'parameters': {
+							'type': 'object',
+							'properties': {
+								'text': {
+									'type': 'string',
+									'description': 'Text from which to identify edges.'
+								},
+								'nodes': {
+									'type': 'array',
+									'items': {
+										'type': 'object'
+									},
+									'description': 'The nodes of the text, with "mention" and "id". If missing, they are found in the text as new nodes.'
+								},
+								'concepts': {
+									'type': 'array',
+									'items': {
+										'type': 'string'
+									},
+									'description': 'Ids of the relationships to identify. If missing, all of them are considered.'
+								}
+							},
+							'required': ['text']
+						},
+						'returns': {
+							'type': 'array',
+							'items': {
+								'type': 'object',
+								'description': 'One edge with "src", "relation", "dst" (ids) and "confidence".'
+							}
+						}
+					}
+				}
+
+
+
+
+
 def validate_ontology(ontology):
 	""" Checks that an ontology (entities as nodes and relationships as edges between them) is coherent.
 
@@ -1130,82 +1212,7 @@ class Formalizer(Agentic):
 		self.call = {name_hint_nodes: self.hint_nodes, name_hint_edges: self.hint_edges, name_is_same: self.is_same_node}
 
 		return [
-			{
-				'type': 'function',
-				'function': {
-					'name': name_hint_nodes,
-					'description': 'Identify nodes in a text from the ontology or some concepts in it.',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'text': {
-								'type': 'string',
-								'description': 'Text from which to identify nodes.'
-							},
-							'concepts': {
-								'type': 'array',
-								'items': {
-									'type': 'string'
-								},
-								'description': 'List of concepts to identify in the text. If empty, all concepts will be considered.'
-							},
-							'candidates': {
-								'type': 'array',
-								'items': {
-									'type': 'object'
-								},
-								'description': 'The known instances a mention can be: "id", "description" and optionally "names", its other names. If missing, no mention has candidates.'
-							}
-						},
-						'required': ['text']
-					},
-					'returns': {
-						'type': 'array',
-						'items': {
-							'type': 'object',
-							'description': 'One node per mention, with "mention", "type", "confidence" and "candidates" ({"id", "score", "description", "names"}).'
-						}
-					}
-				}
-			},
-			{
-				'type': 'function',
-				'function': {
-					'name': name_hint_edges,
-					'description': 'Identify edges of the ontology, or of some relationships in it, between the nodes of a text.',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'text': {
-								'type': 'string',
-								'description': 'Text from which to identify edges.'
-							},
-							'nodes': {
-								'type': 'array',
-								'items': {
-									'type': 'object'
-								},
-								'description': 'The nodes of the text, with "mention" and "id". If missing, they are found in the text as new nodes.'
-							},
-							'concepts': {
-								'type': 'array',
-								'items': {
-									'type': 'string'
-								},
-								'description': 'Ids of the relationships to identify. If missing, all of them are considered.'
-							}
-						},
-						'required': ['text']
-					},
-					'returns': {
-						'type': 'array',
-						'items': {
-							'type': 'object',
-							'description': 'One edge with "src", "relation", "dst" (ids) and "confidence".'
-						}
-					}
-				}
-			},
+
 			{
 				'type': 'function',
 				'function': {
