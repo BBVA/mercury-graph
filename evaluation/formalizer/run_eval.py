@@ -1,10 +1,11 @@
 """ Runs the GLiNER2 Formalizer on every case of a dataset and scores its output against the expected one.
 
-For every case, the Formalizer is used as the EvidenceGraph will use it:
+For every case, the Formalizer is used as the EvidenceGraph will use it, with the ontology of the case as argument:
 
-1. hint_nodes, given the known instances of the case (the known graph and extra_known_nodes) as candidates,
-2. link_mention on every node, to decide whether it is a known instance, a new one or ambiguous,
-3. hint_edges, given the linked nodes.
+1. extract_nodes, to find the mentions of the text,
+2. find_candidates and link_mention (mercury.graph.evidence.linking) on every node, with the known instances of the case (the known
+   graph and extra_known_nodes), to decide whether it is a known instance, a new one or ambiguous (asking match_node),
+3. extract_edges, given the linked nodes.
 
 Only the text of every case is used (no second call with its context).
 
@@ -13,7 +14,7 @@ Scores (micro-averaged precision, recall and F1 over all cases):
 - mentions: (mention), whatever its id, i.e., whether the text was found,
 - entities: (mention, id, status), i.e., whether it was also linked to the right instance,
 - types: (mention, type) of the mentions whose type the text gives (their text_type or, by default, the type of their id), i.e.,
-  whether the type chosen by hint_nodes is the right one, whatever the link,
+  whether the type chosen by extract_nodes is the right one, whatever the link,
 - edges: (src, relation, dst).
 
 Run it from the root of the repository: python evaluation/formalizer/run_eval.py [dataset] [-v]
@@ -28,11 +29,12 @@ from dataclasses import dataclass, field
 import networkx as nx
 
 from mercury.graph.evidence import AgenticGraph, Formalizer
+from mercury.graph.evidence.linking import find_candidates, link_mention, ontology_argument
 
 from check_cases import Case, Entity, Output, get_dataset_name, load_context, load_dataset
 
 
-MODEL	= {'library': 'gliner2', 'model': 'fastino/gliner2.5-base-v1'}
+MODEL	= 'fastino/gliner2.5-base-v1'
 
 
 @dataclass
@@ -63,11 +65,15 @@ class Score:
 METRICS = ('mentions', 'entities', 'types', 'edges')
 
 
-def build_formalizer(ontology: AgenticGraph) -> Formalizer:
-	""" Returns a ready GLiNER2 Formalizer that uses the ontology. """
+def build_formalizer() -> Formalizer:
+	""" Returns a ready Formalizer that answers extract_nodes and extract_edges with GLiNER2 and match_node with rules. """
 
-	formalizer = Formalizer(schema = 'GLiNER2', extra_args = {'model': MODEL, 'ontology': 'ontology'})
-	formalizer.tools['%s/%s' % (formalizer.id.split('/')[0], ontology.id)] = ontology
+	conf = {
+		'extract_nodes': {'decider': 'gliner_nodes', 'extra_args': {'model': MODEL}},
+		'match_node':	 {'decider': 'rules'},
+		'extract_edges': {'decider': 'gliner_edges', 'extra_args': {'model': MODEL}}
+	}
+	formalizer = Formalizer(schema = 'GLiNER2', extra_args = conf)
 	formalizer.pilot(100)
 
 	return formalizer
@@ -82,13 +88,22 @@ def known_nodes(known: nx.MultiDiGraph, case: Case) -> list[dict]:
 	return sorted(nodes, key = lambda node: node['id'])
 
 
-def formalize(text: str, formalizer: Formalizer, candidates: list[dict]) -> Output:
-	""" Returns the output of the Formalizer for a text in the format of the cases, given the known instances as candidates, with the type
-	chosen for every entity. """
+def link(formalizer: Formalizer, node: dict, known: list[dict], ontology: dict, text: str) -> dict:
+	""" Returns the decision of link_mention for a node, given its candidates among the known instances, with the type chosen for it. """
 
-	nodes	 = formalizer.hint_nodes({'text': text, 'candidates': candidates})
-	entities = [{**formalizer.link_mention(node, text), 'type': node['type']} for node in nodes]
-	found	 = formalizer.hint_edges({'text': text, 'nodes': entities})
+	candidates = find_candidates(node, known)
+	decision   = link_mention(formalizer, node, candidates, ontology, text)
+
+	return {**decision, 'type': node['type']}
+
+
+def formalize(text: str, formalizer: Formalizer, known: list[dict], ontology: dict) -> Output:
+	""" Returns the output of the Formalizer for a text in the format of the cases, given the known instances and the ontology, with the
+	type chosen for every entity. """
+
+	nodes	 = formalizer.extract_nodes({'text': text, 'ontology': ontology})
+	entities = [link(formalizer, node, known, ontology, text) for node in nodes]
+	found	 = formalizer.extract_edges({'text': text, 'nodes': entities, 'ontology': ontology})
 	edges	 = [{'src': edge['src'], 'relation': edge['relation'], 'dst': edge['dst']} for edge in found]
 
 	return {'entities': entities, 'edges': edges}
@@ -184,14 +199,15 @@ def main() -> int:
 	dataset = load_dataset(get_dataset_name())
 
 	ontology, known = load_context(dataset['context'])
-	formalizer		= build_formalizer(ontology)
+	ontology_arg	= ontology_argument(ontology)
+	formalizer		= build_formalizer()
 	totals			= {metric: Score() for metric in METRICS}
 	start			= time.time()
 
 	print('case  hits/miss/extra')
 	for case in dataset['cases']:
 		candidates = known_nodes(known, case)
-		predicted  = formalize(case['text'], formalizer, candidates)
+		predicted  = formalize(case['text'], formalizer, candidates, ontology_arg)
 		scores	  = score_case(case, predicted)
 		print_case(case, scores, verbose)
 		for metric in METRICS:
