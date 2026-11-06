@@ -3,7 +3,7 @@ import os, pickle
 from .agentic import Agentic, AgenticRunInvalidRequest, AgenticRunFailed
 from .source import Source
 from .agentic_graph import AgenticGraph, GraphState, MultiGraph
-from .formalizer import Formalizer, validate_initial_graph
+from .formalizer import Formalizer, validate_initial_graph, validate_ontology
 from .crawl import Crawl
 from .agent import Agent
 
@@ -40,21 +40,24 @@ class EvidenceGraph(Agentic):
 
 	The graph is persisted to disk using a pickle file and a configuration mechanism identical to that of `AgenticGraph`.
 
-	## Connection to the ontology is via the Formalizer
+	## Connection to the Formalizer and the ontology
 
 	An `EvidenceGraph` is connected to exactly one `Formalizer`. The tasks themselves the Formalizer does (`id_nodes` identifying nodes,
 	`id_edges` identifying edges and `is_same` determining identity and category membership) are treated as separate functionality to
 	make it possible to have them handled by an Agent or an agent that supervises another Agentic, etc.
 
-	The `Formalizer` has one ontology: an `AgenticGraph` whose nodes are the types of entities and whose edges are the types of
-	relationships (see [Ontologies in EvidenceGraph](evidence_ontologies.md)). The `EvidenceGraph` reads it through the Formalizer.
-	Currently, the ontology is only initialized from its .csv files and nothing modifies it at runtime.
+	The `EvidenceGraph` has one ontology: an `AgenticGraph` whose nodes are the types of entities and whose edges are the types of
+	relationships (see [Ontologies in EvidenceGraph](evidence_ontologies.md)), named by "ontology" in its "agentics". The Formalizer
+	has no ontology: it is given the ontology in the arguments of every question. Currently, the ontology is only initialized from its
+	.csv files and nothing modifies it at runtime. While piloting, once connected, the EvidenceGraph checks that its ontology is coherent
+	with [`validate_ontology()`](evidence_ontologies.md#validation): if any problem is found, every problem is logged and the
+	EvidenceGraph stops in the `ERR_BUILDING` state.
 
 	## Initial graph
 
 	The graph can start from an initial graph: the instances known beforehand and the relationships between them, given as
 	`"initial_nodes"` and `"initial_edges"` files in the configuration. They are only loaded when there is no persisted graph. Once the
-	Formalizer is connected, the initial graph is checked against its ontology with
+	ontology is validated, the initial graph is checked against it with
 	[`validate_initial_graph()`](evidence_ontologies.md#validation). If any problem is found, every problem is
 	logged, the EvidenceGraph stops in the `ERR_BUILDING` state and the graph is discarded, so that it is not persisted and is checked
 	again on the next start.
@@ -261,6 +264,10 @@ class EvidenceGraph(Agentic):
 				if not self._connect_downstream():
 					self._meta_['state'] = self.states.ERR_BUILDING.value
 
+				elif not self._ontology_is_valid():
+					self._graph = None			# Not to be persisted, as with an invalid initial graph.
+					self._meta_['state'] = self.states.ERR_BUILDING.value
+
 				elif not self._initial_graph_is_valid():
 					self._graph = None			# Not to be persisted: the next start would load it from the pickle without validating it.
 					self._meta_['state'] = self.states.ERR_BUILDING.value
@@ -280,6 +287,17 @@ class EvidenceGraph(Agentic):
 
 		file_format = self.conf.get('file_format', None)
 		return AgenticGraph.graph_from_files(self.conf.get('initial_nodes', None), self.conf.get('initial_edges', None), file_format)
+
+
+	def _ontology_is_valid(self):
+		""" Returns True if the ontology is coherent; otherwise, every problem found by `validate_ontology()` is logged. """
+
+		errors = validate_ontology(self._ontology)
+
+		for error in errors:
+			self.log_error('Invalid ontology in EvidenceGraph %s: %s' % (self.id, error))
+
+		return len(errors) == 0
 
 
 	def _initial_graph_is_valid(self):
@@ -343,7 +361,7 @@ class EvidenceGraph(Agentic):
 	def _connect_downstream(self):
 		""" Connects the EvidenceGraph to downstream components or systems.
 
-		This parses the configuration and locates every necessary downstream Agentic: the Formalizer, its ontology, Agentics with
+		This parses the configuration and locates every necessary downstream Agentic: the Formalizer, the ontology, Agentics with
 		capabilities to do entity extraction, etc. and the Sources.
 
 		Returns:
@@ -359,8 +377,10 @@ class EvidenceGraph(Agentic):
 
 		try:
 			formalizer	= agentics['formalizer']
+			ontology	= agentics['ontology']
 
 			assert type(formalizer) is str and formalizer != ''
+			assert type(ontology) is str and ontology != ''
 
 			id_nodes = agentics['id_nodes']
 			id_edges = agentics['id_edges']
@@ -390,7 +410,15 @@ class EvidenceGraph(Agentic):
 
 		self._formalizer = self.tools[key]
 
-		self._ontology = self._formalizer._ontology
+		ag = AgenticGraph(schema = None, extra_args = None)
+		key = '%s/%s_%s' % (endpoint_name, ag.id, ontology)
+
+		if key not in self.tools:
+			self.log_error('Ontology "%s" not found in tools for EvidenceGraph "%s".' % (ontology, self.name))
+
+			return False
+
+		self._ontology = self.tools[key]
 
 		ag = Agent(schema = None, extra_args = None)
 		class_name_agent = ag.id

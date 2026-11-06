@@ -9,28 +9,28 @@ from mercury.graph.evidence import AgenticGraph, EvidenceGraph
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest
 
 
-class Downstream:
-	"""Provides the Formalizer attributes used by EvidenceGraph connections."""
-
-	def __init__(self, ontology = None):
-		"""Creates an ontology placeholder for connection assertions, or keeps the given ontology."""
-		self._ontology = object() if ontology is None else ontology
-
-
 def _agentics(sources = 'source'):
 	"""Returns a minimal complete downstream configuration."""
-	return {'formalizer': 'main', 'id_nodes': 'nodes', 'id_edges': 'edges', 'is_same': 'same', 'sources': sources}
+	return {'formalizer': 'main', 'ontology': 'ontology', 'id_nodes': 'nodes', 'id_edges': 'edges', 'is_same': 'same', 'sources': sources}
+
+
+def _empty_ontology():
+	"""Returns a loaded ontology without types, which is valid."""
+	ontology = AgenticGraph(schema = 'ontology', extra_args = {})
+	ontology.pilot(ontology.states.READY.value)
+	return ontology
 
 
 def _connected_graph(schema = 'graph', persistence = None, sources = 'source', ontology = None, logger = None, **extra_args):
-	"""Returns an EvidenceGraph with all configured downstream tools attached."""
+	"""Returns an EvidenceGraph with all configured downstream tools attached, and an empty ontology unless one is given."""
 	conf = dict(extra_args, agentics = _agentics(sources))
 	if persistence is not None:
 		conf['persistence'] = {'path': str(persistence)}
 	graph = EvidenceGraph(schema = schema, extra_args = conf, logger = logger)
-	formalizer = Downstream(ontology)
+	formalizer = object()
 	tools = {
 		'%s/formalizer_main' % graph.id: formalizer,
+		'%s/agentic_graph_ontology' % graph.id: _empty_ontology() if ontology is None else ontology,
 		'%s/formalizer_nodes' % graph.id: object(),
 		'%s/agent_edges' % graph.id: object(),
 		'%s/formalizer_same' % graph.id: object()
@@ -84,7 +84,7 @@ def test_evidence_graph_pilots_empty_and_connected_graphs():
 
 	assert graph.meta['state'] == graph.states.READY.value
 	assert graph._formalizer is formalizer
-	assert graph._ontology is formalizer._ontology
+	assert graph._ontology is tools['%s/agentic_graph_ontology' % graph.id]
 	assert graph._id_nodes is tools['%s/formalizer_nodes' % graph.id]
 	assert graph._id_edges is tools['%s/agent_edges' % graph.id]
 	assert graph._is_same is tools['%s/formalizer_same' % graph.id]
@@ -100,14 +100,22 @@ def test_evidence_graph_handles_connection_errors():
 	assert invalid._connect_downstream() is False
 
 	graph, _, tools = _connected_graph(schema = 'errors')
-	for key in ['%s/formalizer_main' % graph.id, '%s/formalizer_nodes' % graph.id, '%s/agent_edges' % graph.id,
-		'%s/formalizer_same' % graph.id, '%s/source_source' % graph.id]:
+	for key in ['%s/formalizer_main' % graph.id, '%s/agentic_graph_ontology' % graph.id, '%s/formalizer_nodes' % graph.id,
+		'%s/agent_edges' % graph.id, '%s/formalizer_same' % graph.id, '%s/source_source' % graph.id]:
 		missing_graph, _, _ = _connected_graph(schema = 'errors')
 		del missing_graph.tools[key]
 		assert missing_graph._connect_downstream() is False
 
 	assert graph._connect_downstream() is True
-	assert len(tools) == 5
+	assert len(tools) == 6
+
+
+def test_evidence_graph_requires_an_ontology_in_its_agentics():
+	"""Without "ontology" in "agentics", the EvidenceGraph cannot connect."""
+	graph, _, _ = _connected_graph(schema = 'no_ontology', logger = [])
+	del graph.conf['agentics']['ontology']
+
+	assert graph._connect_downstream() is False
 
 
 def test_evidence_graph_persists_and_reloads_graph(tmp_path):
@@ -321,3 +329,23 @@ def test_evidence_graph_rejects_an_initial_graph_without_descriptions(tmp_path):
 	errors = [event['error'] for event in logger if event['type'] == 'error']
 	assert graph.meta['state'] == graph.states.ERR_BUILDING.value
 	assert len(errors) == 1 and 'project|Helios' in errors[0] and 'no description' in errors[0]
+
+
+def test_evidence_graph_rejects_an_invalid_ontology_without_saving_its_graph(tmp_path):
+	"""An incoherent ontology leaves the EvidenceGraph in ERR_BUILDING, logs every problem and the graph is not saved."""
+	logger	 = []
+	path	 = tmp_path / 'graphs' / 'evidence.pkl'
+	entities = _csv(tmp_path, 'entities', [{'id': i, 'definition': 'A %s.' % i} for i in ('person|teacher', 'vehicle')])
+	edges	 = _csv(tmp_path, 'relationships', [{'id': 'drives|fast', 'src': 'person|teacher', 'dst': 'vehicle', 'definition': 'To drive.'}])
+	ontology = AgenticGraph(schema = 'ontology', extra_args = {'nodes': entities, 'edges': edges})
+	ontology.pilot(ontology.states.READY.value)
+	graph, _, _ = _connected_graph(schema = 'invalid', persistence = path, ontology = ontology, logger = logger)
+
+	graph.pilot(graph.states.READY.value)
+	graph.close(True)
+
+	errors = [event['error'] for event in logger if event['type'] == 'error']
+	assert graph.meta['state'] == graph.states.ERR_BUILDING.value
+	assert len(errors) == 2
+	assert any('person|teacher' in error for error in errors) and any('drives|fast' in error for error in errors)
+	assert not path.exists()
