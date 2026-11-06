@@ -1,107 +1,29 @@
-import os, logging, warnings
-
 from enum import Enum
 
 from .agentic import Agentic, AgenticRunInvalidRequest
 from .agentic_graph import AgenticGraph
-from .decider import DECIDERS, IGNORED_WORDS, compare_names
+from .decider import RulesDecider
+from .gliner_deciders import GlinerEdgesDecider, GlinerNodesDecider
+from .question import Question
+
+
+DECIDERS = {												# The Decider of every "decider" name in the configuration of a question.
+	'rules':		RulesDecider,
+	'gliner_nodes': GlinerNodesDecider,
+	'gliner_edges': GlinerEdgesDecider
+}
+
+ARGUMENT_TYPES = {'string': str, 'array': list, 'object': dict, 'number': (int, float)}	# The Python type of every JSON type of an argument.
 
 
 class FormalizerState(Enum):
 	""" The `FormalizerState` is an enumeration that defines all possible states of a Formalizer. """
 
-	ERR_DECIDER_INIT	= -3	# Something failed loading the decider.
-	ERR_ONTOLOGY_INIT	= -2	# Something failed loading the ontology.
-	ERR_MODEL_INIT		= -1	# Something failed loading the model.
+	ERR_DECIDER_INIT	= -1	# Something failed loading the deciders.
 
 	INITIAL				=  0	# The initial state of the formalizer.
-	MODEL_LOADED_OK		=  1	# The model was loaded successfully.
-	ONTOLOGY_LOADED_OK	=  2	# The ontology was loaded successfully.
-	DECIDER_LOADED_OK	=  3	# The decider was loaded successfully.
 
 	READY				=  100	# The formalizer is ready to be queried.
-
-
-class Question(Enum):
-	EXTRACT_NODES = {
-					'type': 'function',
-					'function': {
-						'name': 'extract_nodes_%s',
-						'description': 'Identify nodes in a text from the ontology or some concepts in it.',
-						'parameters': {
-							'type': 'object',
-							'properties': {
-								'text': {
-									'type': 'string',
-									'description': 'Text from which to identify nodes.'
-								},
-								'concepts': {
-									'type': 'array',
-									'items': {
-										'type': 'string'
-									},
-									'description': 'List of concepts to identify in the text. If empty, all concepts will be considered.'
-								},
-								'candidates': {
-									'type': 'array',
-									'items': {
-										'type': 'object'
-									},
-									'description': 'The known instances a mention can be: "id", "description" and optionally "names", its other names. If missing, no mention has candidates.'
-								}
-							},
-							'required': ['text']
-						},
-						'returns': {
-							'type': 'array',
-							'items': {
-								'type': 'object',
-								'description': 'One node per mention, with "mention", "type", "confidence" and "candidates" ({"id", "score", "description", "names"}).'
-							}
-						}
-					}
-				}
-	EXTRACT_EDGES = {
-					'type': 'function',
-					'function': {
-						'name': 'extract_edges_%s',
-						'description': 'Identify edges of the ontology, or of some relationships in it, between the nodes of a text.',
-						'parameters': {
-							'type': 'object',
-							'properties': {
-								'text': {
-									'type': 'string',
-									'description': 'Text from which to identify edges.'
-								},
-								'nodes': {
-									'type': 'array',
-									'items': {
-										'type': 'object'
-									},
-									'description': 'The nodes of the text, with "mention" and "id". If missing, they are found in the text as new nodes.'
-								},
-								'concepts': {
-									'type': 'array',
-									'items': {
-										'type': 'string'
-									},
-									'description': 'Ids of the relationships to identify. If missing, all of them are considered.'
-								}
-							},
-							'required': ['text']
-						},
-						'returns': {
-							'type': 'array',
-							'items': {
-								'type': 'object',
-								'description': 'One edge with "src", "relation", "dst" (ids) and "confidence".'
-							}
-						}
-					}
-				}
-
-
-
 
 
 def validate_ontology(ontology):
@@ -284,6 +206,7 @@ def _check_parents(indices, kind, ontology):
 	return errors
 
 
+
 class Formalizer(Agentic):
 	""" The Formalizer is the class that takes in natural language and produces structured data in the form of subgraphs.
 
@@ -296,90 +219,65 @@ class Formalizer(Agentic):
 	2. While querying the evidence graph in natural language, identifying nodes and edges in the text of a query verifying matches
 	between them and corresponding nodes and edges in the evidence graph.
 
-	### The level of "intelligence" of the Formalizer
+	### A router of questions
 
-	The Formalizer "speaks" the language of EvidenceGraph, has both an Agentic interface (to be used as a tool by an Agent or just exposed
-	in an Endpoint) and direct access (via the parent) to its ontology and from the EvidenceGraph. It also abstracts the functionality
-	of some "smart" model that does the heavy lifting.
+	The Formalizer answers a fixed set of questions (see [`Question`][mercury.graph.evidence.Question]), but it does not answer any of
+	them itself: every question is answered by the [`Decider`][mercury.graph.evidence.Decider] configured for it. The Formalizer only
+	checks the arguments of a question and passes them to its Decider. It has no model, no ontology and no access to any graph: everything
+	a question needs (the text, the ontology, the context) is in its arguments, built by the caller (the EvidenceGraph or an Agent).
 
-	It is smart enough to suggest potential nodes and edges or score how strongly the definition of one node matches another (making both
-	actually the same entity), but the "intelligence" about how that becomes a final EvidenceGraph is handled by either an Agent or
-	the EvidenceGraph itself.
+	The questions are:
 
-	This functionality is often called (SIE) Structured Information Extracting.
+	1. `extract_nodes`: every mention of a type of the ontology in a text, with its type and confidence.
+	2. `match_node`: whether a mention is a known instance, as a score and a decision ("same").
+	3. `extract_edges`: every edge of a relation of the ontology between the nodes of a text.
 
-	### How GLiNER2 fits into this workflow
+	Every question takes the 'ontology', as {'types': [{'id', 'definition'}], 'relations': [{'id', 'src', 'dst', 'definition'}]},
+	and, optionally, a 'context'.
 
-	Unlike in the [`PdfToMarkdown`][mercury.graph.evidence.formats.PdfToMarkdown] conversion, where a lot of valid "turn-key" solutions
-	exist, and therefore we do not favor any specific tool and provide a simple configuration mechanism to integrate any tool, we
-	consider GLiNER2 as the mature, efficient, open-source, CPU-friendly solution for, at least, this early stage of this project.
+	## Configuration
 
-	#### Possible alternatives to GLiNER2 could be
+	Every question the Formalizer answers has a key, its name in lowercase, with the name of its Decider in "decider" and its
+	configuration in "extra_args":
 
-	- A completely LLM-based solution using a model that could reach similar performance without disproportionate computational cost.
-	- A [SpaCy](https://spacy.io/) based solution for named entity recognition and relationship extraction.
-	- Something like [NuExtract3](https://huggingface.co/numind/NuExtract3) which for the moment has high GPU requirements, but works
-	directly from PDF (similar to [Unlimited-OCR](https://github.com/baidu/Unlimited-OCR) for the PDF stage).
+	```jsonc
+	"extract_nodes": {"decider": "gliner_nodes", "extra_args": {"model": "fastino/gliner2.5-base-v1"}},
+	"match_node":	 {"decider": "rules", "extra_args": {"same_node_threshold": 0.3}},
+	"extract_edges": {"decider": "gliner_edges", "extra_args": {"model": "fastino/gliner2.5-base-v1"}}
+	```
 
-	#### The functions used in GLiNER2 terms
+	A question without a key (or with null) is not exposed. The Deciders are:
 
-	- **AutoExtractor** (Basic Entity Extraction): Is used for node identification from text. It is provided a schema (the types of
-	entities of the Ontology or a selection of them), and every mention found is compared with the known instances given as candidates.
-	- **AutoExtractor** (Structure Extraction): Is given an `extract_json()` format created by the Formalizer to match the definitions
-	of both the relationship and its elements from the Ontology.
-	- **AutoExtractor** (Relation Extraction): `extract_relations()` gives (head, tail) pairs. It is only asked for the relationships
-	with the same type at both ends, whose structure cannot tell one end from the other.
-	Whether a mention is a known instance is not asked to GLiNER2: it is decided by the Decider.
+	- `gliner_nodes` ([`GlinerNodesDecider`][mercury.graph.evidence.GlinerNodesDecider]) for `extract_nodes`.
+	- `gliner_edges` ([`GlinerEdgesDecider`][mercury.graph.evidence.GlinerEdgesDecider]) for `extract_edges`.
+	- `rules` ([`RulesDecider`][mercury.graph.evidence.RulesDecider]) for `match_node`.
 
-	## The Decider
+	While piloting, the Formalizer creates the Decider of every question configured and calls its `ready()`. If no question is
+	configured, a Decider is unknown, answers another question, cannot be created or is not ready, every problem is logged and the
+	Formalizer stops in the `ERR_DECIDER_INIT` state.
 
-	The questions about the nodes found (whether a mention is a known instance and which one of several candidates it is) are answered
-	by a [`Decider`][mercury.graph.evidence.Decider], chosen by the "type" of the "decider" section of the configuration. The
-	rest of that section is the configuration of the Decider. Without it, the Decider is
-	[`RulesDecider`][mercury.graph.evidence.RulesDecider], which compares names.
+	## Arguments
 
-	The Formalizer gathers the context (the mention, its type, the definitions of the ontology and the texts) and the Decider decides.
+	Before passing a question to its Decider, the Formalizer checks that its arguments are those of the question: the required ones are
+	there, there is none it does not know and each one has its type (e.g., 'text' is a string). If any is not, every problem is logged
+	and the question returns None. The content of the ontology is not validated: its coherence is checked by whoever loads it (see
+	[`validate_ontology()`](evidence_ontologies.md#validation)).
 
 	## Types and concepts
 
-	A type of the ontology (of entity or of relationship) is called a *concept* in the code of the Formalizer (e.g., `_choose_concept()`
-	or `concept_definition`) and a *type* in what its capabilities return and in the context given to the Decider (e.g., the 'type' of
-	the nodes of `hint_nodes` and the 'type_definition' of a mention). The types to look for are given in the argument 'concepts'.
-
-	## Ontology validation
-
-	While piloting, the Formalizer checks that its ontology is coherent using
-	[`validate_ontology()`](evidence_ontologies.md#validation). If any problem is found, every problem is logged
-	and the Formalizer stops in the `ERR_ONTOLOGY_INIT` state. Then it creates its Decider: if its type is unknown or `ready()` finds
-	any problem, every problem is logged and the Formalizer stops in the `ERR_DECIDER_INIT` state.
-
-	## Capabilities exposed by the Formalizer
-
-	The Formalizer exposes three capabilities:
-
-	1. Entity Extraction (`hint_nodes`): every mention of a type of the ontology, with the known instances it can be.
-	2. Relationship Extraction (`hint_edges`): every edge of a relationship of the ontology between the nodes found in a text.
-	3. Node comparison (`is_same_node`): how likely a mention is a known instance, as decided by the Decider.
-
-	## Linking mentions to known instances
-
-	[`link_mention()`][mercury.graph.evidence.Formalizer.link_mention] decides whether a mention found by `hint_nodes` is a known
-	instance, a new one or ambiguous, asking the Decider when the name alone is not enough. It is not a capability: those rules
-	belong to the caller (the EvidenceGraph) and are here until it uses them.
+	A type of the ontology (of entity or of relationship) is called a *concept* in the code (e.g., `_choose_concept()`) and a *type* in
+	the arguments and the output of the questions (e.g., the 'types' of the ontology or the 'type' of a node).
 
 	## Known Limitations
 
 	The functionality is still very exploratory and minimalistic. Specifically, the following limitations exist:
 
 	- The extraction threshold is that of GLiNER2 (0.5): it cannot be configured.
-	- The key 'definition' is hardcoded, it should be included in the config to make it easier to find and modify.
-	- Mentions are compared with known instances by the words of their names, so synonyms, abbreviations and scientific names (e.g.,
-	"Cuculus canorus" for the Common Cuckoo) are not linked.
-	- The only Decider is RulesDecider: it only compares names (it ignores the texts) and never chooses between several candidates.
+	- Every GLiNER2 Decider loads its own model, so the same model can be loaded twice.
+	- The only Decider of `match_node` is RulesDecider: it only compares names (it ignores the texts and the descriptions).
 	- Pronouns and generic mentions ("she", "the club") are not resolved.
 	- The direction of the edges of a relationship with the same type at both ends depends on `extract_relations()`, which finds
 	few of them.
-	- link_mention() is in the Formalizer until the EvidenceGraph applies those rules itself.
 
 	In general, the whole system is very early-stage, released for developer use and experimentation. The best way of formalizing
 	entities and relationships from text is still to be determined. It requires a functioning architecture to experiment, and that
@@ -404,9 +302,7 @@ class Formalizer(Agentic):
 		self.conf = extra_args
 		self.name = schema
 
-		self._ontology = None
-		self._model	   = None
-		self._decider  = None
+		self._deciders = {}			# {Question: Decider} of the questions configured, once piloted.
 
 		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
@@ -416,13 +312,14 @@ class Formalizer(Agentic):
 
 			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
-		call = self.call.get(request['name'], None)
+		question = self.call.get(request['name'], None)
 
-		if call is None:
+		if question is None:
 			self.log_error('Formalizer does not have a function named "%s".' % request['name'])
 			raise AgenticRunInvalidRequest
 
-		ret = {'finish_reason': 'stop', 'message': call(request['arguments'])}
+		answer = self._answer(question, request['arguments'])
+		ret	   = {'finish_reason': 'stop', 'message': answer}
 
 		return ret
 
@@ -460,7 +357,7 @@ class Formalizer(Agentic):
 
 
 	def pilot(self, intent, just_once = False):
-		""" Pilots the Formalizer to a new state based on the given intent.
+		""" Pilots the Formalizer to a new state based on the given intent: from INITIAL, it creates the Deciders and becomes READY.
 
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
@@ -470,636 +367,95 @@ class Formalizer(Agentic):
 
 			return
 
-		while self._meta_['state'] < intent:
-			if self._meta_['state'] == self.states.INITIAL.value:
-				model_config = self.conf.get('model', None)
-				if model_config is None:
-					self.log_error('Model configuration is missing while piloting Formalizer %s.' % self.id)
+		if self._meta_['state'] != self.states.INITIAL.value or intent <= self.states.INITIAL.value:
+			return
 
-					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
+		deciders = self._load_deciders()
 
-					break
+		if deciders is None:
+			self._meta_['state'] = self.states.ERR_DECIDER_INIT.value
 
-				try:
-					os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
-					os.environ.setdefault('USE_TF', '0')
+			return
 
-					from gliner2 import AutoExtractor
-
-				except ImportError:
-					AutoExtractor = None
-
-				library = model_config.get('library', None)
-				if library != 'gliner2' or AutoExtractor is None:
-					self.log_error('Missing gliner2.AutoExtractor or unsupported model library while piloting Formalizer %s.' % self.id)
-
-					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
-
-					break
-
-				self.AutoExtractor = AutoExtractor
-
-				model = model_config.get('model', None)
-				if model is None:
-					self.log_error('Model specification is missing while piloting Formalizer %s.' % self.id)
-
-					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
-
-					break
-
-				map_location = model_config.get('map_location', None)
-				quantize = model_config.get('quantize', None)
-				compile = model_config.get('compile', None)
-
-				args = {}
-				if map_location is not None:
-					args['map_location'] = map_location
-
-				if quantize is not None:
-					args['quantize'] = quantize
-
-				if compile is not None:
-					args['compile'] = compile
-
-				try:
-					previous_disable_level = logging.root.manager.disable
-					logging.disable(logging.WARNING)
-
-					with warnings.catch_warnings():
-						warnings.simplefilter('ignore')
-
-						self._model = self.AutoExtractor.from_pretrained(model, **args)
-
-					logging.disable(previous_disable_level)
-
-					self._meta_['state'] = self.states.MODEL_LOADED_OK.value
-
-				except Exception as e:
-					self.log_error('Failed to load model while piloting Formalizer %s: %s' % (self.id, str(e)))
-
-					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
-
-					break
-
-				if just_once:
-					break
-
-			if self._meta_['state'] == self.states.MODEL_LOADED_OK.value:
-				self._ontology = self._find_ontology()
-
-				if self._ontology is None:
-					self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
-					break
-
-				errors = validate_ontology(self._ontology)
-
-				if len(errors) > 0:
-					self._handle_ontology_errors(errors)
-					break
-
-				self._meta_['state'] = self.states.ONTOLOGY_LOADED_OK.value
-
-				if just_once:
-					break
-
-			if self._meta_['state'] == self.states.ONTOLOGY_LOADED_OK.value:
-				self._decider = self._load_decider()
-
-				if self._decider is None:
-					self._meta_['state'] = self.states.ERR_DECIDER_INIT.value
-					break
-
-				self._meta_['state'] = self.states.DECIDER_LOADED_OK.value
-
-				if just_once:
-					break
-
-			if self._meta_['state'] == self.states.DECIDER_LOADED_OK.value:
-				self._meta_['state'] = self.states.READY.value
-
-				if just_once:
-					break
+		self._deciders			= deciders
+		self._meta_['state']	= self.states.READY.value
 
 
-	def _create_schema(self, arguments):
-		ntx = self._ontology._graph.networkx
-		schema = {}
-		concepts = arguments.get('concepts', None)
-		if concepts is None:
-			for id, _ in ntx.nodes.data('id'):
-				node = dict(ntx.nodes(data = True))[id]
-				schema[id] = node.get('definition', '')
-		else:
-			for id in concepts:
-				node = dict(ntx.nodes(data = True)).get(id, {})
-				schema[id] = node.get('definition', '')
-
-		schema = self._model.create_schema().entities(schema)
-		return schema
-
-
-	def hint_nodes(self, arguments):
-		""" Identifies nodes in a text from the ontology or some concepts in it.
+	def extract_nodes(self, arguments):
+		""" Answers `extract_nodes`: every mention of a type of the ontology in a text.
 
 		Args:
-			arguments (dict): A dictionary containing the following keys:
-				- 'text' (str): The text from which to identify nodes.
-				- 'concepts' (list): A list of concepts to identify in the text. If empty, all concepts will be considered.
-				- 'candidates' (list): The known instances a mention can be, as {'id', 'description', 'names'}: its type followed by
-					its name (e.g., `person|teacher|Elena Ruiz`), what tells it apart from other instances and its other names
-					(optional). If missing, no mention has candidates.
+			arguments (dict): 'text' (str), 'ontology' (dict) and optionally 'context' (list).
 
 		Returns:
-			(list): One dictionary per mention with 'mention' (the text as it appears), 'type' (the most specific of the types found for
-				it that are compatible with the most confident one), 'confidence' (that of the type) and 'candidates'.
-
-				The candidates of a mention are those of its root type that share a word with it, as {'id', 'score', 'description',
-				'names'}, from the highest to the lowest score. The score is the share of words in common (1.0 when all of them are), leaving out the words of both types,
-				possessives, accents and the "ignored_words" of the configuration (titles by default). A candidate whose type is neither
-				an ancestor nor a descendant of the type of the mention has 'type_conflict' True. The score measures how alike the names
-				are, not whether they are the same instance: that is decided by the caller.
+			(list): One dictionary per mention with 'mention' (the text as it appears), 'type' and 'confidence', or None if the
+				Formalizer cannot answer (see `_answer()`).
 		"""
+
+		result = self._answer(Question.EXTRACT_NODES, arguments)
+
+		return result
+
+
+	def match_node(self, arguments):
+		""" Answers `match_node`: whether a mention is a known instance.
+
+		Args:
+			arguments (dict): 'mention' ({'mention', 'type', 'texts'}), 'node' ({'id', 'description', 'names'}), 'ontology' (dict) and
+				optionally 'context' (list).
+
+		Returns:
+			(dict): 'score' (0..1) and 'same' (bool), or None if the Formalizer cannot answer (see `_answer()`).
+		"""
+
+		result = self._answer(Question.MATCH_NODE, arguments)
+
+		return result
+
+
+	def extract_edges(self, arguments):
+		""" Answers `extract_edges`: every edge of a relation of the ontology between the nodes of a text.
+
+		Args:
+			arguments (dict): 'text' (str), 'nodes' (list of {'mention', 'id'}), 'ontology' (dict) and optionally 'context' (list).
+
+		Returns:
+			(list): One dictionary per edge with 'src', 'relation', 'dst' (ids) and 'confidence', or None if the Formalizer cannot
+				answer (see `_answer()`).
+		"""
+
+		result = self._answer(Question.EXTRACT_EDGES, arguments)
+
+		return result
+
+
+	def _answer(self, question, arguments):
+		""" Returns the answer of the Decider of a question, or None (logging why) if the Formalizer is not ready, does not answer the
+		question or the arguments are not those of the question. """
 
 		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('Formalizer is not ready for hint_nodes.')
-			return None
-
-		text = arguments.get('text', None)
-		if text is None:
-			self.log_error('Formalizer.hint_nodes() %s called without "text" argument.' % self.id)
-			return None
-
-		schema	   = self._create_schema(arguments)
-		extraction = self._model.extract(text, schema, include_confidence = True)
-
-		entities		= extraction.get('entities', {})
-		candidate_nodes = arguments.get('candidates', [])
-		result			= self._resolve_mentions(entities, candidate_nodes)
-
-		return result
-
-
-	def _resolve_mentions(self, entities, candidate_nodes):
-		""" Returns one node per mention in the entities found by the model, with a single type and its candidate nodes. """
-
-		candidate_types_by_mention = self._group_types_by_mention(entities)
-
-		result = []
-		for mention, candidate_types in candidate_types_by_mention.items():
-			node = self._resolve_mention(mention, candidate_types, candidate_nodes)
-			result.append(node)
-
-		return result
-
-
-	def _group_types_by_mention(self, entities):
-		""" Returns {mention: {type: confidence}}, the candidate types of every mention, from the entities found by the model
-		({type: [{'text': ..., 'confidence': ...}]}).
-
-		A mention found more than once with the same type keeps its highest confidence.
-		"""
-
-		found = {}
-		for concept, matches in entities.items():
-			for match in matches:
-				candidate_types = found.setdefault(match['text'], {})
-				candidate_types[concept] = max(match['confidence'], candidate_types.get(concept, 0))
-
-		return found
-
-
-	def _resolve_mention(self, mention, candidate_types, candidate_nodes):
-		""" Returns the node of a mention: its text, its chosen type, the confidence of that type and its candidate nodes. """
-
-		inferred_type = self._choose_concept(candidate_types)
-		found		  = self._find_candidates(mention, inferred_type, candidate_nodes)
-		node		  = {'mention': mention, 'type': inferred_type, 'confidence': candidate_types[inferred_type], 'candidates': found}
-
-		return node
-
-
-	def _choose_concept(self, candidate_types):
-		""" Returns the most specific candidate type compatible with the most confident one (it, its ancestors or its descendants).
-
-		Among equally specific types, the most confident is chosen. Types of other branches are discarded.
-		"""
-
-		anchor	   = max(candidate_types, key = candidate_types.get)
-		compatible = [concept for concept in candidate_types
-					  if AgenticGraph.descends_from(concept, anchor) or AgenticGraph.descends_from(anchor, concept)]
-
-		result = max(compatible, key = lambda concept: (concept.count('|'), candidate_types[concept]))
-
-		return result
-
-
-	def _find_candidates(self, mention, concept, candidate_nodes):
-		""" Returns the candidate nodes of the root type of concept that share a word with the mention, from the highest to the lowest
-		score. """
-
-		mention_id = '%s|%s' % (concept, mention)
-		scored	   = [self._score_candidate(mention_id, candidate) for candidate in candidate_nodes]
-		found	   = [candidate for candidate in scored if candidate['score'] > 0]
-
-		result = sorted(found, key = lambda candidate: candidate['score'], reverse = True)
-
-		return result
-
-
-	def _score_candidate(self, mention_id, candidate):
-		""" Returns {'id', 'score', 'description', 'names'} of a candidate for a mention, with 'type_conflict' if their types are in
-		different branches. """
-
-		index	   = candidate['id']
-		concept	   = AgenticGraph.parent_of(mention_id)
-		known_type = AgenticGraph.parent_of(index)
-		ignored	   = self.conf.get('ignored_words', IGNORED_WORDS)
-		score	   = compare_names(mention_id, index, ignored)
-		scored	   = {'id': index, 'score': score}
-
-		scored['description'] = candidate.get('description', '')
-		scored['names']		  = candidate.get('names', [])
-
-		if known_type is not None and not (AgenticGraph.descends_from(concept, known_type)
-										 or AgenticGraph.descends_from(known_type, concept)):
-			scored['type_conflict'] = True
-
-		return scored
-
-
-	def hint_edges(self, arguments):
-		""" Identifies edges of the ontology, or of some relationships in it, between the nodes of a text.
-
-		The model is asked for every relationship as a structure with a field for each end, named by its type. A relationship whose
-		ends have the same type (e.g., place to place) has two fields with the same name, so the model only finds that the relationship
-		is in the text, not its pairs: the model is then asked again, only for those relationships, for (head, tail) pairs.
-
-		The mentions at both ends are replaced by the ids of the nodes, and the edges are kept if both ends are nodes with an id and
-		their types are those of the relationship or descendants of them. A repeated edge keeps its highest confidence, and an edge is
-		dropped when the same pair has an edge of a more specific relationship (e.g., works_on when works_on|leads is found).
-
-		Unlike `hint_nodes`, which is given the known instances as candidates, `hint_edges` is given the nodes already linked: the
-		EvidenceGraph calls it after `hint_nodes` and `link_mention()` on the same text. Without nodes (e.g., when it is used as a tool by
-		an Agent), it finds them itself the same way with no known instances, so every node is new (its type followed by the mention).
-
-		Whether an edge is already known is not part of its output: once both ends are ids, that is an exact lookup in the graph, and
-		what to do with it (confirm, aggregate or contradict) is decided by the EvidenceGraph.
-
-		Args:
-			arguments (dict): A dictionary containing the following keys:
-				- 'text' (str): The text from which to identify edges.
-				- 'nodes' (list): The nodes of the text, with 'mention' and 'id' (as returned by `link_mention()`). If missing, they
-				are found in the text with no known instances.
-				- 'concepts' (list): The ids of the relationships to identify. If missing, all of them are considered.
-
-		Returns:
-			(list): One dictionary per edge with 'src', 'relation', 'dst' (ids) and 'confidence'.
-		"""
-
-		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('Formalizer is not ready for hint_edges.')
+			self.log_error('Formalizer %s is not ready for %s.' % (self.id, question.key()))
 
 			return None
 
-		text = arguments.get('text', None)
+		decider = self._deciders.get(question, None)
 
-		if text is None:
-			self.log_error('Formalizer.hint_edges() %s called without "text" argument.' % self.id)
+		if decider is None:
+			self.log_error('Formalizer %s does not answer %s.' % (self.id, question.key()))
 
 			return None
 
-		nodes = arguments.get('nodes', None)
-		if nodes is None:
-			nodes = self._find_new_nodes(text)
+		problems = _argument_problems(question, arguments)
 
-		relations = self._get_relations(arguments.get('concepts', None))
-		ids		  = {node['mention']: node['id'] for node in nodes}
+		for problem in problems:
+			self.log_error('Invalid arguments of %s in Formalizer %s: %s' % (question.key(), self.id, problem))
 
-		found	  = self._extract_structures(text, relations)
-		triples	  = self._pair_mentions(found, relations, ids)
-		same_type = self._find_same_type_relations(found, relations)
-
-		if len(same_type) > 0:
-			triples += self._extract_directed_pairs(text, same_type, relations, ids)
-
-		result = self._finish_edges(triples, relations)
-
-		return result
-
-
-	def _find_new_nodes(self, text):
-		""" Returns the nodes of a text found by hint_nodes and linked by link_mention() with no known instances: all of them are new. """
-
-		nodes = self.hint_nodes({'text': text})
-
-		result = [self.link_mention(node, text) for node in nodes]
-
-		return result
-
-
-	def _get_relations(self, concepts):
-		""" Returns {id: (src, dst, definition)} of the relationships of the ontology, or of those in concepts. """
-
-		ntx = self._ontology._graph.networkx
-
-		relations = {}
-		for src, dst, index, definition in ntx.edges(keys = True, data = 'definition'):
-			if concepts is None or index in concepts:
-				relations[index] = (src, dst, definition)
-
-		return relations
-
-
-	def _extract_structures(self, text, relations):
-		""" Returns {relation id: matches} found by the model, every relationship asked as a structure named by its definition. """
-
-		structures = {definition: [src, dst] for src, dst, definition in relations.values()}
-		extraction = self._model.extract_json(text, structures, include_confidence = True)
-
-		by_definition = {definition: index for index, (_, _, definition) in relations.items()}
-		result		  = {by_definition[definition]: matches for definition, matches in extraction.items()}
-
-		return result
-
-
-	def _pair_mentions(self, found, relations, ids):
-		""" Returns (src id, relation, dst id, confidence) for every pair of mentions of the matches of relations with different end types. """
-
-		triples = []
-		for index, matches in found.items():
-			src_type, dst_type, _ = relations[index]
-			if src_type != dst_type:
-				for match in matches:
-					triples += self._pair_match(index, match.get(src_type, []), match.get(dst_type, []), ids)
-
-		return triples
-
-
-	def _pair_match(self, index, sources, destinations, ids):
-		""" Returns a triple for every source and destination mention of one match, with the lowest of both confidences. """
-
-		triples = []
-		for src in sources:
-			for dst in destinations:
-				confidence = min(src['confidence'], dst['confidence'])
-				triples.append((ids.get(src['text'], None), index, ids.get(dst['text'], None), confidence))
-
-		return triples
-
-
-	def _find_same_type_relations(self, found, relations):
-		""" Returns the ids of the relationships with the same type at both ends that the model found mentions of. """
-
-		result = []
-		for index, matches in found.items():
-			src_type, dst_type, _ = relations[index]
-			mentions = [span for match in matches for spans in match.values() for span in spans]
-			if src_type == dst_type and len(mentions) > 0:
-				result.append(index)
-
-		return result
-
-
-	def _extract_directed_pairs(self, text, same_type, relations, ids):
-		""" Returns (src id, relation, dst id, confidence) for every (head, tail) pair the model finds for the given relationships. """
-
-		schema = {index: relations[index][2] for index in same_type}
-		found  = self._model.extract_relations(text, schema, include_confidence = True)
-
-		triples = []
-		for index, pairs in found.get('relation_extraction', {}).items():
-			for pair in pairs:
-				src = ids.get(pair['head']['text'], None)
-				dst = ids.get(pair['tail']['text'], None)
-				triples.append((src, index, dst, pair['head']['confidence']))
-
-		return triples
-
-
-	def _finish_edges(self, triples, relations):
-		""" Returns the edges of the triples with valid ends, without repeated edges or edges of a relationship more generic than another. """
-
-		valid = [triple for triple in triples if self._has_valid_ends(triple, relations)]
-		best  = self._keep_highest_confidence(valid)
-
-		result = []
-		for (src, index, dst), confidence in best.items():
-			if not self._has_more_specific_edge(src, index, dst, best):
-				result.append({'src': src, 'relation': index, 'dst': dst, 'confidence': confidence})
-
-		return result
-
-
-	def _has_valid_ends(self, triple, relations):
-		""" Returns True if both ends have an id whose type is that of the relationship or a descendant of it. """
-
-		src, index, dst, _ = triple
-		src_type, dst_type, _ = relations[index]
-
-		if src is None or dst is None:
-			return False
-
-		src_valid = AgenticGraph.descends_from(AgenticGraph.parent_of(src), src_type)
-		return src_valid and AgenticGraph.descends_from(AgenticGraph.parent_of(dst), dst_type)
-
-
-	def _keep_highest_confidence(self, triples):
-		""" Returns {(src, relation, dst): confidence} with the highest confidence of every repeated edge. """
-
-		best = {}
-		for src, index, dst, confidence in triples:
-			best[(src, index, dst)] = max(confidence, best.get((src, index, dst), 0))
-
-		return best
-
-
-	def _has_more_specific_edge(self, src, index, dst, edges):
-		""" Returns True if the same pair has an edge of a relationship that descends from index. """
-
-		for other_src, other_index, other_dst in edges:
-			if (other_src, other_dst) == (src, dst) and other_index != index and AgenticGraph.descends_from(other_index, index):
-				return True
-
-		return False
-
-
-	def is_same_node(self, arguments):
-		""" Scores how likely a mention is a known instance, as decided by the Decider of the Formalizer.
-
-		The definitions of the types of the mention and the node are taken from the ontology and passed to the Decider (see
-		[`Decider`][mercury.graph.evidence.Decider]).
-
-		Args:
-			arguments (dict): A dictionary containing the following keys:
-				- 'mention' (dict): A mention, with 'mention' (str, the text as it appears), 'type' (str, its type in the ontology) and
-					optionally 'texts' (list), the texts where it was found.
-				- 'node' (dict): A known instance, with 'id' (str, its type followed by its name, e.g., `person|teacher|Elena Ruiz`),
-					'description' (str) and optionally 'names' (list), its other names.
-
-		Returns:
-			(float): A score in [0..1], or None if the Formalizer is not ready or an argument is missing.
-		"""
-
-		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('Formalizer is not ready for is_same_node.')
-
+		if len(problems) > 0:
 			return None
 
-		mention = arguments.get('mention', None)
-		node	= arguments.get('node', None)
-
-		if mention is None or node is None:
-			self.log_error('Formalizer.is_same_node() %s called without "mention" and "node" arguments.' % self.id)
-
-			return None
-
-		mention_found = self._mention_context(mention)
-		known_node	  = self._node_context(node)
-
-		result = self._decider.is_same_node(mention_found, known_node)
+		result = decider.run(arguments)
 
 		return result
-
-
-	def link_mention(self, node, text = None):
-		""" Decides whether a mention found by `hint_nodes` is a known instance, a new one or ambiguous.
-
-		1. Candidates with `type_conflict` are discarded unless their score is 1 (the whole name).
-		2. A single candidate with score 1 is the instance.
-		3. Otherwise, the Decider scores the mention (with the text) against every candidate left (as `is_same_node` does), and those
-		from the threshold of the Decider on are kept.
-		4. If more than one is kept, the Decider is asked to choose one of them. If it does not, the mention is ambiguous.
-
-		Args:
-			node (dict): A node returned by `hint_nodes`.
-			text (str): The text where the mention was found, passed to the Decider.
-
-		Returns:
-			(dict): The 'mention' with its 'id' and 'status': 'known' (with 'type_conflict' True if the type found contradicts the known
-				one), 'new' (its type followed by the mention) or 'ambiguous' (id None, with the ids of the instances it can be in
-				'candidates').
-		"""
-
-		texts	= [] if text is None else [text]
-		found	= {'mention': node['mention'], 'type': node['type'], 'texts': texts}
-		mention = self._mention_context(found)
-
-		viable = [candidate for candidate in node['candidates'] if candidate['score'] == 1 or not candidate.get('type_conflict', False)]
-		whole  = [candidate for candidate in viable if candidate['score'] == 1]
-
-		accepted = whole if len(whole) == 1 else self._confirm_candidates(mention, viable)
-		chosen	 = self._choose_candidate(mention, accepted)
-		result	 = self._build_link(node, chosen)
-
-		return result
-
-
-	def _confirm_candidates(self, mention, candidate_nodes):
-		""" Returns the candidate nodes that the Decider scores from the threshold on as the same instance as the mention. """
-
-		result = []
-		for candidate in candidate_nodes:
-			known_node = self._node_context(candidate)
-			score	   = self._decider.is_same_node(mention, known_node)
-			if score >= self._decider.threshold:
-				result.append(candidate)
-
-		return result
-
-
-	def _choose_candidate(self, mention, accepted):
-		""" Returns the candidate the Decider chooses as a list of one, or all the accepted ones if there are not several or it does not
-		choose one of them. """
-
-		if len(accepted) < 2:
-			return accepted
-
-		known_nodes = [self._node_context(candidate) for candidate in accepted]
-		index		= self._decider.choose_node(mention, known_nodes)
-
-		result = []
-		for candidate in accepted:
-			if candidate['id'] == index:
-				result.append(candidate)
-
-		if len(result) == 0:
-			return accepted
-
-		return result
-
-
-	def _mention_context(self, mention):
-		""" Returns a mention as passed to the Decider: its text, its type, the definition of the type and the texts.
-
-		Args:
-			mention (dict): The mention, with 'mention' (the text as it appears, e.g., "Ms. Ruiz"), 'type' (its type in the ontology,
-				e.g., `person|teacher`) and optionally 'texts' (the texts where it was found).
-
-		Returns:
-			(dict): The mention with 'mention', 'type', 'type_definition' and 'texts' (empty if it has none) (see
-				[`Decider`][mercury.graph.evidence.Decider]).
-		"""
-
-		concept			   = mention['type']
-		concept_definition = self._concept_definition(concept)
-		texts			   = mention.get('texts', [])
-
-		context = {'mention': mention['mention'], 'type': concept, 'type_definition': concept_definition, 'texts': texts}
-
-		return context
-
-
-	def _node_context(self, node):
-		""" Returns a known instance as passed to the Decider: its id, the definition of its type, its description and its names.
-
-		Args:
-			node (dict): The known instance, with 'id' (its type followed by its name, e.g., `person|teacher|Elena Ruiz`) and
-				optionally 'description' and 'names' (its other names).
-
-		Returns:
-			(dict): The known instance with 'id', 'type_definition', 'description' (empty if it has none) and 'names' (empty if
-				it has none) (see [`Decider`][mercury.graph.evidence.Decider]).
-		"""
-
-		index			   = node['id']
-		concept			   = AgenticGraph.parent_of(index)
-		concept_definition = self._concept_definition(concept)
-
-		context = {'id': index, 'type_definition': concept_definition}
-		context['description'] = node.get('description', '')
-		context['names']	   = node.get('names', [])
-
-		return context
-
-
-	def _concept_definition(self, concept):
-		""" Returns the definition of a type of the ontology, or an empty string if it is not in the ontology. """
-
-		ntx = self._ontology._graph.networkx
-
-		if concept not in ntx.nodes:
-			return ''
-
-		result = ntx.nodes[concept].get('definition', '')
-
-		return result
-
-
-	def _build_link(self, node, accepted):
-		""" Returns the decision for a mention given the candidates accepted: new if none, known if one and ambiguous if several. """
-
-		if len(accepted) == 0:
-			index = '%s|%s' % (node['type'], node['mention'])
-			link  = {'mention': node['mention'], 'id': index, 'status': 'new'}
-		elif len(accepted) == 1:
-			link = {'mention': node['mention'], 'id': accepted[0]['id'], 'status': 'known'}
-			if accepted[0].get('type_conflict', False):
-				link['type_conflict'] = True
-		else:
-			ids	 = [candidate['id'] for candidate in accepted]
-			link = {'mention': node['mention'], 'id': None, 'status': 'ambiguous', 'candidates': ids}
-
-		return link
 
 
 	def close(self, endpoint_locked):
@@ -1109,64 +465,68 @@ class Formalizer(Agentic):
 		"""
 
 		# There is no state to persist, just freeing resources.
-		self._ontology = None
-		self._model	   = None
-		self._decider  = None
+		self._deciders = {}
 
 
-	def _find_ontology(self):
-		""" Returns the AgenticGraph named by "ontology" in the configuration among the tools, or None (logging why) if it is not found. """
+	def _configured_questions(self):
+		""" Returns the questions with a configuration (a key that is not null), in the order of `Question`. """
 
-		name = self.conf.get('ontology', None)
+		questions = []
+		for question in Question:
+			conf = self.conf.get(question.key(), None)
+			if conf is not None:
+				questions.append(question)
 
-		if name is None:
-			self.log_error('Configuration error: "ontology" is mandatory while piloting Formalizer %s.' % self.id)
+		return questions
+
+
+	def _load_deciders(self):
+		""" Returns {Question: Decider} of every question configured, or None (logging every problem) if there is none or any Decider
+		cannot be loaded. """
+
+		questions = self._configured_questions()
+
+		if len(questions) == 0:
+			self.log_error('Formalizer %s answers no question: configure at least one of %s.' % (self.id, _question_keys()))
 
 			return None
 
-		key = '%s/%s_%s' % (self.id.split('/')[0], AgenticGraph(schema = None, extra_args = None).id, name)
+		deciders = {}
+		failed	 = False
+		for question in questions:
+			decider = self._load_decider(question)
+			if decider is None:
+				failed = True
+				continue
 
-		if key not in self.tools:
-			self.log_error('Tool with key "%s" not found while piloting Formalizer %s.' % (key, self.id))
+			deciders[question] = decider
 
+		if failed:
 			return None
 
-		return self.tools[key]
+		return deciders
 
 
-	def _handle_ontology_errors(self, errors):
-		""" Logs every problem found by `validate_ontology()` and sets the `ERR_ONTOLOGY_INIT` state.
+	def _load_decider(self, question):
+		""" Returns the ready Decider of a question, or None (logging why) if its configuration is wrong, it cannot be created or it is
+		not ready. """
 
-		Args:
-			errors (list): The problems found, as returned by `validate_ontology()`.
-		"""
+		decider_class = self._decider_class(question)
 
-		for error in errors:
-			self.log_error('Invalid ontology in Formalizer %s: %s' % (self.id, error))
-
-		self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
-
-
-	def _load_decider(self):
-		""" Returns the Decider of the "decider" section of the configuration (rules by default), or None (logging why) if its type is
-		unknown, it cannot be created or it is not ready. """
-
-		conf = dict(self.conf.get('decider', {'type': 'rules'}))
-		kind = conf.pop('type', None)
-
-		decider_class = DECIDERS.get(kind, None)
 		if decider_class is None:
-			self.log_error('Unknown decider type "%s" while piloting Formalizer %s.' % (kind, self.id))
-
 			return None
 
-		decider = self._create_decider(decider_class, conf)
+		conf	   = self.conf[question.key()]
+		extra_args = conf.get('extra_args', {})
+		decider	   = self._create_decider(question, decider_class, extra_args)
+
 		if decider is None:
 			return None
 
 		problems = decider.ready()
+
 		for problem in problems:
-			self.log_error('Decider "%s" is not ready in Formalizer %s: %s' % (kind, self.id, problem))
+			self.log_error('Decider of %s is not ready in Formalizer %s: %s' % (question.key(), self.id, problem))
 
 		if len(problems) > 0:
 			return None
@@ -1174,14 +534,42 @@ class Formalizer(Agentic):
 		return decider
 
 
-	def _create_decider(self, decider_class, conf):
-		""" Returns a Decider of decider_class with conf, or None (logging why) if creating it fails. """
+	def _decider_class(self, question):
+		""" Returns the class of the Decider configured for a question, or None (logging why) if the configuration is not a dictionary,
+		the Decider is unknown or it answers another question. """
+
+		conf = self.conf[question.key()]
+
+		if type(conf) is not dict:
+			self.log_error('The configuration of %s in Formalizer %s must be a dictionary.' % (question.key(), self.id))
+
+			return None
+
+		name		  = conf.get('decider', None)
+		decider_class = DECIDERS.get(name, None)
+
+		if decider_class is None:
+			self.log_error('Unknown decider "%s" for %s in Formalizer %s.' % (name, question.key(), self.id))
+
+			return None
+
+		if decider_class.QUESTION is not question:
+			answered = decider_class.QUESTION.key()
+			self.log_error('Decider "%s" answers %s, not %s, in Formalizer %s.' % (name, answered, question.key(), self.id))
+
+			return None
+
+		return decider_class
+
+
+	def _create_decider(self, question, decider_class, extra_args):
+		""" Returns a Decider of decider_class with extra_args, or None (logging why) if creating it fails. """
 
 		try:
-			decider = decider_class(conf)
+			decider = decider_class(extra_args)
 
 		except Exception as e:
-			self.log_error('Failed to create the decider while piloting Formalizer %s: %s' % (self.id, str(e)))
+			self.log_error('Failed to create the decider of %s in Formalizer %s: %s' % (question.key(), self.id, str(e)))
 
 			return None
 
@@ -1189,7 +577,8 @@ class Formalizer(Agentic):
 
 
 	def _capabilities(self):
-		""" Returns the capabilities of the Formalizer.
+		""" Returns the capabilities of the Formalizer: those of the questions configured, named after the Formalizer (e.g.,
+		`extract_nodes_GLiNER2`).
 
 		Returns:
 			(list): A list of capabilities, each represented as a dictionary with the following keys:
@@ -1205,37 +594,64 @@ class Formalizer(Agentic):
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
 
-		name_hint_nodes = 'hint_nodes_%s' % self.name
-		name_hint_edges = 'hint_edges_%s' % self.name
-		name_is_same	= 'is_same_node_%s' % self.name
+		self.call = {}
 
-		self.call = {name_hint_nodes: self.hint_nodes, name_hint_edges: self.hint_edges, name_is_same: self.is_same_node}
+		capabilities = []
+		for question in self._configured_questions():
+			capability = question.capability(self.name)
+			name	   = capability['function']['name']
 
-		return [
+			self.call[name] = question
+			capabilities.append(capability)
 
-			{
-				'type': 'function',
-				'function': {
-					'name': name_is_same,
-					'description': 'Score how likely a mention is a known instance (a node, as a "type|name" id).',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'mention': {
-								'type': 'object',
-								'description': 'A mention: "mention" (the text as it appears), "type" and optionally "texts", a list of texts where it was found.'
-							},
-							'node': {
-								'type': 'object',
-								'description': 'A known instance: "id", "description" and optionally "names", its other names.'
-							}
-						},
-						'required': ['mention', 'node']
-					},
-					'returns': {
-						'type': 'number',
-						'description': 'A score (0..1): how likely the mention is the known instance.'
-					}
-				}
-			}
-		]
+		return capabilities
+
+
+def _question_keys():
+	""" Returns the keys of all the questions, separated by commas (e.g., "extract_nodes, match_node, extract_edges"). """
+
+	keys = []
+	for question in Question:
+		keys.append(question.key())
+
+	result = ', '.join(keys)
+
+	return result
+
+
+def _argument_problems(question, arguments):
+	""" Returns the problems of the arguments of a question: a required one is missing, one is unknown or one has another type. """
+
+	if type(arguments) is not dict:
+		return ['The arguments must be a dictionary.']
+
+	parameters = question.value['function']['parameters']
+	properties = parameters['properties']
+
+	problems = []
+	for name in parameters['required']:
+		if name not in arguments:
+			problems.append('Missing argument "%s".' % name)
+
+	for name, value in arguments.items():
+		problem = _argument_problem(name, value, properties)
+		if problem is not None:
+			problems.append(problem)
+
+	return problems
+
+
+def _argument_problem(name, value, properties):
+	""" Returns the problem of one argument (unknown or of another type than its property), or None if it has none. """
+
+	parameter = properties.get(name, None)
+
+	if parameter is None:
+		return 'Unknown argument "%s".' % name
+
+	expected = ARGUMENT_TYPES[parameter['type']]
+
+	if not isinstance(value, expected):
+		return 'Argument "%s" must be of type %s.' % (name, parameter['type'])
+
+	return None

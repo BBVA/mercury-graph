@@ -3,6 +3,7 @@ import re, unicodedata
 from abc import ABC, abstractmethod
 
 from .agentic_graph import AgenticGraph
+from .question import Question
 
 
 IGNORED_WORDS = ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof']	# Default "ignored_words": titles left out when comparing names.
@@ -81,37 +82,24 @@ def _jaccard(words, other_words):
 
 
 class Decider(ABC):
-	""" A Decider answers the questions of a [`Formalizer`][mercury.graph.evidence.Formalizer] about the nodes it finds: whether a
-	mention is a known instance and which one of several candidates it is.
+	""" A Decider answers one of the questions of a [`Formalizer`][mercury.graph.evidence.Formalizer] (see
+	[`Question`][mercury.graph.evidence.Question]): the Formalizer validates the arguments and the Decider answers. How it answers
+	(with a model, with rules or asking an agent) is up to each implementation.
 
-	The Formalizer gathers the context (the mention, its type, the definitions of the ontology and the texts) and the Decider only
-	decides: how it asks its model (or applies its rules) is up to each implementation.
-
-	The arguments are:
-
-	- A mention: a dictionary with 'mention' (the text as it appears), 'type' (its type in the ontology), 'type_definition'
-	(the definition of its type in the ontology) and 'texts' (a list of the texts where it was found). A mention has no id: ids are
-	given by the EvidenceGraph.
-	- A node (a known instance): a dictionary with 'id' (its type followed by its name, e.g., `person|teacher|Elena Ruiz`),
-	'type_definition' (the definition of its type in the ontology), 'description' (what tells it apart from other instances, e.g.,
-	"A science teacher at Riverside High School.") and 'names' (a list of its other names, besides the one in its id).
-
-	A Decider is created by the Formalizer while piloting, with the "decider" section of its configuration (without "type"), and the
+	A Decider is created by the Formalizer while piloting, with the "extra_args" of its question in the configuration, and the
 	Formalizer only uses it if `ready()` finds no problem. A Decider that needs an external library imports it in `ready()`.
 
-	The scores of `is_same_node()` mean different things for each Decider, so each one has its own threshold: the score from which
-	a candidate is accepted as the instance of a mention. It is "same_node_threshold" in the configuration and, without it, the
-	`SAME_NODE_THRESHOLD` of the class.
+	Every Decider answers one question, the `QUESTION` of its class. Its `run()` is given the arguments of that question and returns
+	its output, as the question defines them.
 
 	Args:
-		conf (dict): The configuration of the Decider.
+		extra_args (dict): The configuration of the Decider.
 	"""
 
-	SAME_NODE_THRESHOLD = 0.5	# Default "same_node_threshold": the is_same_node() score from which a candidate is accepted.
+	QUESTION = None		# The Question the Decider answers.
 
-	def __init__(self, conf):
-		self.conf	   = conf
-		self.threshold = conf.get('same_node_threshold', self.SAME_NODE_THRESHOLD)
+	def __init__(self, extra_args):
+		self.conf = extra_args
 
 
 	def ready(self):
@@ -125,66 +113,57 @@ class Decider(ABC):
 
 
 	@abstractmethod
-	def is_same_node(self, mention, node):
-		""" Scores how likely a mention is a known instance.
+	def run(self, arguments):
+		""" Answers the question of the Decider.
 
 		Args:
-			mention (dict): The mention (see the class).
-			node (dict): The known instance (see the class).
+			arguments (dict): The arguments of the question, already validated by the Formalizer.
 
 		Returns:
-			(float): A score in [0..1].
-		"""
-
-
-	@abstractmethod
-	def choose_node(self, mention, nodes):
-		""" Chooses which of several known instances a mention is.
-
-		Args:
-			mention (dict): The mention (see the class).
-			nodes (list): The candidate known instances (see the class).
-
-		Returns:
-			(str): The id of the chosen node, or None if none of them can be chosen.
+			The output of the question.
 		"""
 
 
 class RulesDecider(Decider):
-	""" A [`Decider`][mercury.graph.evidence.Decider] based on rules, without any model.
+	""" A [`Decider`][mercury.graph.evidence.Decider] for `match_node` based on rules, without any model.
 
-	- `is_same_node()` compares the name of the mention with that of the node, as `hint_nodes` does with its candidates: 0 if their
-	types have different roots and the share of significant words in common otherwise. The texts, the definitions, the descriptions
-	and the other names are not used.
-	- `choose_node()` never chooses: it returns None.
+	It compares the name of the mention with that of the node: the score is 0 if their types have different roots and the share of
+	significant words in common otherwise. The texts, the definitions, the descriptions and the other names are not used. The mention
+	is the node ("same") when the score reaches the threshold.
 
 	Its configuration accepts "ignored_words", the words left out of the names (titles by default), and "same_node_threshold" (0.3
 	by default, which accepts "Ms. Ruiz" as "Elena Ruiz" with a score of 0.5).
 	"""
 
-	SAME_NODE_THRESHOLD = 0.3
+	QUESTION			= Question.MATCH_NODE
+	SAME_NODE_THRESHOLD = 0.3	# Default "same_node_threshold": the score from which a mention is the node.
 
-	def is_same_node(self, mention, node):
-		""" Returns the share of significant words in common between the names of the mention and the node.
+	def __init__(self, extra_args):
+		super().__init__(extra_args)
 
-		(See [`Decider.is_same_node()`][mercury.graph.evidence.Decider.is_same_node].)
+		self.threshold	   = extra_args.get('same_node_threshold', self.SAME_NODE_THRESHOLD)
+		self.ignored_words = extra_args.get('ignored_words', IGNORED_WORDS)
+
+
+	def run(self, arguments):
+		""" Returns the share of significant words in common between the names of the mention and the node, and whether it reaches
+		the threshold.
+
+		Args:
+			arguments (dict): The arguments of `match_node`: 'mention' ({'mention', 'type', 'texts'}) and 'node' ({'id',
+				'description', 'names'}).
+
+		Returns:
+			(dict): 'score' (0..1) and 'same' (True when the score reaches the threshold).
 		"""
 
+		mention = arguments['mention']
+		node	= arguments['node']
 		index	= '%s|%s' % (mention['type'], mention['mention'])
-		ignored = self.conf.get('ignored_words', IGNORED_WORDS)
 
-		result = compare_names(index, node['id'], ignored)
+		score = compare_names(index, node['id'], self.ignored_words)
+		same  = score >= self.threshold
+
+		result = {'score': score, 'same': same}
 
 		return result
-
-
-	def choose_node(self, mention, nodes):
-		""" Returns None: rules cannot choose between candidates.
-
-		(See [`Decider.choose_node()`][mercury.graph.evidence.Decider.choose_node].)
-		"""
-
-		return None
-
-
-DECIDERS = {'rules': RulesDecider}	# The Decider of every "type" in the "decider" section of the configuration of a Formalizer.

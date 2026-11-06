@@ -10,8 +10,8 @@
 //
 
 	// You can have more than one Formalizer in an Endpoint, but an EvidenceGraph only uses one. Multiple formalizers could be used
-	// by Agents or more than one EvidenceGraph. You can also share one Formalizer in different Agents or EvidenceGraphs but make sure
-	// the ontology remains consistent. The Formalizer itself has no state other than this configuration.
+	// by Agents or more than one EvidenceGraph. You can also share one Formalizer in different Agents or EvidenceGraphs. The Formalizer
+	// itself has no state other than this configuration: it has no ontology, which is given in the arguments of every question.
 	"GLiNER2": {
 		"name": "GLiNER2",
 
@@ -20,14 +20,54 @@
 			// The description will be exposed in the Formalizer's Agentic API. It can be a string or a list of strings.
 			"description": "This Agentic Formalizer extracts entities and relationships from text.",
 
-			"EXTRACT_NODES": null,
-			"EXTRACT_EDGES": {
-				"decider": "jev_agentic",
-				// Passed to the constructor of Decider (jev_agentic)
-				"extra_args": {"mode": "default"}
-}
+			// Every question the Formalizer answers has a key: "extract_nodes", "match_node" and "extract_edges". A question that is
+			// left out (or null) is not exposed. "decider" is the Decider that answers it and "extra_args" its configuration.
 
+			// extract_nodes: every mention of a type of the ontology in a text, with GLiNER2.
+			"extract_nodes": {
+				"decider": "gliner_nodes",
+				"extra_args": {
+					// Since August 2026, 2.5 is the current architecture (boundary architecture), use "small" (instead of "base") if
+					// you have limited resources or "multi" for multilingual support.
+					"model": "fastino/gliner2.5-base-v1",
+
+					// Use these options with care! If not null, they will be passed to AutoExtractor.from_pretrained() as arguments.
+					// "map_location": "cuda" may actually slow down and interfere with the Agent's use of the GPU.
+					"map_location": null,
+
+					// This may only work on the GPU, set it to true if you know what you are doing.
+					"quantize": null,
+
+					// This may only work on the GPU, set it to true if you know what you are doing.
+					"compile": null
+				}
+			},
+
+			// match_node: whether a mention is a known instance, comparing their names with rules.
+			"match_node": {
+				"decider": "rules",
+				"extra_args": {
+					// Words left out when the names are compared. These are the defaults: titles in English. Change them for documents
+					// in other languages.
+					"ignored_words": ["mr", "mrs", "ms", "miss", "dr", "prof"],
+
+					// The score (0..1) from which a mention that is only part of the name of a known instance is that instance (e.g.,
+					// "Ms. Ruiz" has 0.5 with "Elena Ruiz").
+					"same_node_threshold": 0.3
+				}
+			},
+
+			// extract_edges: every edge of a relation of the ontology between the nodes of a text, with GLiNER2. This Decider loads
+			// its own model, so the same model is loaded twice.
+			"extract_edges": {
+				"decider": "gliner_edges",
+				"extra_args": {
+					"model": "fastino/gliner2.5-base-v1",
+					"map_location": null,
+					"quantize": null,
+					"compile": null
+				}
+			}
 		}
-		"tools": ["jev_agentic"]
 	}
 }
