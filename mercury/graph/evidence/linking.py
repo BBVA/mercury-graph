@@ -9,48 +9,12 @@ For every mention found by `extract_nodes`:
 2. `link_mention()` decides whether it is one of them, a new instance or ambiguous, asking `match_node` of the Formalizer when the
 name alone is not enough.
 
-`ontology_argument()` gives an ontology in the format of the argument 'ontology' of the questions of the Formalizer.
+The argument 'ontology' of the questions is given by
+[`AgenticGraph.as_argument()`][mercury.graph.evidence.AgenticGraph.as_argument].
 """
 
 from .agentic_graph import AgenticGraph
 from .decider import IGNORED_WORDS, compare_names
-
-
-def ontology_argument(ontology):
-	""" Returns an ontology as the argument 'ontology' of the questions of a Formalizer, in the order of its nodes and edges.
-
-	Args:
-		ontology (AgenticGraph): The ontology, loaded (piloted).
-
-	Returns:
-		(dict): 'types', a list of {'id', 'definition'}, and 'relations', a list of {'id', 'src', 'dst', 'definition'}. A missing
-			definition is an empty string.
-	"""
-
-	ntx = ontology._graph.networkx
-
-	types = []
-	for index, definition in ntx.nodes(data = 'definition'):
-		concept = {'id': index, 'definition': _text(definition)}
-		types.append(concept)
-
-	relations = []
-	for src, dst, index, definition in ntx.edges(keys = True, data = 'definition'):
-		relation = {'id': index, 'src': src, 'dst': dst, 'definition': _text(definition)}
-		relations.append(relation)
-
-	result = {'types': types, 'relations': relations}
-
-	return result
-
-
-def _text(value):
-	""" Returns the value, or an empty string if it is None. """
-
-	if value is None:
-		return ''
-
-	return value
 
 
 def find_candidates(node, known_nodes, ignored_words = IGNORED_WORDS):
@@ -135,7 +99,7 @@ def link_mention(formalizer, node, candidates, ontology, text = None):
 		formalizer (Formalizer): A ready Formalizer that answers `match_node`.
 		node (dict): A node returned by `extract_nodes`, with 'mention' and 'type'.
 		candidates (list): Its candidates, as returned by `find_candidates()`.
-		ontology (dict): The ontology, as the argument 'ontology' of the questions (see `ontology_argument()`).
+		ontology (dict): The ontology, as the argument 'ontology' of the questions (see `AgenticGraph.as_argument()`).
 		text (str): The text where the mention was found, passed to `match_node`.
 
 	Returns:

@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 import networkx as nx
 
 from mercury.graph.evidence import AgenticGraph, Formalizer
-from mercury.graph.evidence.linking import find_candidates, link_mention, ontology_argument
+from mercury.graph.evidence.linking import find_candidates, link_mention
 
 from check_cases import Case, Entity, Output, get_dataset_name, load_context, load_dataset
 
@@ -199,7 +199,7 @@ def main() -> int:
 	dataset = load_dataset(get_dataset_name())
 
 	ontology, known = load_context(dataset['context'])
-	ontology_arg	= ontology_argument(ontology)
+	ontology_arg	= ontology.as_argument()
 	formalizer		= build_formalizer()
 	totals			= {metric: Score() for metric in METRICS}
 	start			= time.time()

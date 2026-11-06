@@ -1,10 +1,9 @@
-import pandas as pd
 import pytest
 
-from mercury.graph.evidence import AgenticGraph, Formalizer
+from mercury.graph.evidence import Formalizer
 from mercury.graph.evidence.decider import Decider
 from mercury.graph.evidence.formalizer import DECIDERS, FormalizerState
-from mercury.graph.evidence.linking import find_candidates, link_mention, ontology_argument
+from mercury.graph.evidence.linking import find_candidates, link_mention
 from mercury.graph.evidence.question import Question
 
 
@@ -22,27 +21,6 @@ def _known_nodes(ids):
 def _node(concept, mention):
 	"""Return a node as extract_nodes returns it."""
 	return {'mention': mention, 'type': concept, 'confidence': 0.9}
-
-
-# ontology_argument
-
-
-def test_ontology_argument_lists_the_types_and_relations_in_order(tmp_path):
-	"""The ontology becomes its types and relations, in the order of its nodes and edges, with an empty missing definition."""
-	nodes = pd.DataFrame({'id': ['person', 'project', 'place'], 'definition': ['A person.', 'A project.', None]})
-	edges = pd.DataFrame({'id': ['works_on'], 'src': ['person'], 'dst': ['project'], 'definition': ['To work on.']})
-	nodes.to_csv(tmp_path / 'nodes.csv', sep = '\t', index = False)
-	edges.to_csv(tmp_path / 'edges.csv', sep = '\t', index = False)
-	ontology = AgenticGraph(schema = 'ontology', extra_args = {
-		'nodes': {'type': 'csv', 'path': str(tmp_path / 'nodes.csv')},
-		'edges': {'type': 'csv', 'path': str(tmp_path / 'edges.csv')}})
-	ontology.pilot(ontology.states.READY.value)
-
-	argument = ontology_argument(ontology)
-
-	assert [concept['id'] for concept in argument['types']] == ['person', 'project', 'place']
-	assert argument['types'][0] == {'id': 'person', 'definition': 'A person.'}
-	assert argument['relations'] == [{'id': 'works_on', 'src': 'person', 'dst': 'project', 'definition': 'To work on.'}]
 
 
 # find_candidates

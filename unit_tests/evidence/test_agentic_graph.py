@@ -161,7 +161,8 @@ def test_agentic_graph_metadata_and_requests():
 
 	assert graph.meta['state'] == 0
 	assert graph.meta['description'] == 'First line.\nSecond line.'
-	assert [capability['function']['name'] for capability in graph.meta['capabilities']] == [children_name, node_name, 'search_entities_ontology']
+	assert [capability['function']['name'] for capability in graph.meta['capabilities']] == [children_name, node_name, 'search_entities_ontology',
+																							   'as_argument_ontology']
 	assert graph.dry_run({'anything': True}) == {'status': 0, 'description': 'Valid request.'}
 	assert graph.get_children_idx() is None
 	assert graph.child('ontology') is None
@@ -564,12 +565,46 @@ def _capability_names(graph):
 
 def test_capabilities_depend_on_the_content_of_the_graph(tmp_path):
 	""" The capabilities of relationships are only available when the graph has edges. Before loading, only those of entities are. """
-	entities	  = ['children_entities_by_idx', 'entity_by_idx', 'search_entities']
+	entities	  = ['children_entities_by_idx', 'entity_by_idx', 'search_entities', 'as_argument']
 	relationships = ['children_relationships_by_idx', 'relationship_by_idx', 'search_relationships', 'relations_for']
 
 	assert _capability_names(AgenticGraph(schema = 'ontology', extra_args = {})) == entities
 	assert _capability_names(_school_graph(tmp_path)) == entities
 	assert _capability_names(_ontology_graph(tmp_path)) == entities + relationships
+
+
+def test_as_argument_gives_the_whole_ontology_in_order(tmp_path):
+	""" The ontology becomes its types and relations, with their definitions, in the order of the nodes and edges of its graph. """
+	graph	 = _ontology_graph(tmp_path)
+	ntx		 = graph._graph.networkx
+	argument = graph.as_argument()
+
+	assert [concept['id'] for concept in argument['types']] == list(ntx.nodes)
+	assert sorted(concept['id'] for concept in argument['types']) == sorted(i for i, _ in ENTITIES)
+	assert {'id': 'organization', 'definition': 'A group of people.'} in argument['types']
+	assert [relation['id'] for relation in argument['relations']] == [key for _, _, key in ntx.edges(keys = True)]
+	assert argument['relations'][0] == {'id': 'works_on', 'src': 'person', 'dst': 'project', 'definition': 'A person works on a project.'}
+
+
+def test_as_argument_is_the_capability_and_ignores_max_results(tmp_path):
+	""" The capability as_argument gives the same as the method, whole even with a smaller "max_results". """
+	graph = _ontology_graph(tmp_path, max_results = 2)
+
+	assert _call(graph, 'as_argument') == graph.as_argument()
+	assert len(_call(graph, 'as_argument')['types']) == len(ENTITIES)
+
+
+def test_as_argument_without_relations_or_definitions(tmp_path):
+	""" An ontology without edges has no relations, and a missing definition (an empty cell) is an empty string. """
+	graph = _csv_graph(tmp_path, 'ontology', [{'id': 'person', 'definition': 'A person.'}, {'id': 'place', 'definition': None}])
+
+	assert graph.as_argument() == {'types': [{'id': 'person', 'definition': 'A person.'}, {'id': 'place', 'definition': ''}],
+								   'relations': []}
+
+
+def test_as_argument_is_none_before_loading():
+	""" Before the graph is loaded, there is no ontology to give. """
+	assert AgenticGraph(schema = 'ontology', extra_args = {}).as_argument() is None
 
 
 def test_search_entities_finds_nodes_by_id_and_then_by_definition(tmp_path):
@@ -686,8 +721,8 @@ def test_capabilities_are_not_ready_before_loading():
 	""" Before the graph is loaded, every capability returns None and logs why. """
 	logger = []
 	graph = AgenticGraph(schema = 'ontology', extra_args = {}, logger = logger)
-	runners = (graph._children_entities_by_idx, graph._entity_by_idx, graph._search_entities, graph._children_relationships_by_idx,
-			   graph._relationship_by_idx, graph._search_relationships, graph._relations_for)
+	runners = (graph._children_entities_by_idx, graph._entity_by_idx, graph._search_entities, graph._as_argument,
+			   graph._children_relationships_by_idx, graph._relationship_by_idx, graph._search_relationships, graph._relations_for)
 
 	for runner in runners:
 		assert runner({'index': '', 'text': 'x', 'concept': 'x'}) is None

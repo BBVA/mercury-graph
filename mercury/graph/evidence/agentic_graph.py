@@ -502,6 +502,54 @@ class AgenticGraph(Agentic):
 		return self._entities.properties(index)
 
 
+	def as_argument(self):
+		""" Returns the whole ontology as the argument 'ontology' of the questions of a
+		[`Formalizer`][mercury.graph.evidence.Formalizer], in the order of its nodes and edges.
+
+		Returns:
+			(dict or None): 'types', a list of {'id', 'definition'}, and 'relations', a list of {'id', 'src', 'dst', 'definition'}. A
+				definition that is not a text (missing or an empty cell of a .csv file) is an empty string. None if the graph is not
+				loaded.
+		"""
+
+		if self._graph is None:
+			return None
+
+		ntx = self._graph.networkx
+
+		types = []
+		for index, definition in ntx.nodes(data = 'definition'):
+			concept = {'id': index, 'definition': _definition_text(definition)}
+			types.append(concept)
+
+		relations = []
+		for src, dst, index, definition in ntx.edges(keys = True, data = 'definition'):
+			relation = {'id': index, 'src': src, 'dst': dst, 'definition': _definition_text(definition)}
+			relations.append(relation)
+
+		result = {'types': types, 'relations': relations}
+
+		return result
+
+
+	def _as_argument(self, arguments):
+		""" Runs the as_argument capability (see `as_argument()`).
+
+		Args:
+			arguments (dict): No arguments.
+
+		Returns:
+			(dict or None): The whole ontology as {'types', 'relations'}, or None if not ready.
+		"""
+
+		if not self._is_ready('as_argument'):
+			return None
+
+		result = self.as_argument()
+
+		return result
+
+
 	def _children_entities_by_idx(self, arguments):
 		""" Runs the children_entities_by_idx capability (see `NavigableTree.children_by_idx()`).
 
@@ -729,7 +777,7 @@ class AgenticGraph(Agentic):
 		"""
 
 		available = {'children_entities_by_idx': self._children_entities_by_idx, 'entity_by_idx': self._entity_by_idx,
-					 'search_entities': self._search_entities}
+					 'search_entities': self._search_entities, 'as_argument': self._as_argument}
 
 		if self._has_edges():
 			available.update({'children_relationships_by_idx': self._children_relationships_by_idx, 'relationship_by_idx':
@@ -1056,6 +1104,15 @@ class AgenticGraph(Agentic):
 		return entries[:limit] + [TRUNCATED] if len(entries) > limit else entries
 
 
+def _definition_text(value):
+	""" Returns a definition if it is a text, or an empty string otherwise (missing, or NaN from an empty cell of a .csv file). """
+
+	if isinstance(value, str):
+		return value
+
+	return ''
+
+
 CAPABILITIES = {
 	'children_entities_by_idx': {
 		'description': 'List the types of entity under an id in the ontology "{name}", with their definitions. Ids are hierarchical, with '
@@ -1087,6 +1144,14 @@ CAPABILITIES = {
 			limit = {'type': 'integer', 'description': 'Maximum number of results. Defaults to 20.'}
 		),
 		'returns': LIST
+	},
+	'as_argument': {
+		'description': 'Get the whole ontology "{name}" as the argument "ontology" of the questions of a Formalizer (extract_nodes, '
+					   'match_node and extract_edges): its types of entity and of relationship, with their definitions. Pass it unchanged '
+					   'as "ontology", or leave out the types and relationships you do not want the Formalizer to look for.',
+		'parameters': AgenticGraph.parameters([]),
+		'returns': {'type': 'object', 'description': '"types", a list of {"id", "definition"}, and "relations", a list of {"id", "src", '
+												   '"dst", "definition"}.'}
 	},
 	'children_relationships_by_idx': {
 		'description': 'List the types of relationship under an id in the ontology "{name}", with their definitions and the types of entity '
