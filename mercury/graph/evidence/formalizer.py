@@ -260,9 +260,10 @@ class Formalizer(Agentic):
 	## Arguments
 
 	Before passing a question to its Decider, the Formalizer checks that its arguments are those of the question: the required ones are
-	there, there is none it does not know and each one has its type (e.g., 'text' is a string). If any is not, every problem is logged
-	and the question returns None. The content of the ontology is not validated: its coherence is checked by whoever loads it (see
-	[`validate_ontology()`](evidence_ontologies.md#validation)).
+	there, there is none it does not know, each one has its type (e.g., 'text' is a string) and an object has its required fields (e.g.,
+	the 'mention' of `match_node` has "mention", "type" and "definition", and every node of `extract_edges` has "mention" and "id"). If
+	any is not, every problem is logged and the question returns None. The content of the ontology is not validated: its coherence is
+	checked by whoever loads it (see [`validate_ontology()`](evidence_ontologies.md#validation)).
 
 	## Types and concepts
 
@@ -638,6 +639,9 @@ def _argument_problems(question, arguments):
 		problem = _argument_problem(name, value, properties)
 		if problem is not None:
 			problems.append(problem)
+			continue
+
+		problems += _field_problems(name, value, properties[name])
 
 	return problems
 
@@ -656,3 +660,53 @@ def _argument_problem(name, value, properties):
 		return 'Argument "%s" must be of type %s.' % (name, parameter['type'])
 
 	return None
+
+
+def _field_problems(name, value, parameter):
+	""" Returns the problems of the fields of an argument of the right type: a required field missing from an object, or from an
+	object in an array (e.g., the "mention" of the argument 'mention' of `match_node`). """
+
+	if parameter['type'] == 'object':
+		required = parameter.get('required', [])
+		problems = _missing_fields(name, value, required)
+
+		return problems
+
+	if parameter['type'] == 'array':
+		problems = _item_problems(name, value, parameter['items'])
+
+		return problems
+
+	return []
+
+
+def _item_problems(name, items, item_parameter):
+	""" Returns the problems of the items of an array argument whose items have required fields: an item that is not an object or
+	that misses one of them. """
+
+	required = item_parameter.get('required', [])
+
+	if len(required) == 0:
+		return []
+
+	problems = []
+	for position, item in enumerate(items):
+		label = '%s[%d]' % (name, position)
+		if type(item) is not dict:
+			problems.append('Argument "%s" must be an object.' % label)
+			continue
+
+		problems += _missing_fields(label, item, required)
+
+	return problems
+
+
+def _missing_fields(label, value, required):
+	""" Returns a problem for every required field missing from an object argument. """
+
+	problems = []
+	for field in required:
+		if field not in value:
+			problems.append('Argument "%s" is missing "%s".' % (label, field))
+
+	return problems

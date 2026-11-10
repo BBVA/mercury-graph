@@ -72,11 +72,18 @@ class FakeMatchDecider(FakeDecider):
 	QUESTION = Question.MATCH_NODE
 
 
+class FakeEdgesDecider(FakeDecider):
+	"""The same FakeDecider, for extract_edges."""
+
+	QUESTION = Question.EXTRACT_EDGES
+
+
 @pytest.fixture
 def fake_deciders(monkeypatch):
-	"""Register FakeDecider as "fake" and FakeMatchDecider as "fake_match"."""
+	"""Register FakeDecider as "fake", FakeMatchDecider as "fake_match" and FakeEdgesDecider as "fake_edges"."""
 	monkeypatch.setitem(DECIDERS, 'fake', FakeDecider)
 	monkeypatch.setitem(DECIDERS, 'fake_match', FakeMatchDecider)
+	monkeypatch.setitem(DECIDERS, 'fake_edges', FakeEdgesDecider)
 
 
 ONTOLOGY = {'types': [{'id': 'person', 'definition': 'A person.'}], 'relations': []}
@@ -222,6 +229,40 @@ def test_formalizer_match_node_takes_the_definition_of_the_mention_instead_of_th
 	assert formalizer.match_node({'mention': mention, 'node': node, 'ontology': ONTOLOGY}) is None
 	assert 'Unknown argument "ontology"' in _errors(formalizer)[0]
 	assert 'ontology' not in Question.MATCH_NODE.value['function']['parameters']['properties']
+
+
+MENTION = {'mention': 'Ada', 'type': 'person', 'definition': 'A person.'}
+NODE	= {'id': 'person|Ada Lovelace', 'description': 'A mathematician.'}
+
+
+@pytest.mark.parametrize('arguments, problems', [
+	({'mention': {'type': 'person|person', 'definition': 'A person.', 'texts': ['Ada']}, 'node': NODE},
+	 ['Argument "mention" is missing "mention"']),
+	({'mention': {'mention': 'Ada'}, 'node': {'id': 'person|Ada Lovelace'}},
+	 ['Argument "mention" is missing "type"', 'Argument "mention" is missing "definition"', 'Argument "node" is missing "description"'])
+])
+def test_formalizer_rejects_a_mention_or_node_without_its_required_fields(fake_deciders, arguments, problems):
+	"""match_node with a mention or a node that misses a required field returns None, logs every problem and does not reach the
+	Decider."""
+	formalizer = _formalizer(match_node = {'decider': 'fake_match'})
+	assert formalizer.match_node(arguments) is None
+	assert len(_errors(formalizer)) == len(problems)
+	for problem, error in zip(problems, _errors(formalizer)):
+		assert problem in error
+	assert formalizer._deciders[Question.MATCH_NODE].asked == []
+	assert formalizer.match_node({'mention': MENTION, 'node': NODE}) == []
+
+
+def test_formalizer_rejects_nodes_of_extract_edges_without_mention_and_id(fake_deciders):
+	"""Every node of extract_edges must be an object with "mention" and "id"; the problems name the position of the node."""
+	formalizer = _formalizer(extract_edges = {'decider': 'fake_edges'})
+	nodes	   = [{'mention': 'Ada', 'id': 'person|Ada'}, {'mention': 'Babbage'}, 'person|Ada']
+	assert formalizer.extract_edges({'text': 'Ada met Babbage.', 'nodes': nodes, 'ontology': ONTOLOGY}) is None
+	errors = _errors(formalizer)
+	assert len(errors) == 2
+	assert 'Argument "nodes[1]" is missing "id"' in errors[0]
+	assert 'Argument "nodes[2]" must be an object' in errors[1]
+	assert formalizer._deciders[Question.EXTRACT_EDGES].asked == []
 
 
 def test_formalizer_close_releases_its_deciders(fake_deciders):

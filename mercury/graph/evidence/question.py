@@ -66,11 +66,13 @@ class Question(Enum):
 					'mention': {
 						'type': 'object',
 						'description': 'A mention: "mention" (the text as it appears), "type", "definition" (that of its type in the ontology) and '
-									   'optionally "texts", a list of texts where it was found.'
+									   'optionally "texts", a list of texts where it was found.',
+						'required': ['mention', 'type', 'definition']
 					},
 					'node': {
 						'type': 'object',
-						'description': 'A known instance: "id", "description" and optionally "names", its other names.'
+						'description': 'A known instance: "id", "description" and optionally "names", its other names.',
+						'required': ['id', 'description']
 					},
 					'context': CONTEXT_PARAMETER
 				},
@@ -98,7 +100,8 @@ class Question(Enum):
 					'nodes': {
 						'type': 'array',
 						'items': {
-							'type': 'object'
+							'type': 'object',
+							'required': ['mention', 'id']
 						},
 						'description': 'The nodes of the text, with "mention" and "id".'
 					},
