@@ -12,8 +12,15 @@ Other classes :
 [MultiGraph](#mercury.graph.evidence.MultiGraph) ·
 [NavigableTree](#mercury.graph.evidence.NavigableTree) ·
 [Crawl](#mercury.graph.evidence.Crawl) ·
+[Question](#mercury.graph.evidence.Question) ·
 [Decider](#mercury.graph.evidence.Decider) ·
-[RulesDecider](#mercury.graph.evidence.RulesDecider)
+[RulesDecider](#mercury.graph.evidence.RulesDecider) ·
+[GlinerDecider](#mercury.graph.evidence.GlinerDecider) ·
+[GlinerNodesDecider](#mercury.graph.evidence.GlinerNodesDecider) ·
+[GlinerEdgesDecider](#mercury.graph.evidence.GlinerEdgesDecider)
+
+Modules :
+[linking](#mercury.graph.evidence.linking)
 
 ----
 
@@ -27,5 +34,10 @@ Other classes :
 ::: mercury.graph.evidence.MultiGraph
 ::: mercury.graph.evidence.NavigableTree
 ::: mercury.graph.evidence.Crawl
+::: mercury.graph.evidence.Question
 ::: mercury.graph.evidence.Decider
 ::: mercury.graph.evidence.RulesDecider
+::: mercury.graph.evidence.GlinerDecider
+::: mercury.graph.evidence.GlinerNodesDecider
+::: mercury.graph.evidence.GlinerEdgesDecider
+::: mercury.graph.evidence.linking

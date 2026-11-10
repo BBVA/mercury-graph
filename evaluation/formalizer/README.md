@@ -9,8 +9,9 @@ It is not part of the unit tests: it downloads the GLiNER2 model and its scores 
   synthetic: they come from (or are variations of) the Markdown documents of the template.
 - `check_cases.py`: checks that every expected id and edge is valid against the ontology of the template (run it after editing the
   cases).
-- `run_eval.py`: runs the GLiNER2 Formalizer on every case as the EvidenceGraph will (`hint_nodes`, `link_mention`, `hint_edges`)
-  and scores its output against the expected one.
+- `run_eval.py`: runs the GLiNER2 Formalizer on every case as the EvidenceGraph will (`extract_nodes`, then `find_candidates` and
+  `link_mention` of `mercury.graph.evidence.linking`, which ask `match_node`, then `extract_edges`), with the ontology of the template
+  as the argument `ontology`, and scores its output against the expected one.
 
 Run them from the root of the repository:
 
@@ -29,8 +30,8 @@ Precision, recall and F1, micro-averaged over all cases, of:
 - `mentions`: the mention, whatever its id, i.e., whether the text was found,
 - `entities`: (mention, id, status), i.e., whether it was also linked to the right instance,
 - `types`: (mention, type) of the mentions whose type the text gives (their `text_type` or, by default, the type of their `id`), i.e.,
-  whether the type chosen by `hint_nodes` is the right one, whatever the link. Other mentions are left out, so a mention found with a
-  wrong type is both a miss and an extra, and a mention not found is a miss,
+  whether the type chosen by `extract_nodes` is the right one, whatever the link. Other mentions are left out, so a mention found with
+  a wrong type is both a miss and an extra, and a mention not found is a miss,
 - `edges`: (src, relation, dst).
 
 ## Context of every case

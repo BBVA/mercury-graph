@@ -120,7 +120,7 @@ class Decider(ABC):
 			arguments (dict): The arguments of the question, already validated by the Formalizer.
 
 		Returns:
-			The output of the question.
+			(list or dict): The output of the question (see [`Question`][mercury.graph.evidence.Question]).
 		"""
 
 

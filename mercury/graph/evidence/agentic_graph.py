@@ -290,6 +290,7 @@ class AgenticGraph(Agentic):
 	- `children_entities_by_idx_<name>`: the types of entity (nodes) under an id with their definitions, down to a given depth.
 	- `entity_by_idx_<name>`: the properties of a type of entity and its ancestors with their definitions.
 	- `search_entities_<name>`: the types of entity whose id or definition contains a text.
+	- `as_argument_<name>`: the whole graph as the argument 'ontology' of the extracting questions of a Formalizer (see `as_argument()`).
 
 	Only if the graph has edges:
 

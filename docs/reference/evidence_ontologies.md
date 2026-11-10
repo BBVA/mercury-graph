@@ -57,15 +57,17 @@ place|room              A room inside a building.
 place|room|laboratory   A room equipped for scientific work.
 ```
 
-The definitions are not just documentation. The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) gives every type of
-entity and its definition to the extraction model, so a clear definition directly improves what is found in the text.
+The definitions are not just documentation. The questions of the [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer)
+that extract from a text take the ontology, with its definitions, as their argument `ontology`, and their
+[`Decider`](evidence.md#mercury.graph.evidence.Decider) gives them to the extraction model, so a clear definition directly improves
+what is found in the text. The question that compares a mention with a known instance (`match_node`) takes only the definition of
+the type of the mention.
 
 ### Types and concepts
 
 A type of the ontology, of entity or of relationship, is also called a **concept**: both words name the same thing. The code and the
-files of the ontology (`entities_concepts.csv`, `relationships_concepts.csv`) say *concept*. The capabilities say *type* in what they
-return and in the context they give to a [`Decider`](evidence.md#mercury.graph.evidence.Decider) (e.g., the `type` of a mention and
-its `type_definition`), but they take the types to look for in an argument named `concepts`.
+files of the ontology (`entities_concepts.csv`, `relationships_concepts.csv`) say *concept*. The capabilities say *type* in their
+arguments and in what they return (e.g., the `types` of the argument `ontology` of the Formalizer and the `type` of a mention).
 
 
 ## Relationships: the edges of the ontology
@@ -149,15 +151,20 @@ The ontology is configured in the `ontologies` section of an endpoint (`ontologi
 - `max_results` limits the entries of every answer given to agents.
 - `description` is what agents read about the ontology.
 
-The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) names the ontology it uses in its own configuration (in
-`formalizers.jsonc`). The key is the role and the value is the `name` of the `AgenticGraph`, which must also be one of its `tools`:
+The [`EvidenceGraph`](evidence.md#mercury.graph.evidence.EvidenceGraph) names the ontology it uses in its `agentics` (in
+`evidence_graphs.jsonc`). The key is the role and the value is the `name` of the `AgenticGraph`, which must also be one of its
+`tools`:
 
 ```jsonc
-"ontology": "ontology"
+"agentics": {"formalizer": "GLiNER2", "ontology": "ontology", ...},
+"tools": ["mediawiki_example", "GLiNER2", "ontology"]
 ```
 
-The initial graph is configured in the [`EvidenceGraph`](evidence.md#mercury.graph.evidence.EvidenceGraph) (in
-`evidence_graphs.jsonc`), with the same format of files:
+The [`Formalizer`](evidence.md#mercury.graph.evidence.Formalizer) has no ontology of its own: whoever asks it a question (the
+EvidenceGraph, an agent or a script) passes the ontology in the argument `ontology` of `extract_nodes` and `extract_edges`, and the
+definition of the type of the mention to `match_node` (see [How agents explore the ontology](#how-agents-explore-the-ontology)).
+
+The initial graph is also configured in the EvidenceGraph, with the same format of files:
 
 ```jsonc
 "initial_nodes": {"type": "csv", "$path": "initial_graph/nodes.csv"},
@@ -170,18 +177,17 @@ the starting point of a graph that grows. Both are only read when their pickle d
 
 ## Validation
 
-The ontology and the initial graph are checked at three moments. If anything is wrong, every problem is logged and the object does not
-become ready.
+The ontology and the initial graph are checked at three moments, the last two while the EvidenceGraph is piloted. If anything is
+wrong, every problem is logged and the object does not become ready.
 
 1. **When any graph is loaded** from its files (see
   [`AgenticGraph.graph_from_files()`][mercury.graph.evidence.AgenticGraph.graph_from_files]):
    ids are unique, edges cannot be loaded without a file of nodes, and the `src` and `dst` of every edge are declared nodes. A typo
    such as `projec` as the `dst` of a relationship is reported instead of becoming a new node.
-2. **When the Formalizer is piloted** (see [`Formalizer.pilot()`][mercury.graph.evidence.Formalizer.pilot]): every type
-   of entity and relationship has its parent defined, and every relationship connects the types of its parent or descendants of them.
-   For example, `works_on|leads` from `organization` is rejected when `works_on` goes from `person`.
-3. **When the EvidenceGraph is piloted** with its initial graph (see
-  [`EvidenceGraph.pilot()`][mercury.graph.evidence.EvidenceGraph.pilot]): every instance is of a type of entity of
+2. **The ontology of the EvidenceGraph** (see [`EvidenceGraph.pilot()`][mercury.graph.evidence.EvidenceGraph.pilot]): every
+   type of entity and relationship has its parent defined, and every relationship connects the types of its parent or descendants of
+   them. For example, `works_on|leads` from `organization` is rejected when `works_on` goes from `person`.
+3. **The initial graph of the EvidenceGraph**, once its ontology is valid: every instance is of a type of entity of
    the ontology, every instance has a `description` that is not empty, and every edge has a relationship of the ontology between
    instances of its types or of descendants of them. For example, `person|student|Noah Kim` can be the `src` of `works_on|leads`, but
    not of `teaches_at`, which goes from `person|teacher`. An initial graph that fails is not saved, so the next start checks it again.
@@ -200,9 +206,15 @@ relationships are navigated separately, in two trees:
   the types of relationships, which also come with the types of entities they connect (`src` and `dst`).
 - `relations_for_<ontology>`: the types of relationships a type of entity can take part in, as `src`, `dst` or both, including those
   declared for its ancestors. A `person|student` can take part in `studies_at` and also in `works_on`, declared for `person`.
+- `as_argument_<ontology>`: the whole ontology, with its definitions, in the form of the argument `ontology` of the questions of the
+  Formalizer that extract from a text: `{"types": [{"id", "definition"}], "relations": [{"id", "src", "dst", "definition"}]}`. An
+  agent gets it once and passes it to `extract_nodes` and `extract_edges` (whole, or leaving out the types and relationships it does
+  not want to look for), and takes from its `types` the definition of the type of a mention to ask `match_node`. The same is
+  available in Python as [`AgenticGraph.as_argument()`][mercury.graph.evidence.AgenticGraph.as_argument].
 
 The capabilities of relationships only appear when the ontology has relationships. Entries with `"more": true` have children of their
-own, and every answer is limited to `max_results` entries and says when it has been cut. The exact capabilities are listed in the
+own, and every answer is limited to `max_results` entries and says when it has been cut, except `as_argument_<ontology>`, which
+always gives the whole ontology. The exact capabilities are listed in the
 [`AgenticGraph`](evidence.md#mercury.graph.evidence.AgenticGraph) reference.
 
 
@@ -211,6 +223,9 @@ own, and every answer is limited to `max_results` entries and says when it has b
 - There is no graph query language: agents explore the ontology through the capabilities above, one question at a time.
 - The initial graph is loaded into the EvidenceGraph, but it cannot be explored through capabilities yet.
 - The ontology cannot be edited at runtime: it is defined by its .csv files (deleting its pickle to apply changes).
-- [`Formalizer.is_same_node()`](evidence.md#mercury.graph.evidence.Formalizer.is_same_node), which scores whether a mention is a
-  known instance, is answered by [`RulesDecider`](evidence.md#mercury.graph.evidence.RulesDecider), the only Decider so far: it only
-  compares their names and does not read the texts that mention them.
+- The question `match_node` of the Formalizer, which scores whether a mention is a known instance, is answered by
+  [`RulesDecider`](evidence.md#mercury.graph.evidence.RulesDecider), its only Decider so far: it only compares their names and does
+  not read the texts that mention them.
+- An agent that asks the Formalizer to extract from a text copies the ontology (or part of it) into every question: with a large
+  ontology or a small model, that is costly and copying mistakes are not detected, because the Formalizer only checks the form of
+  its arguments.
