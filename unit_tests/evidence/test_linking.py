@@ -119,7 +119,7 @@ def same_decider(monkeypatch):
 	monkeypatch.setitem(DECIDERS, 'same', SameDecider)
 
 
-def _formalizer(decider = 'rules', **extra_args):
+def _formalizer(decider = 'match_node_rules', **extra_args):
 	"""Return a ready Formalizer that answers match_node with the given Decider and configuration."""
 	formalizer = Formalizer(schema = 'test', extra_args = {'match_node': {'decider': decider, 'extra_args': extra_args}}, logger = [])
 	formalizer.pilot(FormalizerState.READY.value)
@@ -153,7 +153,7 @@ def test_link_mention_links_the_whole_name_despite_a_type_conflict():
 
 
 def test_link_mention_links_a_partial_name_that_match_node_answers_same():
-	"""A partial name is linked if match_node answers "same" (from the threshold of the rules decider on), and new otherwise."""
+	"""A partial name is linked if match_node answers "same" (from the threshold of the match_node_rules decider on), and new otherwise."""
 	assert _link('person|teacher', 'Ms. Ruiz') == {'mention': 'Ms. Ruiz', 'id': 'person|teacher|Elena Ruiz', 'status': 'known'}
 	strict = _formalizer(same_node_threshold = 0.6)
 	assert _link('person|teacher', 'Ms. Ruiz', formalizer = strict) == {'mention': 'Ms. Ruiz', 'id': 'person|teacher|Ms. Ruiz', 'status': 'new'}

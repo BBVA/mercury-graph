@@ -104,7 +104,7 @@ def _errors(formalizer):
 def test_formalizer_initialization_and_calls():
 	"""Exercise initial metadata, the capabilities of the questions configured, and invalid calls."""
 	Formalizer(schema = None, extra_args = {})
-	formalizer = Formalizer(schema = 'any', extra_args = {'description': ['One', 'Two'], 'extract_nodes': {'decider': 'gliner_nodes'}})
+	formalizer = Formalizer(schema = 'any', extra_args = {'description': ['One', 'Two'], 'extract_nodes': {'decider': 'extract_nodes_gliner2'}})
 	assert type(formalizer) is Formalizer
 	assert formalizer.meta['state'] == FormalizerState.INITIAL.value
 	assert formalizer.meta['description'] == 'One\nTwo'
@@ -188,7 +188,7 @@ def test_formalizer_passes_the_arguments_to_the_decider_and_returns_its_answer(f
 
 def test_formalizer_does_not_answer_when_it_is_not_ready():
 	"""Before piloting, every question returns None and logs why."""
-	formalizer = Formalizer(schema = 'test', extra_args = {'extract_nodes': {'decider': 'gliner_nodes'}}, logger = [])
+	formalizer = Formalizer(schema = 'test', extra_args = {'extract_nodes': {'decider': 'extract_nodes_gliner2'}}, logger = [])
 	assert formalizer.extract_nodes({'text': 'Ada', 'ontology': ONTOLOGY}) is None
 	assert 'not ready for extract_nodes' in _errors(formalizer)[0]
 

@@ -224,8 +224,8 @@ always gives the whole ontology. The exact capabilities are listed in the
 - The initial graph is loaded into the EvidenceGraph, but it cannot be explored through capabilities yet.
 - The ontology cannot be edited at runtime: it is defined by its .csv files (deleting its pickle to apply changes).
 - The question `match_node` of the Formalizer, which scores whether a mention is a known instance, is answered by
-  [`RulesDecider`](evidence.md#mercury.graph.evidence.RulesDecider), its only Decider so far: it only compares their names and does
-  not read the texts that mention them.
+  [`MatchNodeRulesDecider`](evidence.md#mercury.graph.evidence.MatchNodeRulesDecider), its only Decider so far: it only compares
+  their names and does not read the texts that mention them.
 - An agent that asks the Formalizer to extract from a text copies the ontology (or part of it) into every question: with a large
   ontology or a small model, that is costly and copying mistakes are not detected, because the Formalizer only checks the form of
   its arguments.

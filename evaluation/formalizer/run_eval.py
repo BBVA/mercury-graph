@@ -69,9 +69,9 @@ def build_formalizer() -> Formalizer:
 	""" Returns a ready Formalizer that answers extract_nodes and extract_edges with GLiNER2 and match_node with rules. """
 
 	conf = {
-		'extract_nodes': {'decider': 'gliner_nodes', 'extra_args': {'model': MODEL}},
-		'match_node':	 {'decider': 'rules'},
-		'extract_edges': {'decider': 'gliner_edges', 'extra_args': {'model': MODEL}}
+		'extract_nodes': {'decider': 'extract_nodes_gliner2', 'extra_args': {'model': MODEL}},
+		'match_node':	 {'decider': 'match_node_rules'},
+		'extract_edges': {'decider': 'extract_edges_gliner2', 'extra_args': {'model': MODEL}}
 	}
 	formalizer = Formalizer(schema = 'GLiNER2', extra_args = conf)
 	formalizer.pilot(100)

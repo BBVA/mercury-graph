@@ -4,8 +4,8 @@ import types
 
 import pytest
 
-from mercury.graph.evidence.decider import RulesDecider
-from mercury.graph.evidence.gliner_deciders import GlinerEdgesDecider, GlinerNodesDecider
+from mercury.graph.evidence.decider import MatchNodeRulesDecider
+from mercury.graph.evidence.gliner_deciders import ExtractEdgesGliner2Decider, ExtractNodesGliner2Decider
 from mercury.graph.evidence.question import Question
 
 
@@ -79,24 +79,24 @@ def _ontology(entities = (), relations = ()):
 	return {'types': concepts, 'relations': edges}
 
 
-# RulesDecider
+# MatchNodeRulesDecider
 
 
 def _match(decider, concept, mention, index, texts = ()):
-	"""Return the answer of a RulesDecider for a mention of a type, with the given texts, and the id of a known instance."""
+	"""Return the answer of a MatchNodeRulesDecider for a mention of a type, with the given texts, and the id of a known instance."""
 	known = {'id': index, 'description': 'Description of %s.' % index, 'names': []}
 	arguments = {'mention': {'mention': mention, 'type': concept, 'texts': list(texts)}, 'node': known, 'ontology': _ontology()}
 	return decider.run(arguments)
 
 
-def test_rules_decider_answers_match_node():
-	"""The rules decider is the Decider of match_node."""
-	assert RulesDecider.QUESTION is Question.MATCH_NODE
+def test_match_node_rules_answers_match_node():
+	"""The match_node_rules decider is the Decider of match_node."""
+	assert MatchNodeRulesDecider.QUESTION is Question.MATCH_NODE
 
 
-def test_rules_decider_scores_the_names_of_nodes_of_the_same_root():
+def test_match_node_rules_scores_the_names_of_nodes_of_the_same_root():
 	"""The score is the share of words in common of the names, whatever the branch, and 0 for another root."""
-	decider = RulesDecider({})
+	decider = MatchNodeRulesDecider({})
 	assert _match(decider, 'person', 'Elena Ruiz', 'person|teacher|Elena Ruiz')['score'] == 1.0
 	assert _match(decider, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz')['score'] == 0.5
 	assert _match(decider, 'person|student', 'Elena Ruiz', 'person|teacher|Elena Ruiz')['score'] == 1.0
@@ -104,66 +104,66 @@ def test_rules_decider_scores_the_names_of_nodes_of_the_same_root():
 	assert _match(decider, 'person', 'Person', 'person|teacher|Teacher')['score'] == 0
 
 
-def test_rules_decider_answers_same_from_its_threshold_on():
+def test_match_node_rules_answers_same_from_its_threshold_on():
 	"""A score from "same_node_threshold" on (0.3 by default) is the same node."""
-	assert _match(RulesDecider({}), 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz') == {'score': 0.5, 'same': True}
-	strict = RulesDecider({'same_node_threshold': 0.6})
+	assert _match(MatchNodeRulesDecider({}), 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz') == {'score': 0.5, 'same': True}
+	strict = MatchNodeRulesDecider({'same_node_threshold': 0.6})
 	assert _match(strict, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz') == {'score': 0.5, 'same': False}
-	assert _match(RulesDecider({'same_node_threshold': 0.5}), 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz')['same'] is True
+	assert _match(MatchNodeRulesDecider({'same_node_threshold': 0.5}), 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz')['same'] is True
 
 
-def test_rules_decider_ignores_the_texts():
-	"""The texts do not change the answer of the rules decider."""
-	decider = RulesDecider({})
+def test_match_node_rules_ignores_the_texts():
+	"""The texts do not change the answer of the match_node_rules decider."""
+	decider = MatchNodeRulesDecider({})
 	answer	= _match(decider, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz')
 	assert _match(decider, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz', ['Ms. Ruiz teaches science.']) == answer
 
 
-def test_rules_decider_takes_its_ignored_words():
+def test_match_node_rules_takes_its_ignored_words():
 	"""Without titles to ignore, "Ms." is a word of the name."""
-	decider = RulesDecider({'ignored_words': []})
+	decider = MatchNodeRulesDecider({'ignored_words': []})
 	assert _match(decider, 'person|teacher', 'Ms. Ruiz', 'person|teacher|Elena Ruiz')['score'] == pytest.approx(1/3)
 
 
 # GLiNER2 Deciders: loading the model
 
 
-def test_gliner_deciders_answer_their_questions():
+def test_gliner2_deciders_answer_their_questions():
 	"""Each GLiNER2 Decider answers its question."""
-	assert GlinerNodesDecider.QUESTION is Question.EXTRACT_NODES
-	assert GlinerEdgesDecider.QUESTION is Question.EXTRACT_EDGES
+	assert ExtractNodesGliner2Decider.QUESTION is Question.EXTRACT_NODES
+	assert ExtractEdgesGliner2Decider.QUESTION is Question.EXTRACT_EDGES
 
 
-def test_gliner_decider_loads_its_model_with_the_options_that_are_not_null(gliner):
+def test_gliner2_decider_loads_its_model_with_the_options_that_are_not_null(gliner):
 	"""ready() loads the model, passing only the options that are not null."""
-	decider = GlinerNodesDecider({'model': 'dummy', 'map_location': 'cpu', 'quantize': True, 'compile': None})
+	decider = ExtractNodesGliner2Decider({'model': 'dummy', 'map_location': 'cpu', 'quantize': True, 'compile': None})
 	assert decider.ready() == []
 	assert DummyModel.loaded == [('dummy', {'map_location': 'cpu', 'quantize': True})]
 	assert type(decider.model) is DummyModel
 
 
-def test_gliner_decider_requires_a_model(gliner):
+def test_gliner2_decider_requires_a_model(gliner):
 	"""Without "model", the Decider is not ready."""
-	assert GlinerEdgesDecider({}).ready() == ['"model" is missing in the configuration.']
+	assert ExtractEdgesGliner2Decider({}).ready() == ['"model" is missing in the configuration.']
 
 
-def test_gliner_decider_requires_gliner2(monkeypatch):
+def test_gliner2_decider_requires_gliner2(monkeypatch):
 	"""Without GLiNER2 installed, the Decider is not ready."""
 	monkeypatch.setitem(sys.modules, 'gliner2', None)
-	problems = GlinerNodesDecider({'model': 'dummy'}).ready()
+	problems = ExtractNodesGliner2Decider({'model': 'dummy'}).ready()
 	assert len(problems) == 1 and 'GLiNER2 is not installed' in problems[0]
 
 
-def test_gliner_decider_reports_a_model_that_cannot_be_loaded_and_restores_logging(gliner):
+def test_gliner2_decider_reports_a_model_that_cannot_be_loaded_and_restores_logging(gliner):
 	"""A model that fails to load is a problem, and the logs silenced while loading are restored."""
 	DummyModel.fail_loading = True
 	previous = logging.root.manager.disable
-	problems = GlinerNodesDecider({'model': 'dummy'}).ready()
+	problems = ExtractNodesGliner2Decider({'model': 'dummy'}).ready()
 	assert problems == ['Failed to load model "dummy": cannot load']
 	assert logging.root.manager.disable == previous
 
 
-# GlinerNodesDecider
+# ExtractNodesGliner2Decider
 
 
 def _found(*matches):
@@ -175,14 +175,14 @@ def _found(*matches):
 
 
 def _extract_nodes(found, entities = ('person', 'place')):
-	"""Return the GlinerNodesDecider and its output when its model finds the given entities, with an ontology of the given types."""
-	decider = GlinerNodesDecider({'model': 'dummy'})
+	"""Return the ExtractNodesGliner2Decider and its output when its model finds the given entities, with an ontology of the given types."""
+	decider = ExtractNodesGliner2Decider({'model': 'dummy'})
 	decider.model = DummyModel(entities = found)
 	nodes = decider.run({'text': 'Some text.', 'ontology': _ontology(entities)})
 	return decider, nodes
 
 
-def test_gliner_nodes_asks_the_model_for_the_types_of_the_ontology():
+def test_extract_nodes_gliner2_asks_the_model_for_the_types_of_the_ontology():
 	"""The model is given every type of the ontology, named by its id and described by its definition."""
 	decider, nodes = _extract_nodes({})
 	assert nodes == []
@@ -190,7 +190,7 @@ def test_gliner_nodes_asks_the_model_for_the_types_of_the_ontology():
 	assert decider.model.entity_schema == {'person': 'Definition of person.', 'place': 'Definition of place.'}
 
 
-def test_gliner_nodes_returns_one_node_per_mention():
+def test_extract_nodes_gliner2_returns_one_node_per_mention():
 	"""Every mention is a node with its type and confidence, in the order the model found them."""
 	found = _found(('person|teacher', 'Elena Ruiz', 0.9), ('organization|school', 'Riverside School', 0.8))
 	assert _extract_nodes(found)[1] == [
@@ -199,37 +199,37 @@ def test_gliner_nodes_returns_one_node_per_mention():
 	]
 
 
-def test_gliner_nodes_gives_a_mention_the_most_specific_compatible_type():
+def test_extract_nodes_gliner2_gives_a_mention_the_most_specific_compatible_type():
 	"""A mention found as a type and its ancestor is one node with the most specific type, even if it is less confident."""
 	found = _found(('person', 'Ms. Ruiz', 0.95), ('person|teacher', 'Ms. Ruiz', 0.7))
 	assert _extract_nodes(found)[1] == [{'mention': 'Ms. Ruiz', 'type': 'person|teacher', 'confidence': 0.7}]
 
 
-def test_gliner_nodes_discards_the_types_of_other_branches():
+def test_extract_nodes_gliner2_discards_the_types_of_other_branches():
 	"""Types that are neither ancestors nor descendants of the most confident one are discarded."""
 	found = _found(('person|student', 'Lucas Moreno', 0.98), ('person|teacher', 'Lucas Moreno', 0.99), ('person', 'Lucas Moreno', 0.9))
 	assert _extract_nodes(found)[1] == [{'mention': 'Lucas Moreno', 'type': 'person|teacher', 'confidence': 0.99}]
 
 
-def test_gliner_nodes_breaks_ties_between_equally_specific_types_by_confidence():
+def test_extract_nodes_gliner2_breaks_ties_between_equally_specific_types_by_confidence():
 	"""When the most confident type is an ancestor of several equally specific types, the most confident of them is chosen."""
 	found = _found(('person', 'Noah', 0.9), ('person|teacher', 'Noah', 0.6), ('person|student', 'Noah', 0.8))
 	assert _extract_nodes(found)[1] == [{'mention': 'Noah', 'type': 'person|student', 'confidence': 0.8}]
 
 
-def test_gliner_nodes_keeps_the_first_of_equally_specific_and_confident_types():
+def test_extract_nodes_gliner2_keeps_the_first_of_equally_specific_and_confident_types():
 	"""Between equally specific types with the same confidence, the first one found is chosen."""
 	found = _found(('person', 'Noah', 0.9), ('person|teacher', 'Noah', 0.8), ('person|student', 'Noah', 0.8))
 	assert _extract_nodes(found)[1] == [{'mention': 'Noah', 'type': 'person|teacher', 'confidence': 0.8}]
 
 
-def test_gliner_nodes_keeps_the_highest_confidence_of_a_repeated_mention():
+def test_extract_nodes_gliner2_keeps_the_highest_confidence_of_a_repeated_mention():
 	"""A mention found twice with the same type is one node with the highest confidence."""
 	found = _found(('person', 'Noah', 0.6), ('person', 'Noah', 0.8))
 	assert _extract_nodes(found)[1] == [{'mention': 'Noah', 'type': 'person', 'confidence': 0.8}]
 
 
-# GlinerEdgesDecider
+# ExtractEdgesGliner2Decider
 
 
 EDGE_ENTITIES  = ('person', 'person|teacher', 'person|student', 'organization', 'organization|school', 'place')
@@ -252,14 +252,14 @@ def _span(text, confidence = 0.9):
 
 
 def _extract_edges(structures, pairs = None, relations = EDGE_RELATIONS):
-	"""Return the GlinerEdgesDecider and its output on NODES, with the given structures and pairs found by the model."""
-	decider = GlinerEdgesDecider({'model': 'dummy'})
+	"""Return the ExtractEdgesGliner2Decider and its output on NODES, with the given structures and pairs found by the model."""
+	decider = ExtractEdgesGliner2Decider({'model': 'dummy'})
 	decider.model = DummyModel(structures = structures, pairs = pairs)
 	edges = decider.run({'text': 'Some text.', 'nodes': NODES, 'ontology': _ontology(EDGE_ENTITIES, relations)})
 	return decider, edges
 
 
-def test_gliner_edges_replaces_the_mentions_by_the_ids_of_the_nodes():
+def test_extract_edges_gliner2_replaces_the_mentions_by_the_ids_of_the_nodes():
 	"""Every source and destination mention of a match is an edge between their ids, with the lowest confidence of both."""
 	structures = {'Definition of works_at|teaches_at.': [
 		{'person|teacher': [_span('Ms. Ruiz', 0.9)], 'organization|school': [_span('Riverside', 0.7)]}
@@ -272,19 +272,19 @@ def test_gliner_edges_replaces_the_mentions_by_the_ids_of_the_nodes():
 	}, True)
 
 
-def test_gliner_edges_only_asks_for_the_relations_of_the_ontology():
+def test_extract_edges_gliner2_only_asks_for_the_relations_of_the_ontology():
 	"""A filtered ontology asks only for its relations."""
 	decider, _ = _extract_edges({}, relations = (('located_in', 'place', 'place'),))
 	assert decider.model.json_request[1] == {'Definition of located_in.': ['place', 'place']}
 
 
-def test_gliner_edges_drops_ends_that_are_not_nodes_or_have_no_id():
+def test_extract_edges_gliner2_drops_ends_that_are_not_nodes_or_have_no_id():
 	"""An end that is not the mention of a node, or that is ambiguous, gives no edge."""
 	structures = {'Definition of works_at.': [{'person': [_span('Noah'), _span('Ana')], 'organization': [_span('Riverside')]}]}
 	assert _extract_edges(structures)[1] == []
 
 
-def test_gliner_edges_requires_ends_of_the_types_of_the_relation():
+def test_extract_edges_gliner2_requires_ends_of_the_types_of_the_relation():
 	"""Ends of descendant types are valid, while those of other types are not (a student does not teach)."""
 	structures = {
 		'Definition of works_at.': [{'person': [_span('Tom')], 'organization': [_span('Riverside')]}],
@@ -295,7 +295,7 @@ def test_gliner_edges_requires_ends_of_the_types_of_the_relation():
 	]
 
 
-def test_gliner_edges_keeps_the_highest_confidence_of_a_repeated_edge():
+def test_extract_edges_gliner2_keeps_the_highest_confidence_of_a_repeated_edge():
 	"""The same edge found twice is one edge with its highest confidence."""
 	structures = {'Definition of works_at.': [
 		{'person': [_span('Tom', 0.6)], 'organization': [_span('Riverside', 0.6)]},
@@ -306,7 +306,7 @@ def test_gliner_edges_keeps_the_highest_confidence_of_a_repeated_edge():
 	]
 
 
-def test_gliner_edges_drops_an_edge_when_the_same_pair_has_a_more_specific_one():
+def test_extract_edges_gliner2_drops_an_edge_when_the_same_pair_has_a_more_specific_one():
 	"""works_at is implied by works_at|teaches_at between the same nodes."""
 	structures = {
 		'Definition of works_at.': [{'person': [_span('Ms. Ruiz')], 'organization': [_span('Riverside')]}],
@@ -315,7 +315,7 @@ def test_gliner_edges_drops_an_edge_when_the_same_pair_has_a_more_specific_one()
 	assert [edge['relation'] for edge in _extract_edges(structures)[1]] == ['works_at|teaches_at']
 
 
-def test_gliner_edges_asks_for_pairs_of_relations_with_the_same_type_at_both_ends():
+def test_extract_edges_gliner2_asks_for_pairs_of_relations_with_the_same_type_at_both_ends():
 	"""The structure of place to place only tells that located_in is in the text: its direction comes from the (head, tail) pairs."""
 	structures = {'Definition of located_in.': [{'place': [_span('Rift Valley')]}, {'place': [_span('Africa')]}]}
 	pairs = {'located_in': [{'head': _span('Rift Valley', 0.8), 'tail': _span('Africa', 0.8)}]}
@@ -324,7 +324,7 @@ def test_gliner_edges_asks_for_pairs_of_relations_with_the_same_type_at_both_end
 	assert decider.model.relations_request == ('Some text.', {'located_in': 'Definition of located_in.'}, True)
 
 
-def test_gliner_edges_does_not_ask_for_pairs_when_no_relation_needs_them():
+def test_extract_edges_gliner2_does_not_ask_for_pairs_when_no_relation_needs_them():
 	"""Without mentions of a relation with the same type at both ends, the model is not asked for pairs."""
 	decider, edges = _extract_edges({'Definition of located_in.': [{'place': []}]})
 	assert edges == []

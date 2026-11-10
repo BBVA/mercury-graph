@@ -8,7 +8,7 @@ from .question import Question
 MODEL_OPTIONS = ['map_location', 'quantize', 'compile']	# Passed to AutoExtractor.from_pretrained() when they are not None.
 
 
-class GlinerDecider(Decider):
+class Gliner2Decider(Decider):
 	""" The base of the [`Decider`][mercury.graph.evidence.Decider]s that answer with a GLiNER2 model. `ready()` loads the model.
 
 	Its configuration is:
@@ -97,7 +97,7 @@ def _load_model(extractor, name, options):
 	return model
 
 
-class GlinerNodesDecider(GlinerDecider):
+class ExtractNodesGliner2Decider(Gliner2Decider):
 	""" A [`Decider`][mercury.graph.evidence.Decider] for `extract_nodes` with GLiNER2 (Basic Entity Extraction).
 
 	The model is given the types of the ontology, each one named by its id and described by its definition. A mention found with
@@ -205,7 +205,7 @@ def _are_compatible(concept, other_concept):
 	return descends or ascends
 
 
-class GlinerEdgesDecider(GlinerDecider):
+class ExtractEdgesGliner2Decider(Gliner2Decider):
 	""" A [`Decider`][mercury.graph.evidence.Decider] for `extract_edges` with GLiNER2 (Structure and Relation Extraction).
 
 	The model is asked for every relation as a structure (`extract_json()`) with a field for each end, named by its type. A relation

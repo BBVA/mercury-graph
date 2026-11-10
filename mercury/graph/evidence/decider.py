@@ -124,7 +124,7 @@ class Decider(ABC):
 		"""
 
 
-class RulesDecider(Decider):
+class MatchNodeRulesDecider(Decider):
 	""" A [`Decider`][mercury.graph.evidence.Decider] for `match_node` based on rules, without any model.
 
 	It compares the name of the mention with that of the node: the score is 0 if their types have different roots and the share of

@@ -2,15 +2,15 @@ from enum import Enum
 
 from .agentic import Agentic, AgenticRunInvalidRequest
 from .agentic_graph import AgenticGraph
-from .decider import RulesDecider
-from .gliner_deciders import GlinerEdgesDecider, GlinerNodesDecider
+from .decider import MatchNodeRulesDecider
+from .gliner_deciders import ExtractEdgesGliner2Decider, ExtractNodesGliner2Decider
 from .question import Question
 
 
 DECIDERS = {												# The Decider of every "decider" name in the configuration of a question.
-	'rules':		RulesDecider,
-	'gliner_nodes': GlinerNodesDecider,
-	'gliner_edges': GlinerEdgesDecider
+	'extract_nodes_gliner2': ExtractNodesGliner2Decider,
+	'match_node_rules':		 MatchNodeRulesDecider,
+	'extract_edges_gliner2': ExtractEdgesGliner2Decider
 }
 
 ARGUMENT_TYPES = {'string': str, 'array': list, 'object': dict, 'number': (int, float)}	# The Python type of every JSON type of an argument.
@@ -242,16 +242,16 @@ class Formalizer(Agentic):
 	configuration in "extra_args":
 
 	```jsonc
-	"extract_nodes": {"decider": "gliner_nodes", "extra_args": {"model": "fastino/gliner2.5-base-v1"}},
-	"match_node":	 {"decider": "rules", "extra_args": {"same_node_threshold": 0.3}},
-	"extract_edges": {"decider": "gliner_edges", "extra_args": {"model": "fastino/gliner2.5-base-v1"}}
+	"extract_nodes": {"decider": "extract_nodes_gliner2", "extra_args": {"model": "fastino/gliner2.5-base-v1"}},
+	"match_node":	 {"decider": "match_node_rules", "extra_args": {"same_node_threshold": 0.3}},
+	"extract_edges": {"decider": "extract_edges_gliner2", "extra_args": {"model": "fastino/gliner2.5-base-v1"}}
 	```
 
 	A question without a key (or with null) is not exposed. The Deciders are:
 
-	- `gliner_nodes` ([`GlinerNodesDecider`][mercury.graph.evidence.GlinerNodesDecider]) for `extract_nodes`.
-	- `gliner_edges` ([`GlinerEdgesDecider`][mercury.graph.evidence.GlinerEdgesDecider]) for `extract_edges`.
-	- `rules` ([`RulesDecider`][mercury.graph.evidence.RulesDecider]) for `match_node`.
+	- `extract_nodes_gliner2` ([`ExtractNodesGliner2Decider`][mercury.graph.evidence.ExtractNodesGliner2Decider]) for `extract_nodes`.
+	- `match_node_rules` ([`MatchNodeRulesDecider`][mercury.graph.evidence.MatchNodeRulesDecider]) for `match_node`.
+	- `extract_edges_gliner2` ([`ExtractEdgesGliner2Decider`][mercury.graph.evidence.ExtractEdgesGliner2Decider]) for `extract_edges`.
 
 	While piloting, the Formalizer creates the Decider of every question configured and calls its `ready()`. If no question is
 	configured, a Decider is unknown, answers another question, cannot be created or is not ready, every problem is logged and the
@@ -276,7 +276,7 @@ class Formalizer(Agentic):
 
 	- The extraction threshold is that of GLiNER2 (0.5): it cannot be configured.
 	- Every GLiNER2 Decider loads its own model, so the same model can be loaded twice.
-	- The only Decider of `match_node` is RulesDecider: it only compares names (it ignores the texts and the descriptions).
+	- The only Decider of `match_node` is MatchNodeRulesDecider: it only compares names (it ignores the texts and the descriptions).
 	- Pronouns and generic mentions ("she", "the club") are not resolved.
 	- The direction of the edges of a relationship with the same type at both ends depends on `extract_relations()`, which finds
 	few of them.

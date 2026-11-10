@@ -25,7 +25,7 @@
 
 			// extract_nodes: every mention of a type of the ontology in a text, with GLiNER2.
 			"extract_nodes": {
-				"decider": "gliner_nodes",
+				"decider": "extract_nodes_gliner2",
 				"extra_args": {
 					// Since August 2026, 2.5 is the current architecture (boundary architecture), use "small" (instead of "base") if
 					// you have limited resources or "multi" for multilingual support.
@@ -45,7 +45,7 @@
 
 			// match_node: whether a mention is a known instance, comparing their names with rules.
 			"match_node": {
-				"decider": "rules",
+				"decider": "match_node_rules",
 				"extra_args": {
 					// Words left out when the names are compared. These are the defaults: titles in English. Change them for documents
 					// in other languages.
@@ -60,7 +60,7 @@
 			// extract_edges: every edge of a relation of the ontology between the nodes of a text, with GLiNER2. This Decider loads
 			// its own model, so the same model is loaded twice.
 			"extract_edges": {
-				"decider": "gliner_edges",
+				"decider": "extract_edges_gliner2",
 				"extra_args": {
 					"model": "fastino/gliner2.5-base-v1",
 					"map_location": null,
