@@ -503,8 +503,8 @@ class AgenticGraph(Agentic):
 
 
 	def as_argument(self):
-		""" Returns the whole ontology as the argument 'ontology' of the questions of a
-		[`Formalizer`][mercury.graph.evidence.Formalizer], in the order of its nodes and edges.
+		""" Returns the whole ontology as the argument 'ontology' of the extracting questions of a
+		[`Formalizer`][mercury.graph.evidence.Formalizer] (`extract_nodes` and `extract_edges`), in the order of its nodes and edges.
 
 		Returns:
 			(dict or None): 'types', a list of {'id', 'definition'}, and 'relations', a list of {'id', 'src', 'dst', 'definition'}. A
@@ -1146,9 +1146,10 @@ CAPABILITIES = {
 		'returns': LIST
 	},
 	'as_argument': {
-		'description': 'Get the whole ontology "{name}" as the argument "ontology" of the questions of a Formalizer (extract_nodes, '
-					   'match_node and extract_edges): its types of entity and of relationship, with their definitions. Pass it unchanged '
-					   'as "ontology", or leave out the types and relationships you do not want the Formalizer to look for.',
+		'description': 'Get the whole ontology "{name}" as the argument "ontology" of the extracting questions of a Formalizer '
+					   '(extract_nodes and extract_edges): its types of entity and of relationship, with their definitions. Pass it '
+					   'unchanged as "ontology", or leave out the types and relationships you do not want the Formalizer to look for. For '
+					   'match_node, give the mention the "definition" of its type from these "types".',
 		'parameters': AgenticGraph.parameters([]),
 		'returns': {'type': 'object', 'description': '"types", a list of {"id", "definition"}, and "relations", a list of {"id", "src", '
 												   '"dst", "definition"}.'}

@@ -150,8 +150,8 @@ class RulesDecider(Decider):
 		the threshold.
 
 		Args:
-			arguments (dict): The arguments of `match_node`: 'mention' ({'mention', 'type', 'texts'}) and 'node' ({'id',
-				'description', 'names'}).
+			arguments (dict): The arguments of `match_node`: 'mention' ({'mention', 'type', 'definition', 'texts'}) and 'node'
+				({'id', 'description', 'names'}).
 
 		Returns:
 			(dict): 'score' (0..1) and 'same' (True when the score reaches the threshold).

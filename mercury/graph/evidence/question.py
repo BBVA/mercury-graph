@@ -22,8 +22,10 @@ class Question(Enum):
 	""" The questions a [`Formalizer`][mercury.graph.evidence.Formalizer] can answer. The value of each one is its capability: its name
 	(with a `%s` for the name of the Formalizer), its arguments and its output.
 
-	Every question takes the 'ontology' it is about (see `ONTOLOGY_PARAMETER`) and, optionally, a 'context'. A question is answered by
-	the [`Decider`][mercury.graph.evidence.Decider] configured for it, under the key of its name in lowercase (e.g., "extract_nodes").
+	Every question holds all it needs in its arguments. The extracting questions take the 'ontology' (see `ONTOLOGY_PARAMETER`), while
+	`match_node` only takes the definition of the type of the mention. Every question also takes, optionally, a 'context'. A question
+	is answered by the [`Decider`][mercury.graph.evidence.Decider] configured for it, under the key of its name in lowercase (e.g.,
+	"extract_nodes").
 	"""
 
 	EXTRACT_NODES = {
@@ -63,16 +65,16 @@ class Question(Enum):
 				'properties': {
 					'mention': {
 						'type': 'object',
-						'description': 'A mention: "mention" (the text as it appears), "type" and optionally "texts", a list of texts where it was found.'
+						'description': 'A mention: "mention" (the text as it appears), "type", "definition" (that of its type in the ontology) and '
+									   'optionally "texts", a list of texts where it was found.'
 					},
 					'node': {
 						'type': 'object',
 						'description': 'A known instance: "id", "description" and optionally "names", its other names.'
 					},
-					'ontology': ONTOLOGY_PARAMETER,
 					'context': CONTEXT_PARAMETER
 				},
-				'required': ['mention', 'node', 'ontology']
+				'required': ['mention', 'node']
 			},
 			'returns': {
 				'type': 'object',

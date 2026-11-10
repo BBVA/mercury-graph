@@ -232,8 +232,9 @@ class Formalizer(Agentic):
 	2. `match_node`: whether a mention is a known instance, as a score and a decision ("same").
 	3. `extract_edges`: every edge of a relation of the ontology between the nodes of a text.
 
-	Every question takes the 'ontology', as {'types': [{'id', 'definition'}], 'relations': [{'id', 'src', 'dst', 'definition'}]},
-	and, optionally, a 'context'.
+	`extract_nodes` and `extract_edges` take the 'ontology' (or the part of it to look for), as {'types': [{'id', 'definition'}],
+	'relations': [{'id', 'src', 'dst', 'definition'}]}. `match_node` does not: its mention comes with the 'definition' of its type,
+	looked up in the ontology by whoever asks. Every question takes, optionally, a 'context'.
 
 	## Configuration
 
@@ -401,7 +402,7 @@ class Formalizer(Agentic):
 		""" Answers `match_node`: whether a mention is a known instance.
 
 		Args:
-			arguments (dict): 'mention' ({'mention', 'type', 'texts'}), 'node' ({'id', 'description', 'names'}), 'ontology' (dict) and
+			arguments (dict): 'mention' ({'mention', 'type', 'definition', 'texts'}), 'node' ({'id', 'description', 'names'}) and
 				optionally 'context' (list).
 
 		Returns:

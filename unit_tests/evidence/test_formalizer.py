@@ -189,7 +189,7 @@ def test_formalizer_does_not_answer_when_it_is_not_ready():
 def test_formalizer_does_not_answer_a_question_it_is_not_configured_for(fake_deciders):
 	"""A question without a Decider returns None and logs why."""
 	formalizer = _formalizer(extract_nodes = {'decider': 'fake'})
-	assert formalizer.match_node({'mention': {}, 'node': {}, 'ontology': ONTOLOGY}) is None
+	assert formalizer.match_node({'mention': {}, 'node': {}}) is None
 	assert formalizer.extract_edges({'text': 'Ada', 'nodes': [], 'ontology': ONTOLOGY}) is None
 	assert 'does not answer match_node' in _errors(formalizer)[0]
 	assert 'does not answer extract_edges' in _errors(formalizer)[1]
@@ -213,6 +213,17 @@ def test_formalizer_rejects_arguments_that_are_not_those_of_the_question(fake_de
 	assert formalizer._deciders[Question.EXTRACT_NODES].asked == []
 
 
+def test_formalizer_match_node_takes_the_definition_of_the_mention_instead_of_the_ontology(fake_deciders):
+	"""match_node holds all it needs in its mention and node: the ontology is an unknown argument."""
+	formalizer = _formalizer(extract_nodes = None, match_node = {'decider': 'fake_match', 'extra_args': {'answer': {'same': True}}})
+	mention	   = {'mention': 'Ada', 'type': 'person', 'definition': 'A person.', 'texts': ['Ada wrote.']}
+	node	   = {'id': 'person|Ada Lovelace', 'description': 'A mathematician.'}
+	assert formalizer.match_node({'mention': mention, 'node': node}) == {'same': True}
+	assert formalizer.match_node({'mention': mention, 'node': node, 'ontology': ONTOLOGY}) is None
+	assert 'Unknown argument "ontology"' in _errors(formalizer)[0]
+	assert 'ontology' not in Question.MATCH_NODE.value['function']['parameters']['properties']
+
+
 def test_formalizer_close_releases_its_deciders(fake_deciders):
 	"""Closing the Formalizer drops its Deciders."""
 	formalizer = _formalizer(extract_nodes = {'decider': 'fake'})
@@ -226,7 +237,7 @@ def test_question_keys_and_capabilities():
 	assert Question.MATCH_NODE.key() == 'match_node'
 	assert capability['function']['name'] == 'match_node_GLiNER2'
 	assert Question.MATCH_NODE.value['function']['name'] == 'match_node_%s'
-	assert capability['function']['parameters']['required'] == ['mention', 'node', 'ontology']
+	assert capability['function']['parameters']['required'] == ['mention', 'node']
 
 
 TEMPLATE_ONTOLOGIES = Path(__file__).resolve().parents[2] / 'cli' / 'new_endpoint_template' / 'ontology_source'

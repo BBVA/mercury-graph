@@ -7,7 +7,8 @@ from mercury.graph.evidence.linking import find_candidates, link_mention
 from mercury.graph.evidence.question import Question
 
 
-ONTOLOGY = {'types': [], 'relations': []}
+ONTOLOGY = {'types': [{'id': 'person', 'definition': 'A human being.'}, {'id': 'person|teacher', 'definition': 'A person who teaches.'}],
+			'relations': []}
 
 KNOWN = ['person|teacher|Elena Ruiz', 'organization|school|Riverside School', 'person|student|Noah Kim', 'person|teacher|Noah Brown',
 		 'project|Helios Solar Car']
@@ -179,17 +180,25 @@ def test_link_mention_prefers_the_only_whole_name():
 	assert _link('person|teacher', 'Noah Brown') == {'mention': 'Noah Brown', 'id': 'person|teacher|Noah Brown', 'status': 'known'}
 
 
-def test_link_mention_asks_match_node_with_the_mention_the_text_and_the_ontology(same_decider):
-	"""match_node is asked about every candidate, with the mention and its text, the known instance and the ontology."""
+def test_link_mention_asks_match_node_with_the_mention_its_definition_and_text_and_the_known_instance(same_decider):
+	"""match_node is asked about every candidate, with the mention, the definition of its type in the ontology and its text, and the
+	known instance, but not the ontology."""
 	formalizer = _formalizer('same', same = ['person|student|Noah Kim'])
 	assert _link('person', 'Noah', formalizer = formalizer) == {'mention': 'Noah', 'id': 'person|student|Noah Kim', 'status': 'known'}
 	asked = formalizer._deciders[Question.MATCH_NODE].asked
 	assert asked[0] == {
-		'mention': {'mention': 'Noah', 'type': 'person', 'texts': ['Some text.']},
-		'node': {'id': 'person|student|Noah Kim', 'description': 'Description of person|student|Noah Kim.', 'names': []},
-		'ontology': ONTOLOGY
+		'mention': {'mention': 'Noah', 'type': 'person', 'definition': 'A human being.', 'texts': ['Some text.']},
+		'node': {'id': 'person|student|Noah Kim', 'description': 'Description of person|student|Noah Kim.', 'names': []}
 	}
 	assert [arguments['node']['id'] for arguments in asked] == ['person|student|Noah Kim', 'person|teacher|Noah Brown']
+
+
+def test_link_mention_gives_an_empty_definition_to_a_type_not_in_the_ontology(same_decider):
+	"""A type the ontology does not have is asked about with an empty definition."""
+	formalizer = _formalizer('same')
+	_link('person|teacher|science', 'Noah', formalizer = formalizer)
+	asked = formalizer._deciders[Question.MATCH_NODE].asked
+	assert len(asked) == 1 and asked[0]['mention']['definition'] == ''
 
 
 def test_link_mention_does_not_ask_match_node_about_the_only_whole_name(same_decider):

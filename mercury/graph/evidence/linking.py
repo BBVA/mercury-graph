@@ -91,15 +91,16 @@ def link_mention(formalizer, node, candidates, ontology, text = None):
 
 	1. Candidates with `type_conflict` are discarded unless their score is 1 (the whole name).
 	2. A single candidate with score 1 is the instance.
-	3. Otherwise, `match_node` of the Formalizer is asked about the mention (with the text) and every candidate left, and those it
-	answers "same" are kept.
+	3. Otherwise, `match_node` of the Formalizer is asked about the mention (with the definition of its type and the text) and every
+	candidate left, and those it answers "same" are kept.
 	4. None kept: the mention is new. One: it is that instance. More than one: it is ambiguous.
 
 	Args:
 		formalizer (Formalizer): A ready Formalizer that answers `match_node`.
 		node (dict): A node returned by `extract_nodes`, with 'mention' and 'type'.
 		candidates (list): Its candidates, as returned by `find_candidates()`.
-		ontology (dict): The ontology, as the argument 'ontology' of the questions (see `AgenticGraph.as_argument()`).
+		ontology (dict): The ontology, as the argument 'ontology' of the questions (see `AgenticGraph.as_argument()`), where the
+			definition of the type of the mention is looked up (empty if it is not there).
 		text (str): The text where the mention was found, passed to `match_node`.
 
 	Returns:
@@ -112,14 +113,15 @@ def link_mention(formalizer, node, candidates, ontology, text = None):
 	if text is not None:
 		texts.append(text)
 
-	mention = {'mention': node['mention'], 'type': node['type'], 'texts': texts}
-	viable	= _viable_candidates(candidates)
-	whole	= _whole_name_candidates(viable)
+	definition = _type_definition(ontology, node['type'])
+	mention	   = {'mention': node['mention'], 'type': node['type'], 'definition': definition, 'texts': texts}
+	viable	   = _viable_candidates(candidates)
+	whole	   = _whole_name_candidates(viable)
 
 	if len(whole) == 1:
 		accepted = whole
 	else:
-		accepted = _confirm_candidates(formalizer, mention, viable, ontology)
+		accepted = _confirm_candidates(formalizer, mention, viable)
 
 	result = _build_link(node, accepted)
 
@@ -150,13 +152,23 @@ def _whole_name_candidates(candidates):
 	return whole
 
 
-def _confirm_candidates(formalizer, mention, candidates, ontology):
+def _type_definition(ontology, concept):
+	""" Returns the definition of a type in the ontology argument, or an empty string if the type is not there. """
+
+	for entry in ontology['types']:
+		if entry['id'] == concept:
+			return entry['definition']
+
+	return ''
+
+
+def _confirm_candidates(formalizer, mention, candidates):
 	""" Returns the candidates that `match_node` of the Formalizer answers "same" for the mention. """
 
 	result = []
 	for candidate in candidates:
 		known_node = {'id': candidate['id'], 'description': candidate['description'], 'names': candidate['names']}
-		arguments  = {'mention': mention, 'node': known_node, 'ontology': ontology}
+		arguments  = {'mention': mention, 'node': known_node}
 		answer	   = formalizer.match_node(arguments)
 		if answer is not None and answer['same']:
 			result.append(candidate)
