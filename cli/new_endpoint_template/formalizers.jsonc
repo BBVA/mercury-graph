@@ -10,59 +10,31 @@
 //
 
 	// You can have more than one Formalizer in an Endpoint, but an EvidenceGraph only uses one. Multiple formalizers could be used
-	// by Agents or more than one EvidenceGraph. You can also share one Formalizer in different Agents or EvidenceGraphs but make sure
-	// the ontology remains consistent. The Formalizer itself has no state other than this configuration.
+	// by Agents or more than one EvidenceGraph. You can also share one Formalizer in different Agents or EvidenceGraphs. The Formalizer
+	// itself has no state other than this configuration: it has no ontology, which is given in the arguments of every question.
 	"GLiNER2": {
 		"name": "GLiNER2",
 
 		// "extra_args" is given to the formalizer's constructor.
 		"extra_args": {
 			// The description will be exposed in the Formalizer's Agentic API. It can be a string or a list of strings.
-			"description": "This Agentic Formalizer extracts entities and relationships from text.",
+			"description": "This Agentic Formalizer extracts entities and relationships from text and matches entities.",
 
-			"model": {
-				// This is mandatory to support other technologies in the future.
-				"library": "gliner2",
+			// Every question the Formalizer answers has a key: "extract_nodes", "match_node" and "extract_edges" that connects
+			// it to the appropriate Decider. You can set it to null, in which case the question will not be exposed by the Formalizer.
 
-				// Since August 2026, 2.5 is the current architecture (boundary architecture), use "small" (instead of "base") if you have
-				// limited resources or "multi" for multilingual support.
-				"model": "fastino/gliner2.5-base-v1",
+			// extract_nodes: every mention of a type of the ontology in a text, with GLiNER2.
+			"extract_nodes": "NodesGLiNER2",
 
-				// Use these options with care! If not null, they will be passed to AutoExtractor.from_pretrained() as arguments.
-				// "map_location": "cuda" may actually slow down and interfere with the Agent's use of the GPU.
-				"map_location": null,
+			// extract_edges: every edge of a relation of the ontology between the nodes of a text.
+			"extract_edges": "EdgesGLiNER2",
 
-				// This may only work on the GPU, set it to true if you know what you are doing.
-				"quantize": null,
+			// match_node: whether a mention is a known instance, comparing their names with rules.
+			"match_node": "MatchNodeLaya"
 
-				// This may only work on the GPU, set it to true if you know what you are doing.
-				"compile": null
-			},
-
-			// The AgenticGraph the Formalizer uses as its ontology (mandatory). The key is the role and the value is the "name" of that
-			// AgenticGraph in ontologies.jsonc (both happen to be "ontology" in this template). It must also be in "tools".
-			"ontology": "ontology",
-
-			// Words left out when the name of a mention is compared with those of the known instances to find its candidates (e.g., "Ms.
-			// Ruiz" with "Elena Ruiz"). These are the defaults: titles in English. Change them for documents in other languages.
-			"ignored_words": ["mr", "mrs", "ms", "miss", "dr", "prof"],
-
-			// The Decider answers whether a mention is a known instance and which one of several candidates it is. "type" chooses it
-			// and the rest of this section is its configuration. "rules" (the default) compares names and never chooses between
-			// several candidates.
-			"decider": {
-				"type": "rules",
-
-				// Words the rules decider leaves out when it compares names. These are the defaults, as in "ignored_words" above.
-				"ignored_words": ["mr", "mrs", "ms", "miss", "dr", "prof"],
-
-				// The score (0..1) of is_same_node from which a mention that is only part of the name of a known instance is linked
-				// to it (e.g., "Ms. Ruiz" has 0.5 with "Elena Ruiz"). Each Decider has its own default: this is that of "rules".
-				"same_node_threshold": 0.3
-			}
 		},
 
-		// "tools" is an argument for the Endpoint to serve these tools to the Formalizer. This must include the name in "ontology".
-		"tools": ["ontology"]
+		// Provide the names of the Deciders so that the Endpoint will provide them to the Formalizer.
+		"tools": ["NodesGLiNER2", "EdgesGLiNER2", "MatchNodeLaya"]
 	}
 }

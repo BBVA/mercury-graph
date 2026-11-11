@@ -1,0 +1,65 @@
+{
+// NOTE on EDITING:
+// ----------------
+// jsonc is JSON with comments. All comments are full line starting with //. The entire line is removed before parsing.
+// You can safely use // inside a url just not at the start of a line.
+//
+// Nesting from external files:
+// ----------------------------
+// You can use the special key "$ref" to include a JSON file from the local filesystem. The value of "$ref" is a relative path to the file.
+//
+
+	// A Decider is a model that answers one specific question from the questions supported by the Formalizer. The Formalizer delegates
+	// the question to the appropriate Decider. In this file, we define all the available Deciders.
+	"NodesGLiNER2": {
+		// The name of the Decider, used for identification within the system.
+		"name": "NodesGLiNER2",
+
+		// This is a class in mercury.graph.evidence.deciders (You can use custom Agentics too.)
+		"class_name": "XNodesGl2Decider",
+
+		"extra_args": {
+			// The description will be exposed via the Agentic API. It can be a string or a list of strings.
+			"description": "This Decider extracts entities from text using the GLiNER2 model.",
+
+			// Since August 2026, 2.5 is the current architecture (boundary architecture), use "small" (instead of "base") if
+			// you have limited resources or "multi" for multilingual support.
+			"model": "fastino/gliner2.5-base-v1",
+
+			// Use these options with care! If not null, they will be passed to AutoExtractor.from_pretrained() as arguments.
+			// "map_location": "cuda" may actually slow down and interfere with the Agent's use of the GPU.
+			"map_location": null,
+
+			// This may only work on the GPU, set it to true if you know what you are doing.
+			"quantize": null,
+
+			// This may only work on the GPU, set it to true if you know what you are doing.
+			"compile": null
+		},
+		// A Decider does not use other Agentic tools directly. This should be null.
+		"tools": null
+	},
+	"EdgesGLiNER2": {
+		"name": "EdgesGLiNER2",
+
+		"class_name": "XEdgesGl2Decider",
+
+		"extra_args": {
+			"description": "This Decider extracts relationships from text using the GLiNER2 model.",
+			"model": "fastino/gliner2.5-base-v1",
+			"map_location": null,
+			"quantize": null,
+			"compile": null
+		},
+		"tools": null
+	},
+	"MatchNodeLaya": {
+		"name": "MatchNodeLaya",
+		"class_name": "MatchNodeLayaDecider",
+
+		"extra_args": {
+			"description": "This Decider matches a node against known instances using the Laya rules."
+		},
+		"tools": null
+	}
+}

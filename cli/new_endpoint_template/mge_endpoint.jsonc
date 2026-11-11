@@ -22,6 +22,9 @@
 	"ontologies": {
 		"$ref": "./ontologies.jsonc"
 	},
+	"deciders": {
+		"$ref": "./deciders.jsonc"
+	},
 	"formalizers": {
 		"$ref": "./formalizers.jsonc"
 	},
