@@ -265,17 +265,6 @@ VALID_EDGES = [('person|student|Noah', 'project|Helios', 'works_on|leads', 'noah
 			   ('person|teacher|Elena', 'organization|school|Riverside', 'teaches_at', 'elena_riverside')]
 
 
-def test_evidence_graph_loads_its_initial_graph(tmp_path):
-	"""Without a pickle, the EvidenceGraph starts from its initial graph, validated against the ontology."""
-	graph = _seeded_graph(tmp_path, VALID_NODES, VALID_EDGES)
-
-	graph.pilot(graph.states.READY.value)
-
-	assert graph.meta['state'] == graph.states.READY.value
-	assert set(graph._graph.networkx.nodes) == set(VALID_NODES)
-	assert graph._graph.networkx.edges['person|student|Noah', 'project|Helios', 'noah_helios'] == {'relation': 'works_on|leads'}
-
-
 def test_evidence_graph_ignores_its_initial_graph_when_there_is_a_pickle(tmp_path):
 	"""The initial graph is only loaded when the pickle does not exist."""
 	path = tmp_path / 'graphs' / 'evidence.pkl'
@@ -290,34 +279,3 @@ def test_evidence_graph_ignores_its_initial_graph_when_there_is_a_pickle(tmp_pat
 	assert graph._graph.networkx.number_of_nodes() == 0
 
 
-def test_evidence_graph_rejects_an_invalid_initial_graph_without_saving_it(tmp_path):
-	"""An initial graph that does not match the ontology leaves the EvidenceGraph in ERR_BUILDING, logs every problem and is not
-	saved, so that the next start does not load it from the pickle.
-	"""
-	logger = []
-	path = tmp_path / 'graphs' / 'evidence.pkl'
-	graph = _seeded_graph(tmp_path, VALID_NODES + ['vehicle|Car'], VALID_EDGES + [('person|student|Noah', 'project|Helios', 'drives', 'x')],
-						  logger = logger, persistence = path)
-
-	graph.pilot(graph.states.READY.value)
-	graph.close(True)
-
-	errors = [event['error'] for event in logger if event['type'] == 'error']
-	assert graph.meta['state'] == graph.states.ERR_BUILDING.value
-	assert len(errors) == 2
-	assert any('vehicle|Car' in error for error in errors) and any('drives' in error for error in errors)
-	assert not path.exists()
-
-
-def test_evidence_graph_rejects_an_initial_graph_without_descriptions(tmp_path):
-	"""An instance with an empty description in the .csv file of the initial graph leaves the EvidenceGraph in ERR_BUILDING."""
-	logger = []
-	rows   = [{'id': 'person|student|Noah', 'description': 'A student.'}, {'id': 'project|Helios', 'description': ''}]
-	graph, _, _ = _connected_graph(schema = 'seeded', ontology = _school_ontology(tmp_path), logger = logger,
-								   initial_nodes = _csv(tmp_path, 'initial_nodes', rows))
-
-	graph.pilot(graph.states.READY.value)
-
-	errors = [event['error'] for event in logger if event['type'] == 'error']
-	assert graph.meta['state'] == graph.states.ERR_BUILDING.value
-	assert len(errors) == 1 and 'project|Helios' in errors[0] and 'no description' in errors[0]

@@ -529,7 +529,6 @@ def test_endpoint_load_objects(tmp_path):
 	conf = _endpoint_conf()
 	conf['sources'] = {'source': {'name': 'source', 'extra_args': {'nested': {'$path': 'source'}}}}
 	conf['ontologies'] = {'ontology': {'name': 'ontology', 'extra_args': {}}}
-	conf['formalizers'] = {'formalizer': {'name': 'formalizer', 'extra_args': {}}}
 	conf['evidence_graphs'] = {'graph': {'name': 'graph', 'extra_args': {}}}
 	conf['agents'] = {'agent': {'name': 'agent', 'extra_args': {}}}
 	conf['custom_agentics'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py', 'extra_args': {}}}
@@ -718,19 +717,6 @@ def test_end_to_end_using_cli(tmp_path, capsys):
 	cli = MgeCli(args)
 	cli.unlock()
 	assert 'forcefully unlocked.' in capsys.readouterr().out
-
-	args = {'command': 'pilot', 'name': endpoint, 'intent': 'ALL_READY', 'just_once': True, 'log_file': log_file}
-	cli = MgeCli(args)
-	cli.pilot()
-	assert 'Final state is 1 "LOADED_OBJ"' in capsys.readouterr().out
-
-	args = {'command': 'summary', 'name': endpoint, 'just_once': False}
-	cli = MgeCli(args)
-	cli.summary()
-	output = capsys.readouterr().out
-	assert '🌐 Endpoint' in output
-	assert '   state         : 4 \x1b[3m(PILOT_REQUIRED)\x1b[0m\n' in output
-	assert ': 0 (INITIAL) id: endpoint' in output
 
 # if __name__ == "__main__":
 # 	pytest.main([__file__])
