@@ -718,5 +718,6 @@ def test_end_to_end_using_cli(tmp_path, capsys):
 	cli.unlock()
 	assert 'forcefully unlocked.' in capsys.readouterr().out
 
+
 # if __name__ == "__main__":
 # 	pytest.main([__file__])

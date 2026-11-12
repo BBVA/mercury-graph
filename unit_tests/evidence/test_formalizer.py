@@ -983,5 +983,5 @@ def test_formalizer_pilot_fails_with_an_invalid_ontology(monkeypatch, tmp_path):
 	assert _mentions(logged, 'drives|fast', 'drives')
 
 
-if __name__ == "__main__":
-	pytest.main([__file__])
+# if __name__ == "__main__":
+# 	pytest.main([__file__])

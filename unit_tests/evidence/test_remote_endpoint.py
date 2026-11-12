@@ -448,3 +448,7 @@ def test_remote_endpoint_dry_run_does_not_check_arguments(monkeypatch):
 	endpoint.dry_run('answer', {})
 
 	assert json.loads(requests[0].data) == {'name': 'answer', 'arguments': {}}
+
+
+# if __name__ == "__main__":
+# 	pytest.main([__file__])

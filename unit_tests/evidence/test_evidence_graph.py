@@ -279,3 +279,5 @@ def test_evidence_graph_ignores_its_initial_graph_when_there_is_a_pickle(tmp_pat
 	assert graph._graph.networkx.number_of_nodes() == 0
 
 
+# if __name__ == "__main__":
+# 	pytest.main([__file__])
