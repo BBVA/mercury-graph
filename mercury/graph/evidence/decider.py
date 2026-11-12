@@ -1,190 +1,203 @@
-import re, unicodedata
+from copy import deepcopy
+from enum import Enum
 
-from abc import ABC, abstractmethod
-
+from .agentic import Agentic
 from .agentic_graph import AgenticGraph
 
 
-IGNORED_WORDS = ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof']	# Default "ignored_words": titles left out when comparing names.
+class DeciderState(Enum):
+	""" The `DeciderState` is an enumeration that defines all possible states of a Decider. """
+
+	ERR_MODEL_INIT		= -1	# Something failed loading the model.
+
+	INITIAL				=  0	# The initial state of the decider.
+	MODEL_LOADED_OK		=  1	# The model was loaded successfully.
+
+	READY				=  100	# The decider is ready to be queried.
 
 
-def compare_names(index, other, ignored_words):
-	""" Returns the share of significant words in common between the names of two ids, or 0 if their types have different roots.
+ONTOLOGY_PARAMETER = {
+	'type': 'object',
+	'description': 'The ontology, or the part of it to use: "types", a list of {"id", "definition"} (e.g., "person|teacher"), and '
+				   '"relations", a list of {"id", "src", "dst", "definition"}.'
+}
 
-	The words of the types of both ids, possessives, accents and the ignored words are left out.
+CONTEXT_PARAMETER = {
+	'type': 'array',
+	'items': {
+		'type': 'object'
+	},
+	'description': 'Optional context of the question (e.g., where the text comes from), built by the caller.'
+}
 
-	Args:
-		index (str): An id, a type followed by a name (e.g., `person|teacher|Ms. Ruiz`).
-		other (str): The other id.
-		ignored_words (list): The words left out of both names (e.g., titles).
 
-	Returns:
-		(float): A score in [0..1], 1.0 when all the significant words are in common.
+class Question(Enum):
+	""" The questions a [`Formalizer`][mercury.graph.evidence.Formalizer] can answer. The value of each one is its capability: its name
+	(with a `%s` for the name of the Formalizer), its arguments and its output.
+
+	Every question holds all it needs in its arguments. The extracting questions take the 'ontology' (see `ONTOLOGY_PARAMETER`), while
+	`match_node` only takes the definition of the type of the mention. Every question also takes, optionally, a 'context'. A question
+	is answered by the [`Decider`][mercury.graph.evidence.Decider] configured for it, under the key of its name in lowercase (e.g.,
+	"extract_nodes").
 	"""
 
-	concept		  = AgenticGraph.parent_of(index)
-	other_concept = AgenticGraph.parent_of(other)
-	if not _have_same_root(concept, other_concept):
-		return 0
+	EXTRACT_NODES = {
+		'type': 'function',
+		'function': {
+			'name': 'extract_nodes_%s',
+			'description': 'Identify the mentions of the types of an ontology in a text.',
+			'parameters': {
+				'type': 'object',
+				'properties': {
+					'text': {
+						'type': 'string',
+						'description': 'Text from which to identify nodes.'
+					},
+					'ontology': ONTOLOGY_PARAMETER,
+					'context': CONTEXT_PARAMETER
+				},
+				'required': ['text', 'ontology']
+			},
+			'returns': {
+				'type': 'array',
+				'items': {
+					'type': 'object',
+					'description': 'One node per mention, with "mention" (the text as it appears), "type" and "confidence".'
+				}
+			}
+		}
+	}
 
-	ignored		= set(ignored_words)
-	generic		= _get_words(concept) | _get_words(other_concept)
-	words		= _get_significant_words(index.rsplit('|', 1)[1], generic, ignored)
-	other_words = _get_significant_words(other.rsplit('|', 1)[1], generic, ignored)
+	MATCH_NODE = {
+		'type': 'function',
+		'function': {
+			'name': 'match_node_%s',
+			'description': 'Decide whether a mention is a known instance (a node, as a "type|name" id).',
+			'parameters': {
+				'type': 'object',
+				'properties': {
+					'mention': {
+						'type': 'object',
+						'description': 'A mention: "mention" (the text as it appears), "type", "definition" (that of its type in the ontology) and '
+									   'optionally "texts", a list of texts where it was found.',
+						'required': ['mention', 'type', 'definition']
+					},
+					'node': {
+						'type': 'object',
+						'description': 'A known instance: "id", "description" and optionally "names", its other names.',
+						'required': ['id', 'description']
+					},
+					'context': CONTEXT_PARAMETER
+				},
+				'required': ['mention', 'node']
+			},
+			'returns': {
+				'type': 'object',
+				'description': '"score" (0..1), how likely the mention is the known instance, and "same", whether it is.'
+			}
+		}
+	}
 
-	result = _jaccard(words, other_words)
-
-	return result
-
-
-def _have_same_root(concept, other_concept):
-	""" Returns True if both types are under the same root type (person|teacher and person|student are). """
-
-	if concept is None or other_concept is None:
-		return False
-
-	return concept.split('|')[0] == other_concept.split('|')[0]
-
-
-def _get_significant_words(name, generic, ignored):
-	""" Returns the words of a name without possessives, the generic words (those of the types) and the ignored words. """
-
-	without_possessives = re.sub("['’]s\\b", '', name)
-
-	result = _get_words(without_possessives) - generic - ignored
-
-	return result
-
-
-def _get_words(text):
-	""" Returns the set of lowercase words of a text, without accents (`|` and `_` separate words). """
-
-	decomposed = unicodedata.normalize('NFKD', text.lower())
-	plain	   = ''.join(char for char in decomposed if not unicodedata.combining(char))
-
-	result = set(re.findall('[^\\W_]+', plain))
-
-	return result
-
-
-def _jaccard(words, other_words):
-	""" Returns the share of words in common between two sets of words (0 if both are empty). """
-
-	every = words | other_words
-
-	if len(every) == 0:
-		return 0
-
-	result = len(words & other_words)/len(every)
-
-	return result
-
-
-class Decider(ABC):
-	""" A Decider answers the questions of a [`Formalizer`][mercury.graph.evidence.Formalizer] about the nodes it finds: whether a
-	mention is a known instance and which one of several candidates it is.
-
-	The Formalizer gathers the context (the mention, its type, the definitions of the ontology and the texts) and the Decider only
-	decides: how it asks its model (or applies its rules) is up to each implementation.
-
-	The arguments are:
-
-	- A mention: a dictionary with 'mention' (the text as it appears), 'type' (its type in the ontology), 'type_definition'
-	(the definition of its type in the ontology) and 'texts' (a list of the texts where it was found). A mention has no id: ids are
-	given by the EvidenceGraph.
-	- A node (a known instance): a dictionary with 'id' (its type followed by its name, e.g., `person|teacher|Elena Ruiz`),
-	'type_definition' (the definition of its type in the ontology), 'description' (what tells it apart from other instances, e.g.,
-	"A science teacher at Riverside High School.") and 'names' (a list of its other names, besides the one in its id).
-
-	A Decider is created by the Formalizer while piloting, with the "decider" section of its configuration (without "type"), and the
-	Formalizer only uses it if `ready()` finds no problem. A Decider that needs an external library imports it in `ready()`.
-
-	The scores of `is_same_node()` mean different things for each Decider, so each one has its own threshold: the score from which
-	a candidate is accepted as the instance of a mention. It is "same_node_threshold" in the configuration and, without it, the
-	`SAME_NODE_THRESHOLD` of the class.
-
-	Args:
-		conf (dict): The configuration of the Decider.
-	"""
-
-	SAME_NODE_THRESHOLD = 0.5	# Default "same_node_threshold": the is_same_node() score from which a candidate is accepted.
-
-	def __init__(self, conf):
-		self.conf	   = conf
-		self.threshold = conf.get('same_node_threshold', self.SAME_NODE_THRESHOLD)
-
-
-	def ready(self):
-		""" Checks that the Decider can be used (e.g., that its model is installed and loaded).
-
-		Returns:
-			(list): A list of strings, one for each problem found. It is empty if the Decider is ready.
-		"""
-
-		return []
+	EXTRACT_EDGES = {
+		'type': 'function',
+		'function': {
+			'name': 'extract_edges_%s',
+			'description': 'Identify the edges of the relations of an ontology between the nodes of a text.',
+			'parameters': {
+				'type': 'object',
+				'properties': {
+					'text': {
+						'type': 'string',
+						'description': 'Text from which to identify edges.'
+					},
+					'nodes': {
+						'type': 'array',
+						'items': {
+							'type': 'object',
+							'required': ['mention', 'id']
+						},
+						'description': 'The nodes of the text, with "mention" and "id".'
+					},
+					'ontology': ONTOLOGY_PARAMETER,
+					'context': CONTEXT_PARAMETER
+				},
+				'required': ['text', 'nodes', 'ontology']
+			},
+			'returns': {
+				'type': 'array',
+				'items': {
+					'type': 'object',
+					'description': 'One edge with "src", "relation", "dst" (ids) and "confidence".'
+				}
+			}
+		}
+	}
 
 
-	@abstractmethod
-	def is_same_node(self, mention, node):
-		""" Scores how likely a mention is a known instance.
+	@classmethod
+	def capability(cls, question, name):
+		""" Returns the capability for a valid question key completed with the given name.
 
 		Args:
-			mention (dict): The mention (see the class).
-			node (dict): The known instance (see the class).
+			question (str): The key of the question to get the capability for. E.g. 'EXTRACT_EDGES'
+			name (str): The name to complete the capability with. E.g. 'my_decider' makes the previous example 'extract_edges_my_decider'
 
 		Returns:
-			(float): A score in [0..1].
+			(dict): The capability dictionary for the given question and name. Or None if the question key is invalid.
 		"""
+		member = cls.__members__.get(question)
+		if not member:
+			return None
+
+		capability = deepcopy(member.value)
+		capability['function']['name'] = capability['function']['name'] % name
+
+		return capability
 
 
-	@abstractmethod
-	def choose_node(self, mention, nodes):
-		""" Chooses which of several known instances a mention is.
+class Decider(Agentic):
+	""" A Decider answers one specific type of question of those enumerated in the Question class.
 
-		Args:
-			mention (dict): The mention (see the class).
-			nodes (list): The candidate known instances (see the class).
-
-		Returns:
-			(str): The id of the chosen node, or None if none of them can be chosen.
-		"""
-
-
-class RulesDecider(Decider):
-	""" A [`Decider`][mercury.graph.evidence.Decider] based on rules, without any model.
-
-	- `is_same_node()` compares the name of the mention with that of the node, as `hint_nodes` does with its candidates: 0 if their
-	types have different roots and the share of significant words in common otherwise. The texts, the definitions, the descriptions
-	and the other names are not used.
-	- `choose_node()` never chooses: it returns None.
-
-	Its configuration accepts "ignored_words", the words left out of the names (titles by default), and "same_node_threshold" (0.3
-	by default, which accepts "Ms. Ruiz" as "Elena Ruiz" with a score of 0.5).
+	Args:
+		schema (str): a schema (a unique name) to use for the Decider's ID.
+		extra_args (dict): the configuration for the Decider.
+		endpoint (Agentic): an optional Endpoint. It becomes part of the Decider's ID and is available via `self.endpoint`. If not
+			provided, the Decider becomes its own Endpoint.
+		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
 
-	SAME_NODE_THRESHOLD = 0.3
+	def __init__(self, schema, extra_args, endpoint = None, logger = None):
+		super().__init__(my_class = 'decider', schema = schema, endpoint = endpoint, logger = logger)
 
-	def is_same_node(self, mention, node):
-		""" Returns the share of significant words in common between the names of the mention and the node.
+		if schema is None:			# This allows finding out the class name (to link tools) without actually instantiating a full object.
+			return
 
-		(See [`Decider.is_same_node()`][mercury.graph.evidence.Decider.is_same_node].)
+		self.states = DeciderState
+
+		self.conf = extra_args
+		self.name = schema
+		self.question = None		# This must be overridden by subclasses.
+
+		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
+
+
+	def _meta(self):
+		""" Returns the metadata of the Agent.
+
+			(See [`Agentic.meta()`][mercury.graph.evidence.Agentic.meta].)
 		"""
 
-		index	= '%s|%s' % (mention['type'], mention['mention'])
-		ignored = self.conf.get('ignored_words', IGNORED_WORDS)
+		meta = {}
+		meta['state'] = DeciderState.INITIAL.value
 
-		result = compare_names(index, node['id'], ignored)
+		meta['description'] = self.conf.get('description', '')
+		if type(meta['description']) is list:
+			meta['description'] = '\n'.join(meta['description'])
 
-		return result
+		meta['capabilities'] = []
 
+		cap = Question.capability(self.question, self.name)
+		if cap is not None:
+			meta['capabilities'].append(cap)
 
-	def choose_node(self, mention, nodes):
-		""" Returns None: rules cannot choose between candidates.
-
-		(See [`Decider.choose_node()`][mercury.graph.evidence.Decider.choose_node].)
-		"""
-
-		return None
-
-
-DECIDERS = {'rules': RulesDecider}	# The Decider of every "type" in the "decider" section of the configuration of a Formalizer.
+		return meta
