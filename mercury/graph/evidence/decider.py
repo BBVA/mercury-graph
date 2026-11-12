@@ -32,13 +32,12 @@ CONTEXT_PARAMETER = {
 
 
 class Question(Enum):
-	""" The questions a [`Formalizer`][mercury.graph.evidence.Formalizer] can answer. The value of each one is its capability: its name
-	(with a `%s` for the name of the Formalizer), its arguments and its output.
+	""" The questions a [`Decider`][mercury.graph.evidence.Decider] can answer.
 
-	Every question holds all it needs in its arguments. The extracting questions take the 'ontology' (see `ONTOLOGY_PARAMETER`), while
-	`match_node` only takes the definition of the type of the mention. Every question also takes, optionally, a 'context'. A question
-	is answered by the [`Decider`][mercury.graph.evidence.Decider] configured for it, under the key of its name in lowercase (e.g.,
-	"extract_nodes").
+	It is an enumeration of capabilities a Decider must expose. They are identified by a key (such as `EXTRACT_NODES`) and you can
+	create a valid capability by calling the `capability()` method with this key and the name of the Decider.
+
+	The capabilities are in the format expected by the Agentic interface which is also usable as tools by the OpenAI/litellm API.
 	"""
 
 	EXTRACT_NODES = {
@@ -140,7 +139,7 @@ class Question(Enum):
 
 		Args:
 			question (str): The key of the question to get the capability for. E.g. 'EXTRACT_EDGES'
-			name (str): The name to complete the capability with. E.g. 'my_decider' makes the previous example 'extract_edges_my_decider'
+			name (str): The name to complete the capability with. E.g. 'my_decider' makes the previous example 'extract_edges_my_decider'.
 
 		Returns:
 			(dict): The capability dictionary for the given question and name. Or None if the question key is invalid.
@@ -157,6 +156,30 @@ class Question(Enum):
 
 class Decider(Agentic):
 	""" A Decider answers one specific type of question of those enumerated in the Question class.
+
+	## Overview
+
+	It is typically a wrapper serializing the I/O and calling an ML model. It is the model that answers one of the questions in Question.
+	You can have any number of Deciders in an Endpoint (from evidence.deciders of custom implementations). Each Formalizer only
+	supports one or none Decider for each of the questions. An EvidenceGraph only supports one Formalizer. An Endpoint supports
+	any number of EvidenceGraphs. The Endpoint can also expose the capabilities of any of the Deciders if configured to do so.
+
+	## Implementing a Decider
+
+	This minimalistic class is abstract because it does not implement the mandatory `_run()` and `_dry_run()` methods of Agentic.
+
+	It does implement the `_meta()` method and a constructor that probably does anything the subclass needs except setting self.question
+	to the key of the question it answers. After setting `self.question`, the subclass can call `self._meta_ = self._meta()` to update
+	its capabilities. The subclass has to implement the `_run()` and `_dry_run()` and possibly `pilot()` unless it does not have
+	any initialization and can use the always ready state provided by Agentic.
+
+	## Using a Decider
+
+	A Decider is just an Agentic defined in the configuration of an Endpoint. When the Endpoint loads the decider, it will provide it
+	with the appropriate extra arguments for its constructor. The Decider has to implement its own `pilot()` method that checks
+	for library imports, models, etc. and sets its state to either DeciderState.READY or DeciderState.FAILED.
+
+	The Decider will be called as a tool by a Formalizer that includes its name for one of its functions.
 
 	Args:
 		schema (str): a schema (a unique name) to use for the Decider's ID.
