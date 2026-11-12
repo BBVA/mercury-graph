@@ -3,7 +3,7 @@ import os, pickle
 from .agentic import Agentic, AgenticRunInvalidRequest, AgenticRunFailed
 from .source import Source
 from .agentic_graph import AgenticGraph, GraphState, MultiGraph
-from .formalizer import Formalizer, validate_initial_graph
+from .formalizer import Formalizer
 from .crawl import Crawl
 from .agent import Agent
 
