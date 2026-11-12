@@ -290,12 +290,12 @@ class EvidenceGraph(Agentic):
 		if not self._from_initial_graph:
 			return True
 
-		errors = validate_initial_graph(self._graph.networkx, self._ontology)
+		# errors = validate_initial_graph(self._graph.networkx, self._ontology)
 
-		for error in errors:
-			self.log_error('Invalid initial graph in EvidenceGraph %s: %s' % (self.id, error))
+		# for error in errors:
+		# 	self.log_error('Invalid initial graph in EvidenceGraph %s: %s' % (self.id, error))
 
-		return len(errors) == 0
+		# return len(errors) == 0
 
 
 	def crawl(self, args):
