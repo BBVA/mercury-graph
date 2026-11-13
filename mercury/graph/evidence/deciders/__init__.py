@@ -1,3 +1,4 @@
+from .gl2_decider import Gl2Decider
 from .x_nodes_gl2_decider import XNodesGl2Decider
 from .x_edges_gl2_decider import XEdgesGl2Decider
 from .match_node_jev_decider import MatchNodeJevDecider
