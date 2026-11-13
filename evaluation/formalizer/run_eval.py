@@ -1,19 +1,17 @@
-""" Runs the GLiNER2 Formalizer on every case of a dataset and scores its output against the expected one.
+""" Runs the Formalizer, with the GLiNER2 Deciders, on every case of a dataset and scores its extraction against the expected one.
 
-For every case, the Formalizer is used as the EvidenceGraph will use it:
+For every case, the Formalizer is asked, with the text of the case:
 
-1. hint_nodes, given the known instances of the case (the known graph and extra_known_nodes) as candidates,
-2. link_mention on every node, to decide whether it is a known instance, a new one or ambiguous,
-3. hint_edges, given the linked nodes.
+1. extract_nodes, to find the mentions of the text and their types,
+2. extract_edges, given the expected nodes of the case (those with an id), so that the edges do not depend on any linking.
 
-Only the text of every case is used (no second call with its context).
+Linking the mentions to the known instances is not evaluated. Only the text of every case is used (no second call with its context).
 
 Scores (micro-averaged precision, recall and F1 over all cases):
 
 - mentions: (mention), whatever its id, i.e., whether the text was found,
-- entities: (mention, id, status), i.e., whether it was also linked to the right instance,
 - types: (mention, type) of the mentions whose type the text gives (their text_type or, by default, the type of their id), i.e.,
-  whether the type chosen by hint_nodes is the right one, whatever the link,
+  whether the type chosen by extract_nodes is the right one,
 - edges: (src, relation, dst).
 
 Run it from the root of the repository: python evaluation/formalizer/run_eval.py [dataset] [-v]
@@ -25,14 +23,13 @@ case.
 import sys, time
 from dataclasses import dataclass, field
 
-import networkx as nx
-
 from mercury.graph.evidence import AgenticGraph, Formalizer
+from mercury.graph.evidence.deciders import XEdgesGl2Decider, XNodesGl2Decider
 
 from check_cases import Case, Entity, Output, get_dataset_name, load_context, load_dataset
 
 
-MODEL	= {'library': 'gliner2', 'model': 'fastino/gliner2.5-base-v1'}
+MODEL	= {'model': 'fastino/gliner2.5-base-v1'}
 
 
 @dataclass
@@ -60,38 +57,40 @@ class Score:
 		return 2*p*r/(p + r) if p + r > 0 else 0.0
 
 
-METRICS = ('mentions', 'entities', 'types', 'edges')
+METRICS = ('mentions', 'types', 'edges')
 
 
 def build_formalizer(ontology: AgenticGraph) -> Formalizer:
-	""" Returns a ready GLiNER2 Formalizer that uses the ontology. """
+	""" Returns a ready Formalizer that uses the ontology and answers extract_nodes and extract_edges with the GLiNER2 Deciders. """
 
-	formalizer = Formalizer(schema = 'GLiNER2', extra_args = {'model': MODEL, 'ontology': 'ontology'})
+	conf	   = {'ontology': 'ontology', 'extract_nodes': 'NodesGLiNER2', 'extract_edges': 'EdgesGLiNER2'}
+	formalizer = Formalizer(schema = 'Formalizer', extra_args = conf)
 	formalizer.tools['%s/%s' % (formalizer.id.split('/')[0], ontology.id)] = ontology
+
+	for decider in (XNodesGl2Decider('NodesGLiNER2', MODEL), XEdgesGl2Decider('EdgesGLiNER2', MODEL)):
+		decider.pilot(100)
+		formalizer.add_tool(decider)
+
 	formalizer.pilot(100)
 
 	return formalizer
 
 
-def known_nodes(known: nx.MultiDiGraph, case: Case) -> list[dict]:
-	""" Returns the known instances of a case (the known graph and extra_known_nodes), with their descriptions, sorted by id. """
+def expected_nodes(case: Case) -> list[dict]:
+	""" Returns the expected nodes of a case that have an id, as given to extract_edges. """
 
-	nodes  = [{'id': index, 'description': description} for index, description in known.nodes(data = 'description')]
-	nodes += case.get('extra_known_nodes', [])
-
-	return sorted(nodes, key = lambda node: node['id'])
+	return [{'mention': e['mention'], 'id': e['id']} for e in case['entities'] if e['id'] is not None]
 
 
-def formalize(text: str, formalizer: Formalizer, candidates: list[dict]) -> Output:
-	""" Returns the output of the Formalizer for a text in the format of the cases, given the known instances as candidates, with the type
-	chosen for every entity. """
+def formalize(case: Case, formalizer: Formalizer) -> Output:
+	""" Returns the output of the Formalizer for the text of a case in the format of the cases: the nodes found by extract_nodes (with
+	their mention and type) and the edges found by extract_edges given the expected nodes of the case. """
 
-	nodes	 = formalizer.hint_nodes({'text': text, 'candidates': candidates})
-	entities = [{**formalizer.link_mention(node, text), 'type': node['type']} for node in nodes]
-	found	 = formalizer.hint_edges({'text': text, 'nodes': entities})
-	edges	 = [{'src': edge['src'], 'relation': edge['relation'], 'dst': edge['dst']} for edge in found]
+	nodes = formalizer.extract_nodes({'text': case['text']})
+	found = formalizer.extract_edges({'text': case['text'], 'nodes': expected_nodes(case)})
+	edges = [{'src': edge['src'], 'relation': edge['relation'], 'dst': edge['dst']} for edge in found]
 
-	return {'entities': entities, 'edges': edges}
+	return {'entities': nodes, 'edges': edges}
 
 
 def keys(output: Output, metric: str) -> set[tuple]:
@@ -99,9 +98,6 @@ def keys(output: Output, metric: str) -> set[tuple]:
 
 	if metric == 'mentions':
 		return {(e['mention'],) for e in output['entities']}
-
-	if metric == 'entities':
-		return {(e['mention'], e['id'], e['status']) for e in output['entities']}
 
 	return {(e['src'], e['relation'], e['dst']) for e in output['edges']}
 
@@ -162,7 +158,7 @@ def print_case(case: Case, scores: dict[str, Score], verbose: bool) -> None:
 	if not verbose:
 		return
 
-	for metric in ('entities', 'types', 'edges'):
+	for metric in METRICS:
 		for item in scores[metric].missing:
 			print('       missing %-8s %s' % (metric, item))
 
@@ -183,15 +179,14 @@ def main() -> int:
 	verbose = '-v' in sys.argv[1:]
 	dataset = load_dataset(get_dataset_name())
 
-	ontology, known = load_context(dataset['context'])
-	formalizer		= build_formalizer(ontology)
+	ontology, _ = load_context(dataset['context'])
+	formalizer	= build_formalizer(ontology)
 	totals			= {metric: Score() for metric in METRICS}
 	start			= time.time()
 
 	print('case  hits/miss/extra')
 	for case in dataset['cases']:
-		candidates = known_nodes(known, case)
-		predicted  = formalize(case['text'], formalizer, candidates)
+		predicted = formalize(case, formalizer)
 		scores	  = score_case(case, predicted)
 		print_case(case, scores, verbose)
 		for metric in METRICS:

@@ -5,12 +5,12 @@ meant to compare versions of the Formalizer (or other models) on the same cases,
 
 It is not part of the unit tests: it downloads the GLiNER2 model and its scores measure the model, they do not pass or fail.
 
-- `cases.json`: 30 short texts about a school, with the ontology and the initial graph of the `mge new` template. The texts are
+- `cases.json`: 70 short texts about a school, with the ontology and the initial graph of the `mge new` template. The texts are
   synthetic: they come from (or are variations of) the Markdown documents of the template.
 - `check_cases.py`: checks that every expected id and edge is valid against the ontology of the template (run it after editing the
   cases).
-- `run_eval.py`: runs the GLiNER2 Formalizer on every case as the EvidenceGraph will (`hint_nodes`, `link_mention`, `hint_edges`)
-  and scores its output against the expected one.
+- `run_eval.py`: runs the Formalizer, with the GLiNER2 Deciders, on every case (`extract_nodes` on the text, and `extract_edges`
+  given the expected nodes of the case) and scores its extraction against the expected one.
 
 Run them from the root of the repository:
 
@@ -27,15 +27,18 @@ python evaluation/formalizer/run_eval.py -v
 Precision, recall and F1, micro-averaged over all cases, of:
 
 - `mentions`: the mention, whatever its id, i.e., whether the text was found,
-- `entities`: (mention, id, status), i.e., whether it was also linked to the right instance,
 - `types`: (mention, type) of the mentions whose type the text gives (their `text_type` or, by default, the type of their `id`), i.e.,
-  whether the type chosen by `hint_nodes` is the right one, whatever the link. Other mentions are left out, so a mention found with a
-  wrong type is both a miss and an extra, and a mention not found is a miss,
-- `edges`: (src, relation, dst).
+  whether the type chosen by `extract_nodes` is the right one. Other mentions are left out, so a mention found with a wrong type is
+  both a miss and an extra, and a mention not found is a miss,
+- `edges`: (src, relation, dst), found by `extract_edges` given the expected nodes of the case (those with an id), so that they do
+  not depend on finding the mentions or linking them.
+
+Linking the mentions to the known instances (their `id` and `status`) is described in the cases and checked by `check_cases.py`, but
+it is not scored.
 
 ## Context of every case
 
-Unless a case says otherwise, the Formalizer works with:
+Unless a case says otherwise, the expected output of a case is written against:
 
 - **the ontology** of the `mge new` template (`ontology_source/entities_concepts.csv` and `relationships_concepts.csv`),
 - **the known graph**: the initial graph of the template (`initial_graph/nodes.csv` and `edges.csv`), 9 instances and 4 edges.

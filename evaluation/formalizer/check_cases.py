@@ -13,8 +13,8 @@ from typing import Literal, NotRequired, TypedDict
 
 import networkx as nx
 
-from mercury.graph.evidence import AgenticGraph
-from mercury.graph.evidence.formalizer import validate_instances
+from mercury.graph.evidence import AgenticGraph, Formalizer
+from mercury.graph.evidence.formalizer import FormalizerState
 
 
 Status = Literal['known', 'new', 'ambiguous', 'unresolved']
@@ -79,6 +79,16 @@ def load_context(context: Context) -> tuple[AgenticGraph, nx.MultiDiGraph]:
 	known = AgenticGraph.graph_from_files(csv(context['known'][0]), csv(context['known'][1])).networkx
 
 	return ontology, known
+
+
+def ontology_formalizer(ontology: AgenticGraph) -> Formalizer:
+	""" Returns a Formalizer with the ontology, piloted until its ontology is loaded and validated (that needs no Decider). """
+
+	formalizer = Formalizer(schema = 'evaluation', extra_args = {'ontology': 'ontology'})
+	formalizer.tools['%s/%s' % (formalizer.id.split('/')[0], ontology.id)] = ontology
+	formalizer.pilot(FormalizerState.ONTOLOGY_LOADED_OK.value)
+
+	return formalizer
 
 
 def check_case(case: Case, ontology: AgenticGraph, known: nx.MultiDiGraph) -> list[str]:
@@ -179,14 +189,18 @@ def check_edges(output: Output, case: Case, ontology: AgenticGraph) -> list[str]
 		errors += ['edge %s: "%s" is not a known or new entity of the case' % (edge['relation'], edge[end]) for end in ('src', 'dst')
 				   if edge[end] not in ends]
 
-	return errors + validate_instances(expected_graph(output, case['id']), ontology)
+	formalizer = ontology_formalizer(ontology)
+	graph	   = expected_graph(output, case['id'])
+
+	return errors + formalizer.validate_initial_graph(graph)
 
 
 def expected_graph(output: Output, case_id: str) -> nx.MultiDiGraph:
-	""" Returns the expected instances (known and new) and edges of an output as a NetworkX graph. """
+	""" Returns the expected instances (known and new) and edges of an output as a NetworkX graph. Every instance is described by its
+	mention, because the validation of the Formalizer requires a description. """
 
 	ntx = nx.MultiDiGraph()
-	ntx.add_nodes_from(e['id'] for e in output['entities'] if e['status'] in ('known', 'new'))
+	ntx.add_nodes_from((e['id'], {'description': e['mention']}) for e in output['entities'] if e['status'] in ('known', 'new'))
 	for i, edge in enumerate(output['edges']):
 		ntx.add_edge(edge['src'], edge['dst'], key = '%s_%d' % (case_id, i), relation = edge['relation'])
 
