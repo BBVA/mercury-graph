@@ -11,30 +11,34 @@
 
 	// You can have more than one Formalizer in an Endpoint, but an EvidenceGraph only uses one. Multiple formalizers could be used
 	// by Agents or more than one EvidenceGraph. You can also share one Formalizer in different Agents or EvidenceGraphs. The Formalizer
-	// itself has no state other than this configuration: it has no ontology, which is given in the arguments of every question.
-	"GLiNER2": {
-		"name": "GLiNER2",
+	// knows its ontology (but not the instances that exist): it completes every question with the types and relations of the ontology
+	// and passes it to the Decider of that question.
+	"Formalizer": {
+		"name": "Formalizer",
 
 		// "extra_args" is given to the formalizer's constructor.
 		"extra_args": {
 			// The description will be exposed in the Formalizer's Agentic API. It can be a string or a list of strings.
-			"description": "This Agentic Formalizer extracts entities and relationships from text and matches entities.",
+			"description": "This Agentic Formalizer extracts entities and relationships from text using the ontology.",
 
-			// Every question the Formalizer answers has a key: "extract_nodes", "match_node" and "extract_edges" that connects
-			// it to the appropriate Decider. You can set it to null, in which case the question will not be exposed by the Formalizer.
+			// The "name" of the AgenticGraph in ontologies.jsonc that the Formalizer uses as its ontology (mandatory). It is validated
+			// while piloting.
+			"ontology": "ontology",
 
-			// extract_nodes: every mention of a type of the ontology in a text, with GLiNER2.
+			// Every question the Formalizer answers has a key: "extract_nodes", "match_node" and "extract_edges" with the "name" of the
+			// Decider (in deciders.jsonc) that answers it. If it is missing or null, the question is not exposed by the Formalizer.
+
+			// extract_nodes: every mention of a type of the ontology in a text.
 			"extract_nodes": "NodesGLiNER2",
 
 			// extract_edges: every edge of a relation of the ontology between the nodes of a text.
 			"extract_edges": "EdgesGLiNER2",
 
-			// match_node: whether a mention is a known instance, comparing their names with rules.
-			"match_node": "MatchNodeLaya"
-
+			// match_node: whether a mention is a known instance. Not exposed until a Decider for it is available.
+			"match_node": null
 		},
 
-		// Provide the names of the Deciders so that the Endpoint will provide them to the Formalizer.
-		"tools": ["NodesGLiNER2", "EdgesGLiNER2", "MatchNodeLaya"]
+		// The ontology and the Deciders, so that the Endpoint will provide them to the Formalizer.
+		"tools": ["ontology", "NodesGLiNER2", "EdgesGLiNER2"]
 	}
 }

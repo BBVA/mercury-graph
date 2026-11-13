@@ -761,7 +761,7 @@ def test_validate_ontology_accepts_a_valid_ontology(tmp_path):
 
 
 def test_the_template_ontology_is_configured_and_loaded(tmp_path):
-	"""The endpoint exposes a loadable ontology and configures its Formalizer with the new decider tools."""
+	"""The endpoint exposes a loadable ontology and configures its Formalizer with it and its decider tools."""
 	shutil.copytree(TEMPLATE_ONTOLOGIES.parent, tmp_path / 'endpoint')
 	conf = Endpoint(str(tmp_path / 'endpoint'), auto_pilot = False).conf
 	extra_args = conf['ontologies']['ontology']['extra_args']
@@ -770,11 +770,12 @@ def test_the_template_ontology_is_configured_and_loaded(tmp_path):
 	ontology.pilot(100)
 
 	assert list(conf['ontologies']) == ['ontology']
-	formalizer = conf['formalizers']['GLiNER2']
+	formalizer = conf['formalizers']['Formalizer']
+	assert formalizer['extra_args']['ontology'] == 'ontology'
 	assert formalizer['extra_args']['extract_nodes'] == 'NodesGLiNER2'
 	assert formalizer['extra_args']['extract_edges'] == 'EdgesGLiNER2'
-	assert formalizer['extra_args']['match_node'] == 'MatchNodeLaya'
-	assert formalizer['tools'] == ['NodesGLiNER2', 'EdgesGLiNER2', 'MatchNodeLaya']
+	assert formalizer['extra_args']['match_node'] is None
+	assert formalizer['tools'] == ['ontology', 'NodesGLiNER2', 'EdgesGLiNER2']
 	assert 'ontology' in conf['expose']
 	assert ontology.meta['state'] == ontology.states.READY.value
 

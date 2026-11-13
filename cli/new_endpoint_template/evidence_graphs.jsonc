@@ -33,12 +33,12 @@
 			// The names (values) must be in "tools". "ontology" is the "name" of the AgenticGraph in ontologies.jsonc that the
 			// EvidenceGraph uses as its ontology (mandatory): it is validated while piloting and given to the Formalizer in its questions.
 			// Sources is a list with any number of Source tools, everything else is a single tool or null.
-			"agentics": {"formalizer": "GLiNER2", "ontology": "ontology", "id_nodes": "GLiNER2", "id_edges": null, "is_same": null,
+			"agentics": {"formalizer": "Formalizer", "ontology": "ontology", "id_nodes": "Formalizer", "id_edges": null, "is_same": null,
 						 "sources": ["mediawiki_example"]}
 		},
 
 		// "tools" declares what tools does the evidence graph expect. The endpoint will find them and provide them via `add_tool()`.
 		// Provide a list of tool names
-		"tools": ["mediawiki_example", "GLiNER2", "ontology"]
+		"tools": ["mediawiki_example", "Formalizer", "ontology"]
 	}
 }
