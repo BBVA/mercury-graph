@@ -134,8 +134,7 @@ class Gl2Decider(Decider):
 		return DeciderState.MODEL_LOADED_OK.value
 
 
-	@staticmethod
-	def _import_extractor():
+	def _import_extractor(self):
 		""" Returns gliner2.AutoExtractor, or None if it cannot be imported. """
 
 		os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
@@ -162,8 +161,7 @@ class Gl2Decider(Decider):
 		return options
 
 
-	@staticmethod
-	def _load_model(extractor, name, options):
+	def _load_model(self, extractor, name, options):
 		""" Returns the model loaded with the options, with the logs and warnings of the libraries silenced while loading. """
 
 		previous_disable_level = logging.root.manager.disable

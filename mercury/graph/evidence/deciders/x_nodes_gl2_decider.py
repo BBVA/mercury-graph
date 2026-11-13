@@ -88,8 +88,7 @@ class XNodesGl2Decider(Gl2Decider):
 		return result
 
 
-	@staticmethod
-	def _group_concepts_by_mention(entities):
+	def _group_concepts_by_mention(self, entities):
 		""" Returns {mention: {type: confidence}}, the candidate types of every mention, from the entities found by the model
 		({type: [{'text': ..., 'confidence': ...}]}).
 
@@ -140,8 +139,7 @@ class XNodesGl2Decider(Gl2Decider):
 		return best
 
 
-	@staticmethod
-	def _are_compatible(concept, other_concept):
+	def _are_compatible(self, concept, other_concept):
 		""" Returns True if one of the types descends from the other (a type descends from itself). """
 
 		descends = AgenticGraph.descends_from(concept, other_concept)
