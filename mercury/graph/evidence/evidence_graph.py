@@ -55,7 +55,8 @@ class EvidenceGraph(Agentic):
 	The graph can start from an initial graph: the instances known beforehand and the relationships between them, given as
 	`"initial_nodes"` and `"initial_edges"` files in the configuration. They are only loaded when there is no persisted graph. Once the
 	Formalizer is connected, the initial graph is checked against its ontology with
-	[`validate_initial_graph()`](evidence_ontologies.md#validation). If any problem is found, every problem is
+	[`Formalizer.validate_initial_graph()`][mercury.graph.evidence.Formalizer.validate_initial_graph] (see
+	[Validation](evidence_ontologies.md#validation)). If any problem is found, every problem is
 	logged, the EvidenceGraph stops in the `ERR_BUILDING` state and the graph is discarded, so that it is not persisted and is checked
 	again on the next start.
 
@@ -290,12 +291,12 @@ class EvidenceGraph(Agentic):
 		if not self._from_initial_graph:
 			return True
 
-		# errors = validate_initial_graph(self._graph.networkx, self._ontology)
+		errors = self._formalizer.validate_initial_graph(self._graph.networkx)
 
-		# for error in errors:
-		# 	self.log_error('Invalid initial graph in EvidenceGraph %s: %s' % (self.id, error))
+		for error in errors:
+			self.log_error('Invalid initial graph in EvidenceGraph %s: %s' % (self.id, error))
 
-		# return len(errors) == 0
+		return len(errors) == 0
 
 
 	def crawl(self, args):
