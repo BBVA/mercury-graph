@@ -82,8 +82,8 @@ A case can add to that context:
   - `known`: it is an instance of the known graph (even when written differently, e.g., "Ms. Ruiz"),
   - `new`: it is not any known instance,
   - `ambiguous`: it could be several known instances and the text does not say which (`candidates` lists them; `id` is null),
-  - `unresolved`: a pronoun or a generic mention that is an end of a relationship the text states, but the text does not say who
-    or what it is (`id` is null),
+  - `unresolved`: a pronoun or a generic mention that the text relates to another mention, but neither the text nor the known
+    instances say who or what it is (`id` is null),
 - `type_conflict` (optional, true): the text gives the instance a type that contradicts the known one.
 - `text_type` (optional): the type the text gives the mention, when it is not the type of its `id`: a known instance whose role the
   text does not state (e.g., "Maya Singh gives the award" gives `person`, not `person|principal`), a `type_conflict` (the type that
@@ -91,12 +91,32 @@ A case can add to that context:
   gives a type also through the relationships of the ontology it states: "She advises the club" gives `person|teacher`, because only
   teachers advise clubs.
 
-Named mentions are always listed. Pronouns ("She") and generic mentions ("the team", "the club" when it is not named) are listed only
-when they are an end of a relationship the text states: with their id if the text says who they are, as `unresolved` otherwise.
+Named mentions are always listed. Pronouns ("She") and generic mentions ("the principal", "the lab", "the club" when it is not named)
+are listed only when the text relates them to another mention by a relationship of the ontology, stated or presupposed (see **Edges**):
+with their id if the text or the known instances say who they are (e.g., "the principal of Riverside High School" is its only known
+principal), as `unresolved` otherwise.
 `ambiguous` and `unresolved` tell the caller that more context could complete the output.
 
-**Edges**: every relationship of the ontology that the text **states** (not that it suggests or that is common sense), between
-instances, with:
+**Edges**: every relationship of the ontology that the text **states** between two listed mentions (not one that it suggests or that
+is common sense), whether they are named, generic or pronouns. A relationship that the text only uses to **identify** a generic mention
+is **presupposed**, not stated, and it is not expected: whoever knows which instance the mention is already knows that relationship.
+
+- When a mention has no name, the words that pick it out are presupposed: a complement ("the principal **of** Riverside High School",
+  "the lab **inside** the school", "the fair **at** the school"), a possessive ("Riverside High's robotics club") or a relative clause
+  ("the teacher **who advises** the club").
+- What the sentence says about a mention is stated, whether the mention is named or not: its verb ("Priya Shah **works on** the club's
+  racing car") or, for a named mention, an apposition or a description of it ("Maya Singh, **the principal of** Riverside High
+  School, …", "the club is **a student club at** Riverside High School").
+
+| Text | Expected edges | Case |
+|---|---|---|
+| Maya Singh, the principal of Riverside High School, welcomed Carlos Vega. | Maya Singh `is_principal_of` the school | N25 |
+| The principal of Riverside High School welcomed the new students. | none: "of Riverside High School" identifies "The principal" | H01 |
+| Riverside High's robotics club won the regional contest. | none: the possessive identifies the club | S07 |
+| Priya Shah works on the club's racing car. | Priya Shah `works_on` the Helios Solar Car | H04 |
+| The chemistry teacher at Riverside High School advises the Riverside Robotics Club. | Noah Brown `advises` the club, not `teaches_at` | H08 |
+
+Every edge has:
 
 - `src`, `relation`, `dst`: ids of instances and of the relationship (its id, not its definition).
 
@@ -104,6 +124,18 @@ Whether an edge is already in the known graph is not part of the output: that is
 
 **Out of scope**: things the ontology cannot express (e.g., "next to the library", "builds the car body") produce no entity or edge.
 Those cases are useful to check that nothing is invented.
+
+## Writing new cases
+
+1. Write a short text in the story of the template (the school, its people, the club, the fair, the projects). Only what the
+   ontology can express counts.
+2. List every named mention, and the generic mentions and pronouns that the text relates to another mention (see **Entities**).
+3. Give every mention its `id` and `status`. An instance known only in that case goes in `extra_known_nodes`, with its `id` and a
+   `description`.
+4. Add `text_type` when the text does not give the type of the `id` (and always with `type_conflict`).
+5. List the stated edges and leave out the presupposed ones (see **Edges**).
+6. Explain in `notes` what the case tests and every judgment call.
+7. Run `check_cases.py` on the file, then both evaluations.
 
 ## Cases with context (C01–C05)
 
