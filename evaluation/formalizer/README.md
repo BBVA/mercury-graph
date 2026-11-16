@@ -11,12 +11,15 @@ It is not part of the unit tests: it downloads the GLiNER2 model and its scores 
   cases).
 - `run_eval.py`: runs the Formalizer, with the GLiNER2 Deciders, on every case (`extract_nodes` on the text, and `extract_edges`
   given the expected nodes of the case) and scores its extraction against the expected one.
+- `run_match_node_eval.py`: runs `match_node` of the Formalizer on pairs of a mention and a known instance and scores its decisions
+  (see [Evaluation of match_node](#evaluation-of-match_node)).
 
 Run them from the root of the repository:
 
 ```bash
 python evaluation/formalizer/check_cases.py
 python evaluation/formalizer/run_eval.py -v
+python evaluation/formalizer/run_match_node_eval.py -v
 ```
 
 `-v` lists what is missing and what is extra in every case. Both scripts take another dataset of this directory as an argument (e.g.,
@@ -35,6 +38,27 @@ Precision, recall and F1, micro-averaged over all cases, of:
 
 Linking the mentions to the known instances (their `id` and `status`) is described in the cases and checked by `check_cases.py`, but
 it is not scored.
+
+## Evaluation of match_node
+
+`run_match_node_eval.py` builds pairs from the same cases: every mention that is `known` or `new` with every known instance (the known
+graph and the `extra_known_nodes` of the case) of the same root type, e.g., every `person|...` for a `person|teacher`. A pair is
+positive if the instance is the expected `id` of the mention. `ambiguous` and `unresolved` mentions and pronouns are left out. The
+mention is given with the type the text gives it (as in `types` above) and with the text of the case.
+
+The Decider is `NamesDecider`, defined in the script as a baseline: the score is the share of the words of the mention that are in the
+name of the instance, and the mention is the same instance from 0.5 on.
+
+Scores:
+
+- `same`: precision, recall and F1 of the answer `same`, which depends on the threshold of the Decider,
+- `AUC`: the probability that a positive pair gets a higher score than a negative one, whatever the threshold (1 orders every pair
+  right, 0.5 is chance): it tells whether the score is useful before it is calibrated,
+- `best threshold`: the threshold with the highest F1 on these pairs, and that F1,
+- `top-1`: the share of `known` mentions whose expected instance is the only one with the highest score among their pairs.
+
+The pairs are also counted by group: positives written as the name of the instance (`positive exact`) or not (`positive different`),
+and negatives that share a word with the name of the instance (`negative homonym`) or not (`negative other`).
 
 ## Context of every case
 
