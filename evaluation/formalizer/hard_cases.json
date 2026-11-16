@@ -1,0 +1,699 @@
+{
+ "context": {
+  "ontology": [
+   "cli/new_endpoint_template/ontology_source/entities_concepts.csv",
+   "cli/new_endpoint_template/ontology_source/relationships_concepts.csv"
+  ],
+  "known": [
+   "cli/new_endpoint_template/initial_graph/nodes.csv",
+   "cli/new_endpoint_template/initial_graph/edges.csv"
+  ]
+ },
+ "cases": [
+  {
+   "id": "H01",
+   "source": "synthetic",
+   "text": "The principal of Riverside High School welcomed the new students.",
+   "entities": [
+    {
+     "mention": "The principal",
+     "id": "person|principal|Maya Singh",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [],
+   "notes": "Hard positive: a role instead of a name. \"The principal\" is Maya Singh, the only known principal of that school. is_principal_of is presupposed by \"The principal of Riverside High School\" (it identifies the mention), not stated, so no edge is expected. \"the new students\" is not listed: the text states no relationship about it."
+  },
+  {
+   "id": "H02",
+   "source": "synthetic",
+   "text": "RHS hosts the Brookdale Science Fair every spring.",
+   "entities": [
+    {
+     "mention": "RHS",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    },
+    {
+     "mention": "Brookdale Science Fair",
+     "id": "event|Brookdale Science Fair",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "event|Brookdale Science Fair",
+     "relation": "takes_place_at",
+     "dst": "organization|school|Riverside High School"
+    }
+   ],
+   "notes": "Hard positive: an acronym of a known school. Judgment call: hosting an event is takes_place_at, as in the known graph."
+  },
+  {
+   "id": "H03",
+   "source": "synthetic",
+   "text": "The science teacher who advises the robotics club ordered new microscopes.",
+   "entities": [
+    {
+     "mention": "The science teacher",
+     "id": "person|teacher|Elena Ruiz",
+     "status": "known"
+    },
+    {
+     "mention": "the robotics club",
+     "id": "organization|club|Riverside Robotics Club",
+     "status": "known"
+    }
+   ],
+   "edges": [],
+   "notes": "Hard positive: a teacher described by her subject and by what she does, which is her description. Judgment call: \"the robotics club\" is the known club, the only robotics club known. advises is presupposed by \"who advises the robotics club\" (it identifies the teacher), not stated, so no edge is expected."
+  },
+  {
+   "id": "H04",
+   "source": "synthetic",
+   "text": "Priya Shah works on the club's racing car.",
+   "entities": [
+    {
+     "mention": "Priya Shah",
+     "id": "person|student|Priya Shah",
+     "status": "known",
+     "text_type": "person"
+    },
+    {
+     "mention": "the club's racing car",
+     "id": "project|Helios Solar Car",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|student|Priya Shah",
+     "relation": "works_on",
+     "dst": "project|Helios Solar Car"
+    }
+   ],
+   "notes": "Hard positive: the known project described instead of named. Judgment call: \"the club's racing car\" is the Helios Solar Car, the only car the club builds; the text does not say that Priya is a student, so her text_type is person. works_on is stated (it is what the sentence says about Priya), so it is expected although the car is a generic mention."
+  },
+  {
+   "id": "H05",
+   "source": "synthetic",
+   "text": "The lab inside Riverside High School is closed for repairs this week.",
+   "entities": [
+    {
+     "mention": "The lab",
+     "id": "place|room|laboratory|science laboratory",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [],
+   "notes": "Hard positive: a short form of a known place. Judgment call: \"The lab\" is the known science laboratory, the only laboratory known inside the school. located_in is presupposed by \"The lab inside Riverside High School\", not stated, so no edge is expected."
+  },
+  {
+   "id": "H06",
+   "source": "synthetic",
+   "text": "The spring fair at Riverside High School drew a record crowd.",
+   "entities": [
+    {
+     "mention": "The spring fair",
+     "id": "event|Brookdale Science Fair",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [],
+   "notes": "Hard positive: the known fair described by its season, which is in its description (\"every spring\"). takes_place_at is presupposed by \"The spring fair at Riverside High School\", not stated, so no edge is expected."
+  },
+  {
+   "id": "H07",
+   "source": "synthetic",
+   "text": "The head of Riverside High School presented the award to Noah Kim.",
+   "entities": [
+    {
+     "mention": "The head",
+     "id": "person|principal|Maya Singh",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    },
+    {
+     "mention": "Noah Kim",
+     "id": "person|student|Noah Kim",
+     "status": "known",
+     "text_type": "person"
+    }
+   ],
+   "edges": [],
+   "notes": "Hard positive: another word for the principal. is_principal_of is presupposed by \"The head of Riverside High School\", not stated, so no edge is expected. The text does not say that Noah is a student, so his text_type is person, and \"the award\" is not an end of any relationship of the ontology."
+  },
+  {
+   "id": "H08",
+   "source": "synthetic",
+   "text": "The chemistry teacher at Riverside High School advises the Riverside Robotics Club this year.",
+   "entities": [
+    {
+     "mention": "The chemistry teacher",
+     "id": "person|teacher|Noah Brown",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside Robotics Club",
+     "id": "organization|club|Riverside Robotics Club",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|teacher|Noah Brown",
+     "relation": "advises",
+     "dst": "organization|club|Riverside Robotics Club"
+    }
+   ],
+   "notes": "Hard positive and hard negative: only the descriptions tell the two known teachers apart, and the one who usually advises the club (Elena Ruiz) is not the chemistry teacher. teaches_at is presupposed by \"The chemistry teacher at Riverside High School\", so it is not expected; advises is stated (it is what the sentence says about him), so it is expected.",
+   "extra_known_nodes": [
+    {
+     "id": "person|teacher|Noah Brown",
+     "description": "A chemistry teacher at Riverside High School."
+    }
+   ]
+  },
+  {
+   "id": "H09",
+   "source": "synthetic",
+   "text": "The teacher who advises the Riverside Robotics Club met the parents on Monday.",
+   "entities": [
+    {
+     "mention": "The teacher",
+     "id": "person|teacher|Elena Ruiz",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside Robotics Club",
+     "id": "organization|club|Riverside Robotics Club",
+     "status": "known"
+    }
+   ],
+   "edges": [],
+   "notes": "Hard positive and hard negative: with two known teachers, only the description of Elena Ruiz says that she advises the club. advises is presupposed by \"The teacher who advises the Riverside Robotics Club\", not stated, so no edge is expected.",
+   "extra_known_nodes": [
+    {
+     "id": "person|teacher|Noah Brown",
+     "description": "A chemistry teacher at Riverside High School."
+    }
+   ]
+  },
+  {
+   "id": "H10",
+   "source": "synthetic",
+   "text": "The student who leads the Helios project presented it at the Brookdale Science Fair.",
+   "entities": [
+    {
+     "mention": "The student",
+     "id": "person|student|Noah Kim",
+     "status": "known"
+    },
+    {
+     "mention": "Helios project",
+     "id": "project|Helios Solar Car",
+     "status": "known"
+    },
+    {
+     "mention": "Brookdale Science Fair",
+     "id": "event|Brookdale Science Fair",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|student|Noah Kim",
+     "relation": "presents",
+     "dst": "project|Helios Solar Car"
+    }
+   ],
+   "notes": "Hard positive and hard negative: both known students work on the Helios Solar Car, and only the description of Noah Kim says that he leads it. works_on|leads is presupposed by \"The student who leads the Helios project\", so it is not expected; presents is stated (\"presented it at the fair\", as in other cases), so it is expected."
+  },
+  {
+   "id": "H11",
+   "source": "synthetic",
+   "text": "Mrs. Kim, Noah's mother, teaches at Brookdale Elementary School.",
+   "entities": [
+    {
+     "mention": "Mrs. Kim",
+     "id": "person|teacher|Mrs. Kim",
+     "status": "new"
+    },
+    {
+     "mention": "Noah",
+     "id": "person|student|Noah Kim",
+     "status": "known",
+     "text_type": "person"
+    },
+    {
+     "mention": "Brookdale Elementary School",
+     "id": "organization|school|Brookdale Elementary School",
+     "status": "new"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|teacher|Mrs. Kim",
+     "relation": "teaches_at",
+     "dst": "organization|school|Brookdale Elementary School"
+    }
+   ],
+   "notes": "Hard negative: the surname of a known student for another person. Judgment calls: her id keeps \"Mrs. Kim\" because the text gives no first name; \"Noah\" is Noah Kim (his mother is a Kim) and the text does not say he is a student."
+  },
+  {
+   "id": "H12",
+   "source": "synthetic",
+   "text": "Riverside Middle School is a public school in Brookdale.",
+   "entities": [
+    {
+     "mention": "Riverside Middle School",
+     "id": "organization|school|Riverside Middle School",
+     "status": "new"
+    },
+    {
+     "mention": "Brookdale",
+     "id": "place|Brookdale",
+     "status": "new"
+    }
+   ],
+   "edges": [],
+   "notes": "Hard negative: a school whose name and description almost match the known high school. No edge, as in R01: located_in goes from a place to a school."
+  },
+  {
+   "id": "H13",
+   "source": "synthetic",
+   "text": "The Brookdale Science Week takes place at Riverside High School in October.",
+   "entities": [
+    {
+     "mention": "Brookdale Science Week",
+     "id": "event|Brookdale Science Week",
+     "status": "new"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "event|Brookdale Science Week",
+     "relation": "takes_place_at",
+     "dst": "organization|school|Riverside High School"
+    }
+   ],
+   "notes": "Hard negative: an event that shares two words and its school with the known science fair, but not its season."
+  },
+  {
+   "id": "H14",
+   "source": "synthetic",
+   "text": "Priya Shah leads Helios II, a solar boat built by the Riverside Robotics Club.",
+   "entities": [
+    {
+     "mention": "Priya Shah",
+     "id": "person|student|Priya Shah",
+     "status": "known",
+     "text_type": "person"
+    },
+    {
+     "mention": "Helios II",
+     "id": "project|Helios II",
+     "status": "new"
+    },
+    {
+     "mention": "Riverside Robotics Club",
+     "id": "organization|club|Riverside Robotics Club",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|student|Priya Shah",
+     "relation": "works_on|leads",
+     "dst": "project|Helios II"
+    }
+   ],
+   "notes": "Hard negative: a new project of the same club whose name starts like the known one. The club building a project is not a relationship of the ontology."
+  },
+  {
+   "id": "H15",
+   "source": "synthetic",
+   "text": "Elena Martin, a new student, studies at Riverside High School.",
+   "entities": [
+    {
+     "mention": "Elena Martin",
+     "id": "person|student|Elena Martin",
+     "status": "new"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|student|Elena Martin",
+     "relation": "studies_at",
+     "dst": "organization|school|Riverside High School"
+    }
+   ],
+   "notes": "Hard negative: the first name of a known teacher for a new student."
+  },
+  {
+   "id": "H16",
+   "source": "synthetic",
+   "text": "Maya Singh's brother, Arjun Singh, studies at Riverside High School.",
+   "entities": [
+    {
+     "mention": "Maya Singh",
+     "id": "person|principal|Maya Singh",
+     "status": "known",
+     "text_type": "person"
+    },
+    {
+     "mention": "Arjun Singh",
+     "id": "person|student|Arjun Singh",
+     "status": "new"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|student|Arjun Singh",
+     "relation": "studies_at",
+     "dst": "organization|school|Riverside High School"
+    }
+   ],
+   "notes": "Hard negative: the surname of the known principal for a new student. Being a sibling is not a relationship of the ontology."
+  },
+  {
+   "id": "H17",
+   "source": "synthetic",
+   "text": "The Riverside Robotics Society, a group of parents, meets at Riverside High School.",
+   "entities": [
+    {
+     "mention": "Riverside Robotics Society",
+     "id": "organization|Riverside Robotics Society",
+     "status": "new"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [],
+   "notes": "Hard negative: a name that shares two words with the known club. Judgment calls: a group of parents is an organization, not a club (a group of students); meeting at a school is not belongs_to."
+  },
+  {
+   "id": "H18",
+   "source": "synthetic",
+   "text": "The physics laboratory is located in Riverside High School.",
+   "entities": [
+    {
+     "mention": "physics laboratory",
+     "id": "place|room|laboratory|physics laboratory",
+     "status": "new"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "place|room|laboratory|physics laboratory",
+     "relation": "located_in",
+     "dst": "organization|school|Riverside High School"
+    }
+   ],
+   "notes": "Hard negative: another laboratory of the same school."
+  },
+  {
+   "id": "H19",
+   "source": "synthetic",
+   "text": "Noah Lee joined the Riverside Robotics Club as a new student.",
+   "entities": [
+    {
+     "mention": "Noah Lee",
+     "id": "person|student|Noah Lee",
+     "status": "new"
+    },
+    {
+     "mention": "Riverside Robotics Club",
+     "id": "organization|club|Riverside Robotics Club",
+     "status": "known"
+    }
+   ],
+   "edges": [],
+   "notes": "Hard negative: the first name of a known student for another student. Joining a club is not a relationship of the ontology."
+  },
+  {
+   "id": "H20",
+   "source": "synthetic",
+   "text": "Elena Ruiz, a first-year student, studies at Riverside High School.",
+   "entities": [
+    {
+     "mention": "Elena Ruiz",
+     "id": "person|student|Elena Ruiz",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|student|Elena Ruiz",
+     "relation": "studies_at",
+     "dst": "organization|school|Riverside High School"
+    }
+   ],
+   "notes": "Same name, two known instances: the student, not the teacher.",
+   "extra_known_nodes": [
+    {
+     "id": "person|student|Elena Ruiz",
+     "description": "A first-year student at Riverside High School who joined the Riverside Robotics Club this year."
+    }
+   ]
+  },
+  {
+   "id": "H21",
+   "source": "synthetic",
+   "text": "Elena Ruiz teaches science to the first-year students at Riverside High School.",
+   "entities": [
+    {
+     "mention": "Elena Ruiz",
+     "id": "person|teacher|Elena Ruiz",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|teacher|Elena Ruiz",
+     "relation": "teaches_at",
+     "dst": "organization|school|Riverside High School"
+    }
+   ],
+   "notes": "Same name, two known instances: the teacher, not the student, although the text also mentions first-year students.",
+   "extra_known_nodes": [
+    {
+     "id": "person|student|Elena Ruiz",
+     "description": "A first-year student at Riverside High School who joined the Riverside Robotics Club this year."
+    }
+   ]
+  },
+  {
+   "id": "H22",
+   "source": "synthetic",
+   "text": "Priya Shah is the principal of Brookdale Elementary School.",
+   "entities": [
+    {
+     "mention": "Priya Shah",
+     "id": "person|principal|Priya Shah",
+     "status": "known"
+    },
+    {
+     "mention": "Brookdale Elementary School",
+     "id": "organization|school|Brookdale Elementary School",
+     "status": "new"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|principal|Priya Shah",
+     "relation": "is_principal_of",
+     "dst": "organization|school|Brookdale Elementary School"
+    }
+   ],
+   "notes": "Same name, two known instances: the principal, not the student.",
+   "extra_known_nodes": [
+    {
+     "id": "person|principal|Priya Shah",
+     "description": "The principal of Brookdale Elementary School."
+    }
+   ]
+  },
+  {
+   "id": "H23",
+   "source": "synthetic",
+   "text": "Priya Shah wired the motor of the Helios Solar Car.",
+   "entities": [
+    {
+     "mention": "Priya Shah",
+     "id": "person|student|Priya Shah",
+     "status": "known",
+     "text_type": "person"
+    },
+    {
+     "mention": "Helios Solar Car",
+     "id": "project|Helios Solar Car",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|student|Priya Shah",
+     "relation": "works_on",
+     "dst": "project|Helios Solar Car"
+    }
+   ],
+   "notes": "Same name, two known instances: the student in the team of the car, not the principal. Judgment calls: wiring its motor is works_on; the text does not say that she is a student, so her text_type is person.",
+   "extra_known_nodes": [
+    {
+     "id": "person|principal|Priya Shah",
+     "description": "The principal of Brookdale Elementary School."
+    }
+   ]
+  },
+  {
+   "id": "H24",
+   "source": "synthetic",
+   "text": "Noah, who teaches chemistry, judged the projects of the Brookdale Science Fair.",
+   "entities": [
+    {
+     "mention": "Noah",
+     "id": "person|teacher|Noah Brown",
+     "status": "known"
+    },
+    {
+     "mention": "Brookdale Science Fair",
+     "id": "event|Brookdale Science Fair",
+     "status": "known"
+    }
+   ],
+   "edges": [],
+   "notes": "Same first name, two known instances: teaching chemistry makes him Noah Brown, not Noah Kim. Judging a fair is not a relationship of the ontology.",
+   "extra_known_nodes": [
+    {
+     "id": "person|teacher|Noah Brown",
+     "description": "A chemistry teacher at Riverside High School."
+    }
+   ]
+  },
+  {
+   "id": "H25",
+   "source": "synthetic",
+   "text": "Ms. Ruiz, who advises the Riverside Robotics Club, took the team to the Brookdale Science Fair.",
+   "entities": [
+    {
+     "mention": "Ms. Ruiz",
+     "id": "person|teacher|Elena Ruiz",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside Robotics Club",
+     "id": "organization|club|Riverside Robotics Club",
+     "status": "known"
+    },
+    {
+     "mention": "Brookdale Science Fair",
+     "id": "event|Brookdale Science Fair",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|teacher|Elena Ruiz",
+     "relation": "advises",
+     "dst": "organization|club|Riverside Robotics Club"
+    }
+   ],
+   "notes": "Same surname, two known teachers: advising the robotics club makes her Elena Ruiz, not Marta Ruiz.",
+   "extra_known_nodes": [
+    {
+     "id": "person|teacher|Marta Ruiz",
+     "description": "A math teacher at Riverside High School who coaches the chess team."
+    }
+   ]
+  },
+  {
+   "id": "H26",
+   "source": "synthetic",
+   "text": "Ms. Ruiz, the math teacher, teaches at Riverside High School.",
+   "entities": [
+    {
+     "mention": "Ms. Ruiz",
+     "id": "person|teacher|Marta Ruiz",
+     "status": "known"
+    },
+    {
+     "mention": "Riverside High School",
+     "id": "organization|school|Riverside High School",
+     "status": "known"
+    }
+   ],
+   "edges": [
+    {
+     "src": "person|teacher|Marta Ruiz",
+     "relation": "teaches_at",
+     "dst": "organization|school|Riverside High School"
+    }
+   ],
+   "notes": "Same surname, two known teachers: teaching math makes her Marta Ruiz, not Elena Ruiz.",
+   "extra_known_nodes": [
+    {
+     "id": "person|teacher|Marta Ruiz",
+     "description": "A math teacher at Riverside High School who coaches the chess team."
+    }
+   ]
+  }
+ ]
+}

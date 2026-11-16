@@ -7,6 +7,7 @@ It is not part of the unit tests: it downloads the GLiNER2 model and its scores 
 
 - `cases.json`: 70 short texts about a school, with the ontology and the initial graph of the `mge new` template. The texts are
   synthetic: they come from (or are variations of) the Markdown documents of the template.
+- `hard_cases.json`: 26 more texts in the same story, written to be hard for `match_node` (see [Writing new cases](#writing-new-cases)).
 - `check_cases.py`: checks that every expected id and edge is valid against the ontology of the template (run it after editing the
   cases).
 - `run_eval.py`: runs the Formalizer, with the GLiNER2 Deciders, on every case (`extract_nodes` on the text, and `extract_edges`
@@ -136,6 +137,10 @@ Those cases are useful to check that nothing is invented.
 5. List the stated edges and leave out the presupposed ones (see **Edges**).
 6. Explain in `notes` what the case tests and every judgment call.
 7. Run `check_cases.py` on the file, then both evaluations.
+
+`hard_cases.json` follows the same rules. Its cases are built to be hard for `match_node`: known instances mentioned without any word of
+their name, new instances that share words with a known one, and known instances with the same name that only the text and the
+descriptions tell apart.
 
 ## Cases with context (C01–C05)
 
