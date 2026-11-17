@@ -143,7 +143,7 @@ def test_source_maker(tmp_path, monkeypatch):
 	xml.build_indices()
 	xml._create_markdown_from_xml()
 	xml_without_destination = SourceMaker('xml_without_destination', 'xml_stream', str(xml_path), str(tmp_path / 'new_xml_destination'), 10, None, None)
-	xml_without_destination._create_markdown_from_xml()
+	assert xml_without_destination.build_indices() is True
 
 	failed_tree = SourceMaker('failed_tree', 'markdown_tree', None, str(tmp_path), 10, None, None)
 	failed_tree._recurse_tree = lambda: None
