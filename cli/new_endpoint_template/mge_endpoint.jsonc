@@ -34,7 +34,7 @@
 	"agents": {
 		"$ref": "./agents.jsonc"
 	},
-	"custom_agentics": {
+	"custom": {
 		"$ref": "./custom_agentics.jsonc"
 	},
 
