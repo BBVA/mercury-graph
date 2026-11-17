@@ -17,10 +17,11 @@ def _endpoint_conf():
 	return {
 		'sources': {},
 		'ontologies': {},
+		'deciders': {},
 		'formalizers': {},
 		'evidence_graphs': {},
 		'agents': {},
-		'custom_agentics': {}
+		'custom': {}
 	}
 
 
@@ -531,7 +532,7 @@ def test_endpoint_load_objects(tmp_path):
 	conf['ontologies'] = {'ontology': {'name': 'ontology', 'extra_args': {}}}
 	conf['evidence_graphs'] = {'graph': {'name': 'graph', 'extra_args': {}}}
 	conf['agents'] = {'agent': {'name': 'agent', 'extra_args': {}}}
-	conf['custom_agentics'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py', 'extra_args': {}}}
+	conf['custom'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py', 'extra_args': {}}}
 	endpoint = _make_endpoint(tmp_path, 'load_objects', conf)
 	custom = tmp_path / 'load_objects' / 'custom.py'
 	custom.write_text(
@@ -547,18 +548,18 @@ def test_endpoint_load_objects(tmp_path):
 	assert endpoint._load_objects() is True
 	assert set(endpoint.ids) == set(conf)
 	assert endpoint.tools[endpoint.ids['sources']['source']].conf['nested']['path'].endswith('/source')
-	assert endpoint.ids['custom_agentics']['custom'] in endpoint.tools
+	assert endpoint.ids['custom']['custom'] in endpoint.tools
 
 
 def test_endpoint_load_objects_errors(tmp_path, monkeypatch):
 	conf = _endpoint_conf()
-	conf['custom_agentics'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py'}}
+	conf['custom'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py'}}
 	endpoint = _make_endpoint(tmp_path, 'invalid_custom', conf)
 	(tmp_path / 'invalid_custom' / 'custom.py').write_text('class Custom: pass\n')
 	assert endpoint._load_objects() is False
 
 	conf = _endpoint_conf()
-	conf['custom_agentics'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py'}}
+	conf['custom'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py'}}
 	endpoint = _make_endpoint(tmp_path, 'missing_spec', conf)
 	monkeypatch.setattr(endpoint_module.importlib.util, 'spec_from_file_location', lambda name, path: None)
 	assert endpoint._load_objects() is False
