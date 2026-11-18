@@ -76,8 +76,8 @@ class Formalizer(Agentic):
 	| `match_node` | `mention` (no `definition`), `node` optionally `context` | `mention` with `definition` of type, `node` and `context` |
 
 	`types` and `relations` restrict the question to some ids of the ontology; by default, all of them are used. The answers are those of
-	the Decider. The arguments are validated, including the required fields of the objects they contain: if they are wrong, every problem
-	is logged and the answer is None.
+	the Decider. The arguments are validated, including the required fields of the objects they contain and the ids of the nodes of
+	`extract_edges` (a type of the ontology, "|" and a name): if they are wrong, every problem is logged and the answer is None.
 
 	## Types and concepts
 
@@ -183,7 +183,8 @@ class Formalizer(Agentic):
 								'type': 'object',
 								'required': ['mention', 'id']
 							},
-							'description': 'The nodes of the text, with "mention" and "id".'
+							'description': 'The nodes of the text, with "mention" and "id". The id of a node is the type extract_nodes gave it, '
+										   'exactly as it is, "|" and its name (e.g., "organization|club|Chess Club").'
 						},
 						'relations': {
 							'type': 'array',
@@ -466,6 +467,7 @@ class Formalizer(Agentic):
 
 		ids					= arguments.get('relations', None)
 		relations, problems = self._ontology_relations(ids)
+		problems		   += self._node_id_problems(arguments['nodes'])
 
 		question = {'text': arguments['text'], 'nodes': arguments['nodes'], 'ontology': {'relations': relations}}
 		self._copy_context(arguments, question)
@@ -493,6 +495,27 @@ class Formalizer(Agentic):
 		self._copy_context(arguments, question)
 
 		return question, []
+
+
+	def _node_id_problems(self, nodes):
+		""" Returns a problem for every node whose id is not a type of the ontology, "|" and a name (e.g., "person|teacher|Elena Ruiz"). """
+
+		ntx = self._ontology._graph.networkx
+
+		problems = []
+		for position, node in enumerate(nodes):
+			index = node['id']
+			if not isinstance(index, str):
+				problem = 'Argument "nodes[%d]" has an id that is not a text.' % position
+				problems.append(problem)
+				continue
+
+			concept = AgenticGraph.parent_of(index)
+			if concept not in ntx.nodes:
+				problem = 'Argument "nodes[%d]" has id "%s", which is not a type of the ontology, "|" and a name.' % (position, index)
+				problems.append(problem)
+
+		return problems
 
 
 	def _copy_context(self, arguments, question):

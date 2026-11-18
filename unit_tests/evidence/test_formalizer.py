@@ -361,6 +361,23 @@ def test_unknown_ontology_ids_are_reported_without_decider_calls():
 	assert all(decider.requests == [] for decider in deciders.values())
 
 
+def test_node_ids_must_be_a_type_of_the_ontology_and_a_name():
+	"""An id of a node without a type of the ontology before its name fails without calling the decider."""
+	logger = []
+	formalizer, deciders = _ready_formalizer(logger = logger)
+	nodes = [{'mention': 'Ada', 'id': 'person'}, {'mention': 'Ada', 'id': 'person_Ada'}, {'mention': 'Ada', 'id': 7},
+			 {'mention': 'Ada', 'id': 'animal|Ada'}, {'mention': 'Ada', 'id': 'person|Ada'}]
+
+	assert formalizer.extract_edges({'text': 'Ada', 'nodes': nodes}) is None
+	errors = _errors(logger)
+	assert any('"nodes[0]" has id "person"' in error for error in errors)
+	assert any('"nodes[1]" has id "person_Ada"' in error for error in errors)
+	assert any('"nodes[2]" has an id that is not a text' in error for error in errors)
+	assert any('"nodes[3]" has id "animal|Ada"' in error for error in errors)
+	assert not any('"nodes[4]"' in error for error in errors)
+	assert all(decider.requests == [] for decider in deciders.values())
+
+
 def test_validate_ontology_accepts_hierarchy_and_requires_loaded_graph():
 	"""Valid parent chains and inherited ends pass, while an unloaded ontology has one error."""
 	formalizer = _formalizer()
