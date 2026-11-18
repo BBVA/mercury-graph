@@ -19,9 +19,11 @@ Scores:
 Every score is also given by group of pairs: positives written as the name of the instance (exact) or not (different), negatives that
 share a word with the name of the instance (homonym) or not (other).
 
-Run it from the root of the repository: python evaluation/formalizer/run_match_node_eval.py [dataset] [-v]
+Run it from the root of the repository: python evaluation/formalizer/run_match_node_eval.py [dataset] [-v] [--laya[=subfolder]]
 
-The dataset is cases.json unless another .json file of this directory is given. -v lists the pairs whose answer is wrong.
+The dataset is cases.json unless another .json file of this directory is given. -v lists the pairs whose answer is wrong. The Decider
+is NamesDecider, a baseline, unless --laya is given: then it is MatchNodeLayaDecider with the model convaiinnovations/laya, or the
+checkpoint of that model in the subfolder given (e.g., --laya=typed-decisions).
 """
 
 import re, sys, time
@@ -29,6 +31,7 @@ import re, sys, time
 import networkx as nx
 
 from mercury.graph.evidence import AgenticGraph, Decider, DeciderState, Formalizer
+from mercury.graph.evidence.deciders import MatchNodeLayaDecider
 
 from check_cases import Case, Entity, get_dataset_name, load_context, load_dataset
 from run_eval import Score, text_type
@@ -37,6 +40,7 @@ from run_eval import Score, text_type
 PRONOUNS  = {'he', 'she', 'it', 'they', 'him', 'her', 'them', 'his', 'its', 'their'}
 GROUPS	  = ('positive exact', 'positive different', 'negative homonym', 'negative other')
 THRESHOLD = 0.5
+LAYA	  = 'convaiinnovations/laya'
 
 
 class NamesDecider(Decider):
@@ -70,6 +74,33 @@ class NamesDecider(Decider):
 
 	def _words(self, text):
 		return set(re.findall(r'\w+', text.lower()))
+
+
+def get_decider() -> Decider:
+	""" Returns the Decider of the arguments: MatchNodeLayaDecider if --laya is given (with the subfolder after "=", if any), or
+	NamesDecider. """
+
+	options = [arg for arg in sys.argv[1:] if arg == '--laya' or arg.startswith('--laya=')]
+	if len(options) == 0:
+		return NamesDecider('Names', {'threshold': THRESHOLD})
+
+	conf	  = {'model': LAYA, 'threshold': THRESHOLD}
+	subfolder = options[0].partition('=')[2]
+	if subfolder != '':
+		conf['subfolder'] = subfolder
+
+	return MatchNodeLayaDecider('Laya', conf)
+
+
+def decider_name(decider: Decider) -> str:
+	""" Returns the class of the Decider followed by its model and subfolder, if any. """
+
+	parts = [type(decider).__name__]
+	for key in ('model', 'subfolder'):
+		if key in decider.conf:
+			parts.append(decider.conf[key])
+
+	return ' '.join(parts)
 
 
 def build_formalizer(ontology: AgenticGraph, decider: Decider) -> Formalizer:
@@ -257,9 +288,13 @@ def main() -> int:
 	dataset = load_dataset(get_dataset_name())
 
 	ontology, known = load_context(dataset['context'])
-	decider			= NamesDecider('Names', {'threshold': THRESHOLD})
+	decider			= get_decider()
 	formalizer		= build_formalizer(ontology, decider)
 	start			= time.time()
+	if decider.meta['state'] != DeciderState.READY.value:
+		print('The Decider is not ready (state %d).' % decider.meta['state'])
+
+		return 1
 
 	pairs = []
 	for case in dataset['cases']:
@@ -269,7 +304,7 @@ def main() -> int:
 		answer = decide(formalizer, pair)
 		pair.update(answer)
 
-	print('Decider: %s, %d pairs of %d cases.' % (type(decider).__name__, len(pairs), len(dataset['cases'])))
+	print('Decider: %s, %d pairs of %d cases.' % (decider_name(decider), len(pairs), len(dataset['cases'])))
 	print_scores(pairs)
 	if verbose:
 		print_errors(pairs)
