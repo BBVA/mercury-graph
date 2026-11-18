@@ -8,10 +8,10 @@ class MatchNodeLayaDecider(Decider):
 	""" A [`Decider`][mercury.graph.evidence.Decider] that answers `match_node` with a local Laya model: whether a mention is a known
 	instance.
 
-	Laya answers a yes/no question about a state (a JSON object) with the probability of "yes". The state has the known instance
-	(`id`, `description` and `names`, if any), the mention (`mention`, `type`, the `type_definition` and `texts`, if any) and the
-	`context` of the question, if any, in that order: if the state does not fit the model, Laya cuts it from the end, so the context and
-	then the texts are cut first. A cut is logged.
+	Laya answers a yes/no question about a state (its input, a JSON object) with the probability of "yes". The state has the known
+	instance (`id`, `description` and `names`, if any), the mention (`mention`, `type`, the `type_definition` and `texts`, if any) and
+	the `context` of the question, if any, in that order: if the state does not fit the model, Laya cuts it from the end, so the context
+	and then the texts are cut first. A cut is logged.
 
 	The answer is `{"score": <the probability of yes>, "same": score >= threshold}`.
 
@@ -81,8 +81,8 @@ class MatchNodeLayaDecider(Decider):
 	def _answer(self, arguments):
 		""" Returns the score and the decision of the model for the mention and the known instance of the arguments. """
 
-		state  = self._state(arguments)
-		result = self._model.predict(state, self.QUESTIONS)
+		laya_state = self._create_laya_state(arguments)
+		result	   = self._model.predict(laya_state, self.QUESTIONS)
 
 		self._log_cut(result)
 
@@ -92,8 +92,8 @@ class MatchNodeLayaDecider(Decider):
 		return {'score': score, 'same': score >= threshold}
 
 
-	def _state(self, arguments):
-		""" Returns the state for the model: the known instance, the mention and the context, in that order. """
+	def _create_laya_state(self, arguments):
+		""" Returns the state that Laya decides on (its input): the known instance, the mention and the context, in that order. """
 
 		node  = arguments['node']
 		known = {'id': node['id'], 'description': node['description']}
@@ -105,11 +105,11 @@ class MatchNodeLayaDecider(Decider):
 		if 'texts' in mention:
 			found['texts'] = mention['texts']
 
-		state = {'known_instance': known, 'mention': found}
+		laya_state = {'known_instance': known, 'mention': found}
 		if 'context' in arguments:
-			state['context'] = arguments['context']
+			laya_state['context'] = arguments['context']
 
-		return state
+		return laya_state
 
 
 	def _log_cut(self, result):
