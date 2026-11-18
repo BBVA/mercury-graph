@@ -35,8 +35,8 @@ class Formalizer(Agentic):
 
 	| Layer | What it knows | What it does |
 	|---|---|---|
-	| The caller (an Agent or the EvidenceGraph) | nothing of the ontology | asks in terms of the ontology: "extract the nodes of text" |
-	| The Formalizer | the ontology, but not the instances that exist | completes question with types, relations and their definitions |
+	| The caller (an Agent or the EvidenceGraph) | nothing of the ontology | asks in ontology terms: "extract the nodes of a text" |
+	| The Formalizer | the ontology, but not the instances that exist | completes the question with types, relations and definitions |
 	| A [`Decider`][mercury.graph.evidence.Decider] | nothing | answers a [`Question`][mercury.graph.evidence.Question] with its model |
 
 	The Formalizer translates: the caller never passes the ontology, and the Decider receives everything it needs in the question. The
@@ -73,11 +73,13 @@ class Formalizer(Agentic):
 	|---|---|---|
 	| `extract_nodes` | `text`, optionally `types` (ids) and `context` | `text`, `ontology` (its types) and `context` |
 	| `extract_edges` | `text`, `nodes`, optionally `relations` (ids) and `context` | `text`, `nodes`, `ontology` and `context` |
-	| `match_node` | `mention` (no `definition`), `node` optionally `context` | `mention` with `definition` of type, `node` and `context` |
+	| `match_node` | `mention` (no `definition`), `node` and optionally `context` | `mention` with `definition`, `node` and `context` |
 
-	`types` and `relations` restrict the question to some ids of the ontology; by default, all of them are used. The answers are those of
-	the Decider. The arguments are validated, including the required fields of the objects they contain and the ids of the nodes of
-	`extract_edges` (a type of the ontology, "|" and a name): if they are wrong, every problem is logged and the answer is None.
+	The `ontology` of the Decider holds the types or the relations asked for, with their definitions, and the `mention` of `match_node`
+	gets the `definition` of its type. `types` and `relations` restrict the question to some ids of the ontology; by default, all of
+	them are used. The answers are those of the Decider. The arguments are validated, including the required fields of the objects
+	they contain and the ids of the nodes of `extract_edges` (a type of the ontology, "|" and a name): if they are wrong, every problem
+	is logged and the answer is None.
 
 	## Types and concepts
 
