@@ -1,205 +1,22 @@
-import os, logging, warnings
-
+from copy import deepcopy
 from enum import Enum
 
 from .agentic import Agentic, AgenticRunInvalidRequest
 from .agentic_graph import AgenticGraph
-from .decider import DECIDERS, IGNORED_WORDS, compare_names
+from .decider import CONTEXT_PARAMETER, Decider, DeciderState
 
 
 class FormalizerState(Enum):
 	""" The `FormalizerState` is an enumeration that defines all possible states of a Formalizer. """
 
-	ERR_DECIDER_INIT	= -3	# Something failed loading the decider.
-	ERR_ONTOLOGY_INIT	= -2	# Something failed loading the ontology.
-	ERR_MODEL_INIT		= -1	# Something failed loading the model.
+	ERR_DECIDER_INIT	= -2	# Something failed loading the deciders.
+	ERR_ONTOLOGY_INIT	= -1	# Something failed loading the ontology.
 
 	INITIAL				=  0	# The initial state of the formalizer.
-	MODEL_LOADED_OK		=  1	# The model was loaded successfully.
-	ONTOLOGY_LOADED_OK	=  2	# The ontology was loaded successfully.
-	DECIDER_LOADED_OK	=  3	# The decider was loaded successfully.
+	ONTOLOGY_LOADED_OK	=  1	# The ontology was loaded successfully.
+	DECIDER_LOADED_OK	=  2	# The deciders were loaded successfully.
 
 	READY				=  100	# The formalizer is ready to be queried.
-
-
-def validate_ontology(ontology):
-	""" Checks that an ontology (entities as nodes and relationships as edges between them) is coherent.
-
-	The checks are:
-
-	- Every entity has its parent (the id without its last `|` level) defined.
-	- Every relationship has its parent defined (e.g., `works_on` for `works_on|leads`).
-	- The `src` and `dst` of a relationship are those of its parent or descendants of them (e.g., `works_on|leads` can go from
-	`person|student` if `works_on` goes from `person`).
-
-	That ids are unique and that the `src` and `dst` of every relationship are entities of the ontology is already checked when it is
-	loaded (see
-	[`AgenticGraph.graph_from_files()`][mercury.graph.evidence.AgenticGraph.graph_from_files]).
-
-	Args:
-		ontology (AgenticGraph): the ontology. It must be loaded (piloted) before being validated, otherwise that is the only problem
-			reported.
-
-	Returns:
-		(list): A list of strings, one for each problem found. It is empty if the ontology is valid.
-	"""
-
-	if ontology._graph is None:
-		return ['Ontology "%s" is not loaded.' % ontology.name]
-
-	ntx		  = ontology._graph.networkx
-	relations = _relation_ends(ntx)
-
-	errors  = _check_parents(set(ntx.nodes), 'Entity', ontology.name)
-	errors += _check_parents(set(relations), 'Relationship', ontology.name)
-	errors += _check_relation_inheritance(relations)
-
-	return errors
-
-
-def validate_initial_graph(ntx, ontology):
-	""" Checks that an initial graph of instances (such as the one an EvidenceGraph starts from) matches an ontology and describes
-	every instance.
-
-	The checks are those of [`validate_instances()`][mercury.graph.evidence.formalizer.validate_instances] and:
-
-	- Every instance has a `description` that is not empty (e.g., "A science teacher at Riverside High School.").
-
-	Args:
-		ntx (networkx.MultiDiGraph): the initial graph, with the instances as nodes and their relationships as edges.
-		ontology (AgenticGraph): the ontology. It must be loaded.
-
-	Returns:
-		(list): A list of strings, one for each problem found. It is empty if the initial graph is valid.
-	"""
-
-	errors	= validate_instances(ntx, ontology)
-	errors += _check_descriptions(ntx)
-
-	return errors
-
-
-def validate_instances(ntx, ontology):
-	""" Checks that a graph of instances matches an ontology.
-
-	The checks are:
-
-	- Every instance is a name under a type of entity of the ontology (e.g., `person|student|Noah Kim` under `person|student`).
-	- Every edge has a `relation` that is a relationship of the ontology, and the types of the instances it connects are the `src` and
-	`dst` of that relationship or descendants of them (e.g., a `person|student` can be the `src` of a relationship from `person`).
-
-	Args:
-		ntx (networkx.MultiDiGraph): the graph, with the instances as nodes and their relationships as edges.
-		ontology (AgenticGraph): the ontology. It must be loaded.
-
-	Returns:
-		(list): A list of strings, one for each problem found. It is empty if the graph matches the ontology.
-	"""
-
-	types	  = set(ontology._graph.networkx.nodes)
-	relations = _relation_ends(ontology._graph.networkx)
-
-	return _check_instances(ntx, types) + _check_instance_edges(ntx, relations)
-
-
-def _check_descriptions(ntx):
-	""" Returns an error for every instance in ntx without a description or with an empty one. """
-
-	errors = []
-	for index, description in sorted(ntx.nodes(data = 'description')):
-		if not _is_text(description):
-			errors.append('Instance "%s" has no description: the initial graph needs one for every instance.' % index)
-
-	return errors
-
-
-def _is_text(value):
-	""" Returns True if value is a string that is not empty or only spaces (an empty cell of a .csv file is read as NaN). """
-
-	if not isinstance(value, str):
-		return False
-
-	return value.strip() != ''
-
-
-def _check_instances(ntx, types):
-	""" Returns an error for every instance in ntx that is not under a type of entity in types. """
-
-	errors = []
-	for index in sorted(ntx.nodes):
-		if AgenticGraph.parent_of(index) is None:
-			errors.append('Instance "%s" has no type: its id must start with a type of entity of the ontology.' % index)
-		elif AgenticGraph.parent_of(index) not in types:
-			errors.append('Instance "%s" is of type "%s", which is not in the ontology.' % (index, AgenticGraph.parent_of(index)))
-
-	return errors
-
-
-def _check_instance_edges(ntx, relations):
-	""" Returns the errors of every edge in ntx, sorted by edge id. """
-
-	errors = []
-	for src, dst, key, relation in sorted(ntx.edges(keys = True, data = 'relation'), key = lambda edge: str(edge[2])):
-		errors += _check_instance_edge(src, dst, key, relation, relations)
-
-	return errors
-
-
-def _check_instance_edge(src, dst, key, relation, relations):
-	""" Returns the errors of one edge: a missing or unknown relation, or instances of types the relation does not connect. """
-
-	if not isinstance(relation, str):
-		return ['Edge "%s" has no relation.' % key]
-
-	if relation not in relations:
-		return ['Edge "%s" has relation "%s", which is not in the ontology.' % (key, relation)]
-
-	errors = []
-	for end, instance, expected in zip(('src', 'dst'), (src, dst), relations[relation]):
-		if AgenticGraph.parent_of(instance) is not None and not AgenticGraph.descends_from(AgenticGraph.parent_of(instance), expected):
-			errors.append('Edge "%s": its %s "%s" is not a "%s" as required by "%s".' % (key, end, instance, expected, relation))
-
-	return errors
-
-
-def _relation_ends(ntx):
-	""" Returns a dictionary of relationship id: (src, dst) of the ontology ntx. """
-
-	return {key: (src, dst) for src, dst, key in ntx.edges(keys = True)}
-
-
-def _check_relation_inheritance(relations):
-	""" Returns an error for every src or dst of a relationship that is not that of its parent or a descendant of it. """
-
-	errors = []
-	for index, ends in sorted(relations.items()):
-		parent = AgenticGraph.parent_of(index)
-		if parent in relations:
-			errors += _check_inherited_ends(index, ends, parent, relations[parent])
-
-	return errors
-
-
-def _check_inherited_ends(index, ends, parent, parent_ends):
-	""" Returns an error for each end of a relationship that does not descend from the same end of its parent. """
-
-	errors = []
-	for end, concept, expected in zip(('src', 'dst'), ends, parent_ends):
-		if not AgenticGraph.descends_from(concept, expected):
-			errors.append('Relationship "%s" has %s "%s", which is not a "%s" as required by its parent "%s".' % (index, end, concept, expected, parent))
-
-	return errors
-
-
-def _check_parents(indices, kind, ontology):
-	""" Returns an error for every index whose parent is not in indices. kind and ontology name them in the messages. """
-
-	errors = []
-	for index in sorted(indices):
-		if AgenticGraph.parent_of(index) is not None and AgenticGraph.parent_of(index) not in indices:
-			errors.append('%s "%s" has no parent "%s" in %s.' % (kind, index, AgenticGraph.parent_of(index), ontology))
-
-	return errors
 
 
 class Formalizer(Agentic):
@@ -214,94 +31,67 @@ class Formalizer(Agentic):
 	2. While querying the evidence graph in natural language, identifying nodes and edges in the text of a query verifying matches
 	between them and corresponding nodes and edges in the evidence graph.
 
-	### The level of "intelligence" of the Formalizer
+	### Three layers, each with its own knowledge
 
-	The Formalizer "speaks" the language of EvidenceGraph, has both an Agentic interface (to be used as a tool by an Agent or just exposed
-	in an Endpoint) and direct access (via the parent) to its ontology and from the EvidenceGraph. It also abstracts the functionality
-	of some "smart" model that does the heavy lifting.
+	| Layer | What it knows | What it does |
+	|---|---|---|
+	| The caller (an Agent or the EvidenceGraph) | nothing of the ontology | asks in ontology terms: "extract the nodes of a text" |
+	| The Formalizer | the ontology, but not the instances that exist | completes the question with types, relations and definitions |
+	| A [`Decider`][mercury.graph.evidence.Decider] | nothing | answers a [`Question`][mercury.graph.evidence.Question] with its model |
 
-	It is smart enough to suggest potential nodes and edges or score how strongly the definition of one node matches another (making both
-	actually the same entity), but the "intelligence" about how that becomes a final EvidenceGraph is handled by either an Agent or
-	the EvidenceGraph itself.
+	The Formalizer translates: the caller never passes the ontology, and the Decider receives everything it needs in the question. The
+	instances that exist are known by the EvidenceGraph.
 
 	This functionality is often called (SIE) Structured Information Extracting.
 
-	### How GLiNER2 fits into this workflow
+	## Configuration
 
-	Unlike in the [`PdfToMarkdown`][mercury.graph.evidence.formats.PdfToMarkdown] conversion, where a lot of valid "turn-key" solutions
-	exist, and therefore we do not favor any specific tool and provide a simple configuration mechanism to integrate any tool, we
-	consider GLiNER2 as the mature, efficient, open-source, CPU-friendly solution for, at least, this early stage of this project.
+	The `extra_args` of a Formalizer are:
 
-	#### Possible alternatives to GLiNER2 could be
+	- "description" (optional): exposed in the metadata of the Formalizer. It can be a string or a list of strings.
+	- "ontology" (mandatory): the name of the [`AgenticGraph`][mercury.graph.evidence.AgenticGraph] it uses as its ontology.
+	- "extract_nodes", "extract_edges" and "match_node": the name of the Decider that answers each question. A question that is
+	missing or null is not offered.
 
-	- A completely LLM-based solution using a model that could reach similar performance without disproportionate computational cost.
-	- A [SpaCy](https://spacy.io/) based solution for named entity recognition and relationship extraction.
-	- Something like [NuExtract3](https://huggingface.co/numind/NuExtract3) which for the moment has high GPU requirements, but works
-	directly from PDF (similar to [Unlimited-OCR](https://github.com/baidu/Unlimited-OCR) for the PDF stage).
+	The ontology and the Deciders must also be in its "tools", so that the Endpoint provides them with `add_tool()`.
 
-	#### The functions used in GLiNER2 terms
+	## Piloting
 
-	- **AutoExtractor** (Basic Entity Extraction): Is used for node identification from text. It is provided a schema (the types of
-	entities of the Ontology or a selection of them), and every mention found is compared with the known instances given as candidates.
-	- **AutoExtractor** (Structure Extraction): Is given an `extract_json()` format created by the Formalizer to match the definitions
-	of both the relationship and its elements from the Ontology.
-	- **AutoExtractor** (Relation Extraction): `extract_relations()` gives (head, tail) pairs. It is only asked for the relationships
-	with the same type at both ends, whose structure cannot tell one end from the other.
-	Whether a mention is a known instance is not asked to GLiNER2: it is decided by the Decider.
+	1. It finds its ontology among its tools and validates it: every type of entity and relationship has its parent defined, and every
+	relationship connects the types of its parent or descendants of them. If anything fails, every problem is logged and it stops in
+	the `ERR_ONTOLOGY_INIT` state.
+	2. It finds the Decider of every question configured among its tools and checks that it answers that question and is ready. If
+	anything fails, every problem is logged and it stops in the `ERR_DECIDER_INIT` state.
 
-	## The Decider
-
-	The questions about the nodes found (whether a mention is a known instance and which one of several candidates it is) are answered
-	by a [`Decider`][mercury.graph.evidence.Decider], chosen by the "type" of the "decider" section of the configuration. The
-	rest of that section is the configuration of the Decider. Without it, the Decider is
-	[`RulesDecider`][mercury.graph.evidence.RulesDecider], which compares names.
-
-	The Formalizer gathers the context (the mention, its type, the definitions of the ontology and the texts) and the Decider decides.
-
-	## Types and concepts
-
-	A type of the ontology (of entity or of relationship) is called a *concept* in the code of the Formalizer (e.g., `_choose_concept()`
-	or `concept_definition`) and a *type* in what its capabilities return and in the context given to the Decider (e.g., the 'type' of
-	the nodes of `hint_nodes` and the 'type_definition' of a mention). The types to look for are given in the argument 'concepts'.
-
-	## Ontology validation
-
-	While piloting, the Formalizer checks that its ontology is coherent using
-	[`validate_ontology()`](evidence_ontologies.md#validation). If any problem is found, every problem is logged
-	and the Formalizer stops in the `ERR_ONTOLOGY_INIT` state. Then it creates its Decider: if its type is unknown or `ready()` finds
-	any problem, every problem is logged and the Formalizer stops in the `ERR_DECIDER_INIT` state.
+	The ontology and the Deciders must be piloted before the Formalizer.
 
 	## Capabilities exposed by the Formalizer
 
-	The Formalizer exposes three capabilities:
+	One for each question configured, named after the Formalizer (e.g., `extract_nodes_Formalizer`):
 
-	1. Entity Extraction (`hint_nodes`): every mention of a type of the ontology, with the known instances it can be.
-	2. Relationship Extraction (`hint_edges`): every edge of a relationship of the ontology between the nodes found in a text.
-	3. Node comparison (`is_same_node`): how likely a mention is a known instance, as decided by the Decider.
+	| Question | The caller gives | The Decider receives |
+	|---|---|---|
+	| `extract_nodes` | `text`, optionally `types` (ids) and `context` | `text`, `ontology` (its types) and `context` |
+	| `extract_edges` | `text`, `nodes`, optionally `relations` (ids) and `context` | `text`, `nodes`, `ontology` and `context` |
+	| `match_node` | `mention` (no `definition`), `node` and optionally `context` | `mention` with `definition`, `node` and `context` |
 
-	## Linking mentions to known instances
+	The `ontology` of the Decider holds the types or the relations asked for, with their definitions, and the `mention` of `match_node`
+	gets the `definition` of its type. `types` and `relations` restrict the question to some ids of the ontology; by default, all of
+	them are used. The answers are those of the Decider. The arguments are validated, including the required fields of the objects
+	they contain and the ids of the nodes of `extract_edges` (a type of the ontology, "|" and a name): if they are wrong, every problem
+	is logged and the answer is None.
 
-	[`link_mention()`][mercury.graph.evidence.Formalizer.link_mention] decides whether a mention found by `hint_nodes` is a known
-	instance, a new one or ambiguous, asking the Decider when the name alone is not enough. It is not a capability: those rules
-	belong to the caller (the EvidenceGraph) and are here until it uses them.
+	## Types and concepts
+
+	A type of the ontology (of entity or of relationship) is called a *concept* in the code of the Formalizer and a *type* in its
+	capabilities.
 
 	## Known Limitations
 
-	The functionality is still very exploratory and minimalistic. Specifically, the following limitations exist:
-
-	- The extraction threshold is that of GLiNER2 (0.5): it cannot be configured.
-	- The key 'definition' is hardcoded, it should be included in the config to make it easier to find and modify.
-	- Mentions are compared with known instances by the words of their names, so synonyms, abbreviations and scientific names (e.g.,
-	"Cuculus canorus" for the Common Cuckoo) are not linked.
-	- The only Decider is RulesDecider: it only compares names (it ignores the texts) and never chooses between several candidates.
-	- Pronouns and generic mentions ("she", "the club") are not resolved.
-	- The direction of the edges of a relationship with the same type at both ends depends on `extract_relations()`, which finds
-	few of them.
-	- link_mention() is in the Formalizer until the EvidenceGraph applies those rules itself.
-
-	In general, the whole system is very early-stage, released for developer use and experimentation. The best way of formalizing
-	entities and relationships from text is still to be determined. It requires a functioning architecture to experiment, and that
-	is what we are to-some-extent providing with this early-stage implementation.
+	The functionality is still very exploratory and minimalistic. In general, the whole system is very early-stage, released for
+	developer use and experimentation. The best way of formalizing entities and relationships from text is still to be determined. It
+	requires a functioning architecture to experiment, and that is what we are to-some-extent providing with this early-stage
+	implementation.
 
 	Args:
 		schema (str): a schema (a unique name) to use for the Formalizer's ID.
@@ -310,6 +100,115 @@ class Formalizer(Agentic):
 			provided, the Formalizer becomes its own Endpoint.
 		logger (list): an optional logger to use for logging events. It must provide an `append()` method to add new events.
 	"""
+
+	QUESTION_KEYS = ['extract_nodes', 'match_node', 'extract_edges']	# The keys of the configuration, in the order of Question.
+
+	ARGUMENT_TYPES = {'string': str, 'array': list, 'object': dict, 'number': (int, float)}	# The Python type of every JSON type.
+
+	FUNCTIONS = {
+		'extract_nodes': {
+			'type': 'function',
+			'function': {
+				'name': 'extract_nodes_%s',
+				'description': 'Identify the mentions of the types of the ontology in a text.',
+				'parameters': {
+					'type': 'object',
+					'properties': {
+						'text': {
+							'type': 'string',
+							'description': 'Text from which to identify nodes.'
+						},
+						'types': {
+							'type': 'array',
+							'items': {
+								'type': 'string'
+							},
+							'description': 'Optional ids of the types of the ontology to look for (e.g., "person|teacher"). All by default.'
+						},
+						'context': CONTEXT_PARAMETER
+					},
+					'required': ['text']
+				},
+				'returns': {
+					'type': 'array',
+					'items': {
+						'type': 'object',
+						'description': 'One node per mention, with "mention" (the text as it appears), "type" and "confidence".'
+					}
+				}
+			}
+		},
+		'match_node': {
+			'type': 'function',
+			'function': {
+				'name': 'match_node_%s',
+				'description': 'Decide whether a mention is a known instance (a node, as a "type|name" id).',
+				'parameters': {
+					'type': 'object',
+					'properties': {
+						'mention': {
+							'type': 'object',
+							'description': 'A mention: "mention" (the text as it appears), "type" (a type of the ontology) and optionally '
+										   '"texts", a list of texts where it was found.',
+							'required': ['mention', 'type']
+						},
+						'node': {
+							'type': 'object',
+							'description': 'A known instance: "id", "description" and optionally "names", its other names.',
+							'required': ['id', 'description']
+						},
+						'context': CONTEXT_PARAMETER
+					},
+					'required': ['mention', 'node']
+				},
+				'returns': {
+					'type': 'object',
+					'description': '"score" (0..1), how likely the mention is the known instance, and "same", whether it is.'
+				}
+			}
+		},
+		'extract_edges': {
+			'type': 'function',
+			'function': {
+				'name': 'extract_edges_%s',
+				'description': 'Identify the edges of the relations of the ontology between the nodes of a text.',
+				'parameters': {
+					'type': 'object',
+					'properties': {
+						'text': {
+							'type': 'string',
+							'description': 'Text from which to identify edges.'
+						},
+						'nodes': {
+							'type': 'array',
+							'items': {
+								'type': 'object',
+								'required': ['mention', 'id']
+							},
+							'description': 'The nodes of the text, with "mention" and "id". The id of a node is the type extract_nodes gave it, '
+										   'exactly as it is, "|" and its name (e.g., "organization|club|Chess Club").'
+						},
+						'relations': {
+							'type': 'array',
+							'items': {
+								'type': 'string'
+							},
+							'description': 'Optional ids of the relations of the ontology to look for (e.g., "teaches_at"). All by default.'
+						},
+						'context': CONTEXT_PARAMETER
+					},
+					'required': ['text', 'nodes']
+				},
+				'returns': {
+					'type': 'array',
+					'items': {
+						'type': 'object',
+						'description': 'One edge with "src", "relation", "dst" (ids) and "confidence".'
+					}
+				}
+			}
+		}
+	}
 
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(my_class = 'formalizer', schema = schema, endpoint = endpoint, logger = logger)
@@ -323,8 +222,7 @@ class Formalizer(Agentic):
 		self.name = schema
 
 		self._ontology = None
-		self._model	   = None
-		self._decider  = None
+		self._deciders = {}			# {question key: Decider} of the questions configured, once piloted.
 
 		self._meta_ = self._meta()	# Just to make .meta reflect the initial state.
 
@@ -334,13 +232,14 @@ class Formalizer(Agentic):
 
 			(See [`Agentic.run()`][mercury.graph.evidence.Agentic.run].)
 		"""
-		call = self.call.get(request['name'], None)
+		key = self.call.get(request['name'], None)
 
-		if call is None:
+		if key is None:
 			self.log_error('Formalizer does not have a function named "%s".' % request['name'])
 			raise AgenticRunInvalidRequest
 
-		ret = {'finish_reason': 'stop', 'message': call(request['arguments'])}
+		answer = self._answer(key, request['arguments'])
+		ret	   = {'finish_reason': 'stop', 'message': answer}
 
 		return ret
 
@@ -378,7 +277,7 @@ class Formalizer(Agentic):
 
 
 	def pilot(self, intent, just_once = False):
-		""" Pilots the Formalizer to a new state based on the given intent.
+		""" Pilots the Formalizer to a new state based on the given intent: it loads and validates its ontology, then finds its Deciders.
 
 		(See [`Agentic.pilot()`][mercury.graph.evidence.Agentic.pilot].)
 		"""
@@ -390,106 +289,15 @@ class Formalizer(Agentic):
 
 		while self._meta_['state'] < intent:
 			if self._meta_['state'] == self.states.INITIAL.value:
-				model_config = self.conf.get('model', None)
-				if model_config is None:
-					self.log_error('Model configuration is missing while piloting Formalizer %s.' % self.id)
+				self._meta_['state'] = self._pilot_ontology()
 
-					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
-
-					break
-
-				try:
-					os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
-					os.environ.setdefault('USE_TF', '0')
-
-					from gliner2 import AutoExtractor
-
-				except ImportError:
-					AutoExtractor = None
-
-				library = model_config.get('library', None)
-				if library != 'gliner2' or AutoExtractor is None:
-					self.log_error('Missing gliner2.AutoExtractor or unsupported model library while piloting Formalizer %s.' % self.id)
-
-					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
-
-					break
-
-				self.AutoExtractor = AutoExtractor
-
-				model = model_config.get('model', None)
-				if model is None:
-					self.log_error('Model specification is missing while piloting Formalizer %s.' % self.id)
-
-					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
-
-					break
-
-				map_location = model_config.get('map_location', None)
-				quantize = model_config.get('quantize', None)
-				compile = model_config.get('compile', None)
-
-				args = {}
-				if map_location is not None:
-					args['map_location'] = map_location
-
-				if quantize is not None:
-					args['quantize'] = quantize
-
-				if compile is not None:
-					args['compile'] = compile
-
-				try:
-					previous_disable_level = logging.root.manager.disable
-					logging.disable(logging.WARNING)
-
-					with warnings.catch_warnings():
-						warnings.simplefilter('ignore')
-
-						self._model = self.AutoExtractor.from_pretrained(model, **args)
-
-					logging.disable(previous_disable_level)
-
-					self._meta_['state'] = self.states.MODEL_LOADED_OK.value
-
-				except Exception as e:
-					self.log_error('Failed to load model while piloting Formalizer %s: %s' % (self.id, str(e)))
-
-					self._meta_['state'] = self.states.ERR_MODEL_INIT.value
-
-					break
-
-				if just_once:
-					break
-
-			if self._meta_['state'] == self.states.MODEL_LOADED_OK.value:
-				self._ontology = self._find_ontology()
-
-				if self._ontology is None:
-					self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
-					break
-
-				errors = validate_ontology(self._ontology)
-
-				if len(errors) > 0:
-					self._handle_ontology_errors(errors)
-					break
-
-				self._meta_['state'] = self.states.ONTOLOGY_LOADED_OK.value
-
-				if just_once:
+				if self._meta_['state'] < 0 or just_once:
 					break
 
 			if self._meta_['state'] == self.states.ONTOLOGY_LOADED_OK.value:
-				self._decider = self._load_decider()
+				self._meta_['state'] = self._pilot_deciders()
 
-				if self._decider is None:
-					self._meta_['state'] = self.states.ERR_DECIDER_INIT.value
-					break
-
-				self._meta_['state'] = self.states.DECIDER_LOADED_OK.value
-
-				if just_once:
+				if self._meta_['state'] < 0 or just_once:
 					break
 
 			if self._meta_['state'] == self.states.DECIDER_LOADED_OK.value:
@@ -499,525 +307,79 @@ class Formalizer(Agentic):
 					break
 
 
-	def _create_schema(self, arguments):
-		ntx = self._ontology._graph.networkx
-		schema = {}
-		concepts = arguments.get('concepts', None)
-		if concepts is None:
-			for id, _ in ntx.nodes.data('id'):
-				node = dict(ntx.nodes(data = True))[id]
-				schema[id] = node.get('definition', '')
-		else:
-			for id in concepts:
-				node = dict(ntx.nodes(data = True)).get(id, {})
-				schema[id] = node.get('definition', '')
-
-		schema = self._model.create_schema().entities(schema)
-		return schema
-
-
-	def hint_nodes(self, arguments):
-		""" Identifies nodes in a text from the ontology or some concepts in it.
+	def extract_nodes(self, arguments):
+		""" Answers `extract_nodes`: every mention of a type of the ontology in a text.
 
 		Args:
-			arguments (dict): A dictionary containing the following keys:
-				- 'text' (str): The text from which to identify nodes.
-				- 'concepts' (list): A list of concepts to identify in the text. If empty, all concepts will be considered.
-				- 'candidates' (list): The known instances a mention can be, as {'id', 'description', 'names'}: its type followed by
-					its name (e.g., `person|teacher|Elena Ruiz`), what tells it apart from other instances and its other names
-					(optional). If missing, no mention has candidates.
+			arguments (dict): 'text' (str) and optionally 'types' (list of ids) and 'context' (list).
 
 		Returns:
-			(list): One dictionary per mention with 'mention' (the text as it appears), 'type' (the most specific of the types found for
-				it that are compatible with the most confident one), 'confidence' (that of the type) and 'candidates'.
-
-				The candidates of a mention are those of its root type that share a word with it, as {'id', 'score', 'description',
-				'names'}, from the highest to the lowest score. The score is the share of words in common (1.0 when all of them are), leaving out the words of both types,
-				possessives, accents and the "ignored_words" of the configuration (titles by default). A candidate whose type is neither
-				an ancestor nor a descendant of the type of the mention has 'type_conflict' True. The score measures how alike the names
-				are, not whether they are the same instance: that is decided by the caller.
+			(list): One dictionary per mention with 'mention' (the text as it appears), 'type' and 'confidence', or None if the
+				Formalizer cannot answer (see `_answer()`).
 		"""
 
-		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('Formalizer is not ready for hint_nodes.')
-			return None
-
-		text = arguments.get('text', None)
-		if text is None:
-			self.log_error('Formalizer.hint_nodes() %s called without "text" argument.' % self.id)
-			return None
-
-		schema	   = self._create_schema(arguments)
-		extraction = self._model.extract(text, schema, include_confidence = True)
-
-		entities		= extraction.get('entities', {})
-		candidate_nodes = arguments.get('candidates', [])
-		result			= self._resolve_mentions(entities, candidate_nodes)
+		result = self._answer('extract_nodes', arguments)
 
 		return result
 
 
-	def _resolve_mentions(self, entities, candidate_nodes):
-		""" Returns one node per mention in the entities found by the model, with a single type and its candidate nodes. """
-
-		candidate_types_by_mention = self._group_types_by_mention(entities)
-
-		result = []
-		for mention, candidate_types in candidate_types_by_mention.items():
-			node = self._resolve_mention(mention, candidate_types, candidate_nodes)
-			result.append(node)
-
-		return result
-
-
-	def _group_types_by_mention(self, entities):
-		""" Returns {mention: {type: confidence}}, the candidate types of every mention, from the entities found by the model
-		({type: [{'text': ..., 'confidence': ...}]}).
-
-		A mention found more than once with the same type keeps its highest confidence.
-		"""
-
-		found = {}
-		for concept, matches in entities.items():
-			for match in matches:
-				candidate_types = found.setdefault(match['text'], {})
-				candidate_types[concept] = max(match['confidence'], candidate_types.get(concept, 0))
-
-		return found
-
-
-	def _resolve_mention(self, mention, candidate_types, candidate_nodes):
-		""" Returns the node of a mention: its text, its chosen type, the confidence of that type and its candidate nodes. """
-
-		inferred_type = self._choose_concept(candidate_types)
-		found		  = self._find_candidates(mention, inferred_type, candidate_nodes)
-		node		  = {'mention': mention, 'type': inferred_type, 'confidence': candidate_types[inferred_type], 'candidates': found}
-
-		return node
-
-
-	def _choose_concept(self, candidate_types):
-		""" Returns the most specific candidate type compatible with the most confident one (it, its ancestors or its descendants).
-
-		Among equally specific types, the most confident is chosen. Types of other branches are discarded.
-		"""
-
-		anchor	   = max(candidate_types, key = candidate_types.get)
-		compatible = [concept for concept in candidate_types
-					  if AgenticGraph.descends_from(concept, anchor) or AgenticGraph.descends_from(anchor, concept)]
-
-		result = max(compatible, key = lambda concept: (concept.count('|'), candidate_types[concept]))
-
-		return result
-
-
-	def _find_candidates(self, mention, concept, candidate_nodes):
-		""" Returns the candidate nodes of the root type of concept that share a word with the mention, from the highest to the lowest
-		score. """
-
-		mention_id = '%s|%s' % (concept, mention)
-		scored	   = [self._score_candidate(mention_id, candidate) for candidate in candidate_nodes]
-		found	   = [candidate for candidate in scored if candidate['score'] > 0]
-
-		result = sorted(found, key = lambda candidate: candidate['score'], reverse = True)
-
-		return result
-
-
-	def _score_candidate(self, mention_id, candidate):
-		""" Returns {'id', 'score', 'description', 'names'} of a candidate for a mention, with 'type_conflict' if their types are in
-		different branches. """
-
-		index	   = candidate['id']
-		concept	   = AgenticGraph.parent_of(mention_id)
-		known_type = AgenticGraph.parent_of(index)
-		ignored	   = self.conf.get('ignored_words', IGNORED_WORDS)
-		score	   = compare_names(mention_id, index, ignored)
-		scored	   = {'id': index, 'score': score}
-
-		scored['description'] = candidate.get('description', '')
-		scored['names']		  = candidate.get('names', [])
-
-		if known_type is not None and not (AgenticGraph.descends_from(concept, known_type)
-										 or AgenticGraph.descends_from(known_type, concept)):
-			scored['type_conflict'] = True
-
-		return scored
-
-
-	def hint_edges(self, arguments):
-		""" Identifies edges of the ontology, or of some relationships in it, between the nodes of a text.
-
-		The model is asked for every relationship as a structure with a field for each end, named by its type. A relationship whose
-		ends have the same type (e.g., place to place) has two fields with the same name, so the model only finds that the relationship
-		is in the text, not its pairs: the model is then asked again, only for those relationships, for (head, tail) pairs.
-
-		The mentions at both ends are replaced by the ids of the nodes, and the edges are kept if both ends are nodes with an id and
-		their types are those of the relationship or descendants of them. A repeated edge keeps its highest confidence, and an edge is
-		dropped when the same pair has an edge of a more specific relationship (e.g., works_on when works_on|leads is found).
-
-		Unlike `hint_nodes`, which is given the known instances as candidates, `hint_edges` is given the nodes already linked: the
-		EvidenceGraph calls it after `hint_nodes` and `link_mention()` on the same text. Without nodes (e.g., when it is used as a tool by
-		an Agent), it finds them itself the same way with no known instances, so every node is new (its type followed by the mention).
-
-		Whether an edge is already known is not part of its output: once both ends are ids, that is an exact lookup in the graph, and
-		what to do with it (confirm, aggregate or contradict) is decided by the EvidenceGraph.
+	def match_node(self, arguments):
+		""" Answers `match_node`: whether a mention is a known instance.
 
 		Args:
-			arguments (dict): A dictionary containing the following keys:
-				- 'text' (str): The text from which to identify edges.
-				- 'nodes' (list): The nodes of the text, with 'mention' and 'id' (as returned by `link_mention()`). If missing, they
-				are found in the text with no known instances.
-				- 'concepts' (list): The ids of the relationships to identify. If missing, all of them are considered.
+			arguments (dict): 'mention' ({'mention', 'type', 'texts'}), 'node' ({'id', 'description', 'names'}) and optionally
+				'context' (list).
 
 		Returns:
-			(list): One dictionary per edge with 'src', 'relation', 'dst' (ids) and 'confidence'.
+			(dict): 'score' (0..1) and 'same' (bool), or None if the Formalizer cannot answer (see `_answer()`).
 		"""
 
-		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('Formalizer is not ready for hint_edges.')
-
-			return None
-
-		text = arguments.get('text', None)
-
-		if text is None:
-			self.log_error('Formalizer.hint_edges() %s called without "text" argument.' % self.id)
-
-			return None
-
-		nodes = arguments.get('nodes', None)
-		if nodes is None:
-			nodes = self._find_new_nodes(text)
-
-		relations = self._get_relations(arguments.get('concepts', None))
-		ids		  = {node['mention']: node['id'] for node in nodes}
-
-		found	  = self._extract_structures(text, relations)
-		triples	  = self._pair_mentions(found, relations, ids)
-		same_type = self._find_same_type_relations(found, relations)
-
-		if len(same_type) > 0:
-			triples += self._extract_directed_pairs(text, same_type, relations, ids)
-
-		result = self._finish_edges(triples, relations)
+		result = self._answer('match_node', arguments)
 
 		return result
 
 
-	def _find_new_nodes(self, text):
-		""" Returns the nodes of a text found by hint_nodes and linked by link_mention() with no known instances: all of them are new. """
-
-		nodes = self.hint_nodes({'text': text})
-
-		result = [self.link_mention(node, text) for node in nodes]
-
-		return result
-
-
-	def _get_relations(self, concepts):
-		""" Returns {id: (src, dst, definition)} of the relationships of the ontology, or of those in concepts. """
-
-		ntx = self._ontology._graph.networkx
-
-		relations = {}
-		for src, dst, index, definition in ntx.edges(keys = True, data = 'definition'):
-			if concepts is None or index in concepts:
-				relations[index] = (src, dst, definition)
-
-		return relations
-
-
-	def _extract_structures(self, text, relations):
-		""" Returns {relation id: matches} found by the model, every relationship asked as a structure named by its definition. """
-
-		structures = {definition: [src, dst] for src, dst, definition in relations.values()}
-		extraction = self._model.extract_json(text, structures, include_confidence = True)
-
-		by_definition = {definition: index for index, (_, _, definition) in relations.items()}
-		result		  = {by_definition[definition]: matches for definition, matches in extraction.items()}
-
-		return result
-
-
-	def _pair_mentions(self, found, relations, ids):
-		""" Returns (src id, relation, dst id, confidence) for every pair of mentions of the matches of relations with different end types. """
-
-		triples = []
-		for index, matches in found.items():
-			src_type, dst_type, _ = relations[index]
-			if src_type != dst_type:
-				for match in matches:
-					triples += self._pair_match(index, match.get(src_type, []), match.get(dst_type, []), ids)
-
-		return triples
-
-
-	def _pair_match(self, index, sources, destinations, ids):
-		""" Returns a triple for every source and destination mention of one match, with the lowest of both confidences. """
-
-		triples = []
-		for src in sources:
-			for dst in destinations:
-				confidence = min(src['confidence'], dst['confidence'])
-				triples.append((ids.get(src['text'], None), index, ids.get(dst['text'], None), confidence))
-
-		return triples
-
-
-	def _find_same_type_relations(self, found, relations):
-		""" Returns the ids of the relationships with the same type at both ends that the model found mentions of. """
-
-		result = []
-		for index, matches in found.items():
-			src_type, dst_type, _ = relations[index]
-			mentions = [span for match in matches for spans in match.values() for span in spans]
-			if src_type == dst_type and len(mentions) > 0:
-				result.append(index)
-
-		return result
-
-
-	def _extract_directed_pairs(self, text, same_type, relations, ids):
-		""" Returns (src id, relation, dst id, confidence) for every (head, tail) pair the model finds for the given relationships. """
-
-		schema = {index: relations[index][2] for index in same_type}
-		found  = self._model.extract_relations(text, schema, include_confidence = True)
-
-		triples = []
-		for index, pairs in found.get('relation_extraction', {}).items():
-			for pair in pairs:
-				src = ids.get(pair['head']['text'], None)
-				dst = ids.get(pair['tail']['text'], None)
-				triples.append((src, index, dst, pair['head']['confidence']))
-
-		return triples
-
-
-	def _finish_edges(self, triples, relations):
-		""" Returns the edges of the triples with valid ends, without repeated edges or edges of a relationship more generic than another. """
-
-		valid = [triple for triple in triples if self._has_valid_ends(triple, relations)]
-		best  = self._keep_highest_confidence(valid)
-
-		result = []
-		for (src, index, dst), confidence in best.items():
-			if not self._has_more_specific_edge(src, index, dst, best):
-				result.append({'src': src, 'relation': index, 'dst': dst, 'confidence': confidence})
-
-		return result
-
-
-	def _has_valid_ends(self, triple, relations):
-		""" Returns True if both ends have an id whose type is that of the relationship or a descendant of it. """
-
-		src, index, dst, _ = triple
-		src_type, dst_type, _ = relations[index]
-
-		if src is None or dst is None:
-			return False
-
-		src_valid = AgenticGraph.descends_from(AgenticGraph.parent_of(src), src_type)
-		return src_valid and AgenticGraph.descends_from(AgenticGraph.parent_of(dst), dst_type)
-
-
-	def _keep_highest_confidence(self, triples):
-		""" Returns {(src, relation, dst): confidence} with the highest confidence of every repeated edge. """
-
-		best = {}
-		for src, index, dst, confidence in triples:
-			best[(src, index, dst)] = max(confidence, best.get((src, index, dst), 0))
-
-		return best
-
-
-	def _has_more_specific_edge(self, src, index, dst, edges):
-		""" Returns True if the same pair has an edge of a relationship that descends from index. """
-
-		for other_src, other_index, other_dst in edges:
-			if (other_src, other_dst) == (src, dst) and other_index != index and AgenticGraph.descends_from(other_index, index):
-				return True
-
-		return False
-
-
-	def is_same_node(self, arguments):
-		""" Scores how likely a mention is a known instance, as decided by the Decider of the Formalizer.
-
-		The definitions of the types of the mention and the node are taken from the ontology and passed to the Decider (see
-		[`Decider`][mercury.graph.evidence.Decider]).
+	def extract_edges(self, arguments):
+		""" Answers `extract_edges`: every edge of a relation of the ontology between the nodes of a text.
 
 		Args:
-			arguments (dict): A dictionary containing the following keys:
-				- 'mention' (dict): A mention, with 'mention' (str, the text as it appears), 'type' (str, its type in the ontology) and
-					optionally 'texts' (list), the texts where it was found.
-				- 'node' (dict): A known instance, with 'id' (str, its type followed by its name, e.g., `person|teacher|Elena Ruiz`),
-					'description' (str) and optionally 'names' (list), its other names.
+			arguments (dict): 'text' (str), 'nodes' (list of {'mention', 'id'}) and optionally 'relations' (list of ids) and 'context'
+				(list).
 
 		Returns:
-			(float): A score in [0..1], or None if the Formalizer is not ready or an argument is missing.
+			(list): One dictionary per edge with 'src', 'relation', 'dst' (ids) and 'confidence', or None if the Formalizer cannot
+				answer (see `_answer()`).
 		"""
 
-		if self._meta_['state'] != self.states.READY.value:
-			self.log_error('Formalizer is not ready for is_same_node.')
-
-			return None
-
-		mention = arguments.get('mention', None)
-		node	= arguments.get('node', None)
-
-		if mention is None or node is None:
-			self.log_error('Formalizer.is_same_node() %s called without "mention" and "node" arguments.' % self.id)
-
-			return None
-
-		mention_found = self._mention_context(mention)
-		known_node	  = self._node_context(node)
-
-		result = self._decider.is_same_node(mention_found, known_node)
+		result = self._answer('extract_edges', arguments)
 
 		return result
 
 
-	def link_mention(self, node, text = None):
-		""" Decides whether a mention found by `hint_nodes` is a known instance, a new one or ambiguous.
+	def validate_initial_graph(self, ntx):
+		""" Checks that an initial graph of instances (such as the one an EvidenceGraph starts from) matches the ontology of the
+		Formalizer and describes every instance.
 
-		1. Candidates with `type_conflict` are discarded unless their score is 1 (the whole name).
-		2. A single candidate with score 1 is the instance.
-		3. Otherwise, the Decider scores the mention (with the text) against every candidate left (as `is_same_node` does), and those
-		from the threshold of the Decider on are kept.
-		4. If more than one is kept, the Decider is asked to choose one of them. If it does not, the mention is ambiguous.
+		The checks are:
+
+		- Every instance is a name under a type of entity of the ontology (e.g., `person|student|Noah Kim` under `person|student`).
+		- Every instance has a `description` that is not empty (e.g., "A science teacher at Riverside High School.").
+		- Every edge has a `relation` that is a relationship of the ontology, and the types of the instances it connects are the `src`
+		and `dst` of that relationship or descendants of them (e.g., a `person|student` can be the `src` of a relationship from
+		`person`).
 
 		Args:
-			node (dict): A node returned by `hint_nodes`.
-			text (str): The text where the mention was found, passed to the Decider.
+			ntx (networkx.MultiDiGraph): the initial graph, with the instances as nodes and their relationships as edges. The ontology
+				of the Formalizer must be loaded (it is once the Formalizer is piloted).
 
 		Returns:
-			(dict): The 'mention' with its 'id' and 'status': 'known' (with 'type_conflict' True if the type found contradicts the known
-				one), 'new' (its type followed by the mention) or 'ambiguous' (id None, with the ids of the instances it can be in
-				'candidates').
+			(list): A list of strings, one for each problem found. It is empty if the initial graph is valid.
 		"""
 
-		texts	= [] if text is None else [text]
-		found	= {'mention': node['mention'], 'type': node['type'], 'texts': texts}
-		mention = self._mention_context(found)
+		errors	= self._validate_instances(ntx)
+		errors += self._check_descriptions(ntx)
 
-		viable = [candidate for candidate in node['candidates'] if candidate['score'] == 1 or not candidate.get('type_conflict', False)]
-		whole  = [candidate for candidate in viable if candidate['score'] == 1]
-
-		accepted = whole if len(whole) == 1 else self._confirm_candidates(mention, viable)
-		chosen	 = self._choose_candidate(mention, accepted)
-		result	 = self._build_link(node, chosen)
-
-		return result
-
-
-	def _confirm_candidates(self, mention, candidate_nodes):
-		""" Returns the candidate nodes that the Decider scores from the threshold on as the same instance as the mention. """
-
-		result = []
-		for candidate in candidate_nodes:
-			known_node = self._node_context(candidate)
-			score	   = self._decider.is_same_node(mention, known_node)
-			if score >= self._decider.threshold:
-				result.append(candidate)
-
-		return result
-
-
-	def _choose_candidate(self, mention, accepted):
-		""" Returns the candidate the Decider chooses as a list of one, or all the accepted ones if there are not several or it does not
-		choose one of them. """
-
-		if len(accepted) < 2:
-			return accepted
-
-		known_nodes = [self._node_context(candidate) for candidate in accepted]
-		index		= self._decider.choose_node(mention, known_nodes)
-
-		result = []
-		for candidate in accepted:
-			if candidate['id'] == index:
-				result.append(candidate)
-
-		if len(result) == 0:
-			return accepted
-
-		return result
-
-
-	def _mention_context(self, mention):
-		""" Returns a mention as passed to the Decider: its text, its type, the definition of the type and the texts.
-
-		Args:
-			mention (dict): The mention, with 'mention' (the text as it appears, e.g., "Ms. Ruiz"), 'type' (its type in the ontology,
-				e.g., `person|teacher`) and optionally 'texts' (the texts where it was found).
-
-		Returns:
-			(dict): The mention with 'mention', 'type', 'type_definition' and 'texts' (empty if it has none) (see
-				[`Decider`][mercury.graph.evidence.Decider]).
-		"""
-
-		concept			   = mention['type']
-		concept_definition = self._concept_definition(concept)
-		texts			   = mention.get('texts', [])
-
-		context = {'mention': mention['mention'], 'type': concept, 'type_definition': concept_definition, 'texts': texts}
-
-		return context
-
-
-	def _node_context(self, node):
-		""" Returns a known instance as passed to the Decider: its id, the definition of its type, its description and its names.
-
-		Args:
-			node (dict): The known instance, with 'id' (its type followed by its name, e.g., `person|teacher|Elena Ruiz`) and
-				optionally 'description' and 'names' (its other names).
-
-		Returns:
-			(dict): The known instance with 'id', 'type_definition', 'description' (empty if it has none) and 'names' (empty if
-				it has none) (see [`Decider`][mercury.graph.evidence.Decider]).
-		"""
-
-		index			   = node['id']
-		concept			   = AgenticGraph.parent_of(index)
-		concept_definition = self._concept_definition(concept)
-
-		context = {'id': index, 'type_definition': concept_definition}
-		context['description'] = node.get('description', '')
-		context['names']	   = node.get('names', [])
-
-		return context
-
-
-	def _concept_definition(self, concept):
-		""" Returns the definition of a type of the ontology, or an empty string if it is not in the ontology. """
-
-		ntx = self._ontology._graph.networkx
-
-		if concept not in ntx.nodes:
-			return ''
-
-		result = ntx.nodes[concept].get('definition', '')
-
-		return result
-
-
-	def _build_link(self, node, accepted):
-		""" Returns the decision for a mention given the candidates accepted: new if none, known if one and ambiguous if several. """
-
-		if len(accepted) == 0:
-			index = '%s|%s' % (node['type'], node['mention'])
-			link  = {'mention': node['mention'], 'id': index, 'status': 'new'}
-		elif len(accepted) == 1:
-			link = {'mention': node['mention'], 'id': accepted[0]['id'], 'status': 'known'}
-			if accepted[0].get('type_conflict', False):
-				link['type_conflict'] = True
-		else:
-			ids	 = [candidate['id'] for candidate in accepted]
-			link = {'mention': node['mention'], 'id': None, 'status': 'ambiguous', 'candidates': ids}
-
-		return link
+		return errors
 
 
 	def close(self, endpoint_locked):
@@ -1028,8 +390,219 @@ class Formalizer(Agentic):
 
 		# There is no state to persist, just freeing resources.
 		self._ontology = None
-		self._model	   = None
-		self._decider  = None
+		self._deciders = {}
+
+
+	def _answer(self, key, arguments):
+		""" Returns the answer of the Decider of a question, or None (logging why) if the Formalizer is not ready, does not answer the
+		question or the arguments are not those of the question. """
+
+		if self._meta_['state'] != self.states.READY.value:
+			self.log_error('Formalizer %s is not ready for %s.' % (self.id, key))
+
+			return None
+
+		decider = self._deciders.get(key, None)
+
+		if decider is None:
+			self.log_error('Formalizer %s does not answer %s.' % (self.id, key))
+
+			return None
+
+		question, problems = self._question(key, arguments)
+
+		for problem in problems:
+			self.log_error('Invalid arguments of %s in Formalizer %s: %s' % (key, self.id, problem))
+
+		if len(problems) > 0:
+			return None
+
+		capability = decider.meta['capabilities'][0]['function']['name']
+		request	   = {'name': capability, 'arguments': question}
+		response   = decider.run(request)
+
+		return response['message']
+
+
+	def _question(self, key, arguments):
+		""" Returns the arguments of the Question for the Decider and the problems found: those of the arguments or, if they have none,
+		those of translating them. """
+
+		problems = self._argument_problems(key, arguments)
+
+		if len(problems) > 0:
+			return None, problems
+
+		question, problems = self._translate(key, arguments)
+
+		return question, problems
+
+
+	def _translate(self, key, arguments):
+		""" Returns the arguments of the Question for the Decider, completed with the ontology, and the problems found (an id that is
+		not in the ontology). """
+
+		if key == 'extract_nodes':
+			return self._translate_extract_nodes(arguments)
+
+		if key == 'extract_edges':
+			return self._translate_extract_edges(arguments)
+
+		return self._translate_match_node(arguments)
+
+
+	def _translate_extract_nodes(self, arguments):
+		""" Returns the arguments of `extract_nodes` for the Decider, with the types of the ontology asked for, and the problems found. """
+
+		ids				   = arguments.get('types', None)
+		concepts, problems = self._ontology_types(ids)
+
+		question = {'text': arguments['text'], 'ontology': {'types': concepts}}
+		self._copy_context(arguments, question)
+
+		return question, problems
+
+
+	def _translate_extract_edges(self, arguments):
+		""" Returns the arguments of `extract_edges` for the Decider, with the relations of the ontology asked for, and the problems
+		found. """
+
+		ids					= arguments.get('relations', None)
+		relations, problems = self._ontology_relations(ids)
+		problems		   += self._node_id_problems(arguments['nodes'])
+
+		question = {'text': arguments['text'], 'nodes': arguments['nodes'], 'ontology': {'relations': relations}}
+		self._copy_context(arguments, question)
+
+		return question, problems
+
+
+	def _translate_match_node(self, arguments):
+		""" Returns the arguments of `match_node` for the Decider, with the definition of the type of the mention, and the problems
+		found. """
+
+		mention = dict(arguments['mention'])
+		concept = mention['type']
+		ntx		= self._ontology._graph.networkx
+
+		if concept not in ntx.nodes:
+			problem = 'Type "%s" of the mention is not in the ontology.' % concept
+
+			return None, [problem]
+
+		definition			  = ntx.nodes[concept].get('definition', None)
+		mention['definition'] = self._definition_text(definition)
+
+		question = {'mention': mention, 'node': arguments['node']}
+		self._copy_context(arguments, question)
+
+		return question, []
+
+
+	def _node_id_problems(self, nodes):
+		""" Returns a problem for every node whose id is not a type of the ontology, "|" and a name (e.g., "person|teacher|Elena Ruiz"). """
+
+		ntx = self._ontology._graph.networkx
+
+		problems = []
+		for position, node in enumerate(nodes):
+			index = node['id']
+			if not isinstance(index, str):
+				problem = 'Argument "nodes[%d]" has an id that is not a text.' % position
+				problems.append(problem)
+				continue
+
+			concept = AgenticGraph.parent_of(index)
+			if concept not in ntx.nodes:
+				problem = 'Argument "nodes[%d]" has id "%s", which is not a type of the ontology, "|" and a name.' % (position, index)
+				problems.append(problem)
+
+		return problems
+
+
+	def _copy_context(self, arguments, question):
+		""" Copies the context of the arguments, if any, to the question. """
+
+		if 'context' in arguments:
+			question['context'] = arguments['context']
+
+
+	def _ontology_types(self, ids):
+		""" Returns the types of the ontology with the given ids (all of them if ids is None), as a list of {'id', 'definition'}, and a
+		problem for every id that is not a type of the ontology. """
+
+		ntx = self._ontology._graph.networkx
+
+		if ids is None:
+			ids = list(ntx.nodes)
+
+		concepts = []
+		problems = []
+		for index in ids:
+			if index not in ntx.nodes:
+				problems.append('Type "%s" is not in the ontology.' % index)
+				continue
+
+			definition = ntx.nodes[index].get('definition', None)
+			concept	   = {'id': index, 'definition': self._definition_text(definition)}
+			concepts.append(concept)
+
+		return concepts, problems
+
+
+	def _ontology_relations(self, ids):
+		""" Returns the relations of the ontology with the given ids (all of them if ids is None), as a list of {'id', 'src', 'dst',
+		'definition'}, and a problem for every id that is not a relation of the ontology. """
+
+		ntx		  = self._ontology._graph.networkx
+		relations = {}
+		for src, dst, index, definition in ntx.edges(keys = True, data = 'definition'):
+			relation		 = {'id': index, 'src': src, 'dst': dst, 'definition': self._definition_text(definition)}
+			relations[index] = relation
+
+		if ids is None:
+			ids = list(relations)
+
+		result	 = []
+		problems = []
+		for index in ids:
+			if index not in relations:
+				problems.append('Relation "%s" is not in the ontology.' % index)
+				continue
+
+			result.append(relations[index])
+
+		return result, problems
+
+
+	def _definition_text(self, value):
+		""" Returns a definition if it is a text, or an empty string otherwise (missing, or NaN from an empty cell of a .csv file). """
+
+		if isinstance(value, str):
+			return value
+
+		return ''
+
+
+	def _pilot_ontology(self):
+		""" Finds and validates the ontology and returns the new state: ONTOLOGY_LOADED_OK or, logging every problem, ERR_ONTOLOGY_INIT. """
+
+		ontology = self._find_ontology()
+
+		if ontology is None:
+			return self.states.ERR_ONTOLOGY_INIT.value
+
+		errors = self._validate_ontology(ontology)
+
+		for error in errors:
+			self.log_error('Invalid ontology in Formalizer %s: %s' % (self.id, error))
+
+		if len(errors) > 0:
+			return self.states.ERR_ONTOLOGY_INIT.value
+
+		self._ontology = ontology
+
+		return self.states.ONTOLOGY_LOADED_OK.value
 
 
 	def _find_ontology(self):
@@ -1042,7 +615,9 @@ class Formalizer(Agentic):
 
 			return None
 
-		key = '%s/%s_%s' % (self.id.split('/')[0], AgenticGraph(schema = None, extra_args = None).id, name)
+		endpoint_name = self.id.split('/')[0]
+		class_name	  = AgenticGraph(schema = None, extra_args = None).id
+		key			  = '%s/%s_%s' % (endpoint_name, class_name, name)
 
 		if key not in self.tools:
 			self.log_error('Tool with key "%s" not found while piloting Formalizer %s.' % (key, self.id))
@@ -1052,62 +627,82 @@ class Formalizer(Agentic):
 		return self.tools[key]
 
 
-	def _handle_ontology_errors(self, errors):
-		""" Logs every problem found by `validate_ontology()` and sets the `ERR_ONTOLOGY_INIT` state.
+	def _pilot_deciders(self):
+		""" Finds the Deciders and returns the new state: DECIDER_LOADED_OK or, logging every problem, ERR_DECIDER_INIT. """
 
-		Args:
-			errors (list): The problems found, as returned by `validate_ontology()`.
-		"""
+		keys = self._configured_questions()
 
-		for error in errors:
-			self.log_error('Invalid ontology in Formalizer %s: %s' % (self.id, error))
+		if len(keys) == 0:
+			self.log_error('Formalizer %s answers no question: configure at least one of %s.' % (self.id, ', '.join(self.QUESTION_KEYS)))
 
-		self._meta_['state'] = self.states.ERR_ONTOLOGY_INIT.value
+			return self.states.ERR_DECIDER_INIT.value
+
+		deciders = {}
+		for key in keys:
+			decider = self._find_decider(key)
+			if decider is not None:
+				deciders[key] = decider
+
+		if len(deciders) < len(keys):
+			return self.states.ERR_DECIDER_INIT.value
+
+		self._deciders = deciders
+
+		return self.states.DECIDER_LOADED_OK.value
 
 
-	def _load_decider(self):
-		""" Returns the Decider of the "decider" section of the configuration (rules by default), or None (logging why) if its type is
-		unknown, it cannot be created or it is not ready. """
+	def _find_decider(self, key):
+		""" Returns the Decider configured for a question among the tools, or None (logging why) if it is not found, it answers another
+		question or it is not ready. """
 
-		conf = dict(self.conf.get('decider', {'type': 'rules'}))
-		kind = conf.pop('type', None)
+		name	= self.conf[key]
+		decider = self._decider_tool(name)
 
-		decider_class = DECIDERS.get(kind, None)
-		if decider_class is None:
-			self.log_error('Unknown decider type "%s" while piloting Formalizer %s.' % (kind, self.id))
-
-			return None
-
-		decider = self._create_decider(decider_class, conf)
 		if decider is None:
+			self.log_error('Decider "%s" of %s not found in the tools of Formalizer %s.' % (name, key, self.id))
+
 			return None
 
-		problems = decider.ready()
-		for problem in problems:
-			self.log_error('Decider "%s" is not ready in Formalizer %s: %s' % (kind, self.id, problem))
+		expected = key.upper()
+		if decider.question != expected:
+			self.log_error('Decider "%s" answers %s, not %s, in Formalizer %s.' % (name, decider.question, expected, self.id))
 
-		if len(problems) > 0:
 			return None
 
-		return decider
-
-
-	def _create_decider(self, decider_class, conf):
-		""" Returns a Decider of decider_class with conf, or None (logging why) if creating it fails. """
-
-		try:
-			decider = decider_class(conf)
-
-		except Exception as e:
-			self.log_error('Failed to create the decider while piloting Formalizer %s: %s' % (self.id, str(e)))
+		state = decider.meta['state']
+		if state != DeciderState.READY.value:
+			self.log_error('Decider "%s" of %s is not ready (state %d) in Formalizer %s.' % (name, key, state, self.id))
 
 			return None
 
 		return decider
+
+
+	def _decider_tool(self, name):
+		""" Returns the Decider with a name among the tools, or None if there is none. """
+
+		for tool in self.tools.values():
+			if isinstance(tool, Decider) and tool.name == name:
+				return tool
+
+		return None
+
+
+	def _configured_questions(self):
+		""" Returns the keys of the questions with a Decider (a key of the configuration that is not null), in the order of Question. """
+
+		keys = []
+		for key in self.QUESTION_KEYS:
+			name = self.conf.get(key, None)
+			if name is not None:
+				keys.append(key)
+
+		return keys
 
 
 	def _capabilities(self):
-		""" Returns the capabilities of the Formalizer.
+		""" Returns the capabilities of the Formalizer: those of the questions configured, named after the Formalizer (e.g.,
+		`extract_nodes_Formalizer`).
 
 		Returns:
 			(list): A list of capabilities, each represented as a dictionary with the following keys:
@@ -1123,112 +718,248 @@ class Formalizer(Agentic):
 				* 'returns': A dictionary with 'type' and 'items'
 		"""
 
-		name_hint_nodes = 'hint_nodes_%s' % self.name
-		name_hint_edges = 'hint_edges_%s' % self.name
-		name_is_same	= 'is_same_node_%s' % self.name
+		self.call = {}
 
-		self.call = {name_hint_nodes: self.hint_nodes, name_hint_edges: self.hint_edges, name_is_same: self.is_same_node}
+		capabilities = []
+		for key in self._configured_questions():
+			capability = deepcopy(self.FUNCTIONS[key])
+			name	   = capability['function']['name'] % self.name
+			capability['function']['name'] = name
 
-		return [
-			{
-				'type': 'function',
-				'function': {
-					'name': name_hint_nodes,
-					'description': 'Identify nodes in a text from the ontology or some concepts in it.',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'text': {
-								'type': 'string',
-								'description': 'Text from which to identify nodes.'
-							},
-							'concepts': {
-								'type': 'array',
-								'items': {
-									'type': 'string'
-								},
-								'description': 'List of concepts to identify in the text. If empty, all concepts will be considered.'
-							},
-							'candidates': {
-								'type': 'array',
-								'items': {
-									'type': 'object'
-								},
-								'description': 'The known instances a mention can be: "id", "description" and optionally "names", its other names. If missing, no mention has candidates.'
-							}
-						},
-						'required': ['text']
-					},
-					'returns': {
-						'type': 'array',
-						'items': {
-							'type': 'object',
-							'description': 'One node per mention, with "mention", "type", "confidence" and "candidates" ({"id", "score", "description", "names"}).'
-						}
-					}
-				}
-			},
-			{
-				'type': 'function',
-				'function': {
-					'name': name_hint_edges,
-					'description': 'Identify edges of the ontology, or of some relationships in it, between the nodes of a text.',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'text': {
-								'type': 'string',
-								'description': 'Text from which to identify edges.'
-							},
-							'nodes': {
-								'type': 'array',
-								'items': {
-									'type': 'object'
-								},
-								'description': 'The nodes of the text, with "mention" and "id". If missing, they are found in the text as new nodes.'
-							},
-							'concepts': {
-								'type': 'array',
-								'items': {
-									'type': 'string'
-								},
-								'description': 'Ids of the relationships to identify. If missing, all of them are considered.'
-							}
-						},
-						'required': ['text']
-					},
-					'returns': {
-						'type': 'array',
-						'items': {
-							'type': 'object',
-							'description': 'One edge with "src", "relation", "dst" (ids) and "confidence".'
-						}
-					}
-				}
-			},
-			{
-				'type': 'function',
-				'function': {
-					'name': name_is_same,
-					'description': 'Score how likely a mention is a known instance (a node, as a "type|name" id).',
-					'parameters': {
-						'type': 'object',
-						'properties': {
-							'mention': {
-								'type': 'object',
-								'description': 'A mention: "mention" (the text as it appears), "type" and optionally "texts", a list of texts where it was found.'
-							},
-							'node': {
-								'type': 'object',
-								'description': 'A known instance: "id", "description" and optionally "names", its other names.'
-							}
-						},
-						'required': ['mention', 'node']
-					},
-					'returns': {
-						'type': 'number',
-						'description': 'A score (0..1): how likely the mention is the known instance.'
-					}
-				}
-			}
-		]
+			self.call[name] = key
+			capabilities.append(capability)
+
+		return capabilities
+
+
+	def _argument_problems(self, key, arguments):
+		""" Returns the problems of the arguments of a question: a required one is missing, one is unknown or one has another type. """
+
+		if type(arguments) is not dict:
+			return ['The arguments must be a dictionary.']
+
+		parameters = self.FUNCTIONS[key]['function']['parameters']
+		properties = parameters['properties']
+
+		problems = []
+		for name in parameters['required']:
+			if name not in arguments:
+				problems.append('Missing argument "%s".' % name)
+
+		for name, value in arguments.items():
+			problem = self._argument_problem(name, value, properties)
+			if problem is not None:
+				problems.append(problem)
+				continue
+
+			problems += self._field_problems(name, value, properties[name])
+
+		return problems
+
+
+	def _argument_problem(self, name, value, properties):
+		""" Returns the problem of one argument (unknown or of another type than its property), or None if it has none. """
+
+		parameter = properties.get(name, None)
+
+		if parameter is None:
+			return 'Unknown argument "%s".' % name
+
+		expected = self.ARGUMENT_TYPES[parameter['type']]
+
+		if not isinstance(value, expected):
+			return 'Argument "%s" must be of type %s.' % (name, parameter['type'])
+
+		return None
+
+
+	def _field_problems(self, name, value, parameter):
+		""" Returns the problems of the fields of an argument of the right type: a required field missing from an object, or from an
+		object in an array (e.g., the "mention" of the argument 'mention' of `match_node`), or an item of another type. """
+
+		if parameter['type'] == 'object':
+			required = parameter.get('required', [])
+			problems = self._missing_fields(name, value, required)
+
+			return problems
+
+		if parameter['type'] == 'array':
+			problems = self._item_problems(name, value, parameter['items'])
+
+			return problems
+
+		return []
+
+
+	def _item_problems(self, name, items, item_parameter):
+		""" Returns the problems of the items of an array argument: an item of another type or an object that misses a required field. """
+
+		expected = self.ARGUMENT_TYPES[item_parameter['type']]
+		required = item_parameter.get('required', [])
+
+		problems = []
+		for position, item in enumerate(items):
+			label = '%s[%d]' % (name, position)
+			if not isinstance(item, expected):
+				problems.append('Argument "%s" must be of type %s.' % (label, item_parameter['type']))
+				continue
+
+			problems += self._missing_fields(label, item, required)
+
+		return problems
+
+
+	def _missing_fields(self, label, value, required):
+		""" Returns a problem for every required field missing from an object argument. """
+
+		problems = []
+		for field in required:
+			if field not in value:
+				problems.append('Argument "%s" is missing "%s".' % (label, field))
+
+		return problems
+
+
+	def _validate_ontology(self, ontology):
+		""" Checks that an ontology (entities as nodes and relationships as edges between them) is coherent.
+
+		The checks are:
+
+		- Every entity has its parent (the id without its last `|` level) defined.
+		- Every relationship has its parent defined (e.g., `works_on` for `works_on|leads`).
+		- The `src` and `dst` of a relationship are those of its parent or descendants of them (e.g., `works_on|leads` can go from
+		`person|student` if `works_on` goes from `person`).
+
+		That ids are unique and that the `src` and `dst` of every relationship are entities of the ontology is already checked when it
+		is loaded (see [`AgenticGraph.graph_from_files()`][mercury.graph.evidence.AgenticGraph.graph_from_files]).
+
+		Args:
+			ontology (AgenticGraph): the ontology. It must be loaded (piloted) before being validated, otherwise that is the only
+				problem reported.
+
+		Returns:
+			(list): A list of strings, one for each problem found. It is empty if the ontology is valid.
+		"""
+
+		if ontology._graph is None:
+			return ['Ontology "%s" is not loaded.' % ontology.name]
+
+		ntx		  = ontology._graph.networkx
+		relations = self._relation_ends(ntx)
+
+		errors  = self._check_parents(set(ntx.nodes), 'Entity', ontology.name)
+		errors += self._check_parents(set(relations), 'Relationship', ontology.name)
+		errors += self._check_relation_inheritance(relations)
+
+		return errors
+
+
+	def _validate_instances(self, ntx):
+		""" Returns the problems of a graph of instances that does not match the ontology: an instance that is not under a type of entity
+		of the ontology, or an edge without a relationship of the ontology or between instances of other types. """
+
+		types	  = set(self._ontology._graph.networkx.nodes)
+		relations = self._relation_ends(self._ontology._graph.networkx)
+
+		return self._check_instances(ntx, types) + self._check_instance_edges(ntx, relations)
+
+
+	def _check_descriptions(self, ntx):
+		""" Returns an error for every instance in ntx without a description or with an empty one. """
+
+		errors = []
+		for index, description in sorted(ntx.nodes(data = 'description')):
+			if not self._is_text(description):
+				errors.append('Instance "%s" has no description: the initial graph needs one for every instance.' % index)
+
+		return errors
+
+
+	def _is_text(self, value):
+		""" Returns True if value is a string that is not empty or only spaces (an empty cell of a .csv file is read as NaN). """
+
+		if not isinstance(value, str):
+			return False
+
+		return value.strip() != ''
+
+
+	def _check_instances(self, ntx, types):
+		""" Returns an error for every instance in ntx that is not under a type of entity in types. """
+
+		errors = []
+		for index in sorted(ntx.nodes):
+			if AgenticGraph.parent_of(index) is None:
+				errors.append('Instance "%s" has no type: its id must start with a type of entity of the ontology.' % index)
+			elif AgenticGraph.parent_of(index) not in types:
+				errors.append('Instance "%s" is of type "%s", which is not in the ontology.' % (index, AgenticGraph.parent_of(index)))
+
+		return errors
+
+
+	def _check_instance_edges(self, ntx, relations):
+		""" Returns the errors of every edge in ntx, sorted by edge id. """
+
+		errors = []
+		for src, dst, key, relation in sorted(ntx.edges(keys = True, data = 'relation'), key = lambda edge: str(edge[2])):
+			errors += self._check_instance_edge(src, dst, key, relation, relations)
+
+		return errors
+
+
+	def _check_instance_edge(self, src, dst, key, relation, relations):
+		""" Returns the errors of one edge: a missing or unknown relation, or instances of types the relation does not connect. """
+
+		if not isinstance(relation, str):
+			return ['Edge "%s" has no relation.' % key]
+
+		if relation not in relations:
+			return ['Edge "%s" has relation "%s", which is not in the ontology.' % (key, relation)]
+
+		errors = []
+		for end, instance, expected in zip(('src', 'dst'), (src, dst), relations[relation]):
+			if AgenticGraph.parent_of(instance) is not None and not AgenticGraph.descends_from(AgenticGraph.parent_of(instance), expected):
+				errors.append('Edge "%s": its %s "%s" is not a "%s" as required by "%s".' % (key, end, instance, expected, relation))
+
+		return errors
+
+
+	def _relation_ends(self, ntx):
+		""" Returns a dictionary of relationship id: (src, dst) of the ontology ntx. """
+
+		return {key: (src, dst) for src, dst, key in ntx.edges(keys = True)}
+
+
+	def _check_relation_inheritance(self, relations):
+		""" Returns an error for every src or dst of a relationship that is not that of its parent or a descendant of it. """
+
+		errors = []
+		for index, ends in sorted(relations.items()):
+			parent = AgenticGraph.parent_of(index)
+			if parent in relations:
+				errors += self._check_inherited_ends(index, ends, parent, relations[parent])
+
+		return errors
+
+
+	def _check_inherited_ends(self, index, ends, parent, parent_ends):
+		""" Returns an error for each end of a relationship that does not descend from the same end of its parent. """
+
+		errors = []
+		for end, concept, expected in zip(('src', 'dst'), ends, parent_ends):
+			if not AgenticGraph.descends_from(concept, expected):
+				msg = 'Relationship "%s" has %s "%s", which is not a "%s" as required by its parent "%s".'
+				errors.append(msg % (index, end, concept, expected, parent))
+
+		return errors
+
+
+	def _check_parents(self, indices, kind, ontology):
+		""" Returns an error for every index whose parent is not in indices. kind and ontology name them in the messages. """
+
+		errors = []
+		for index in sorted(indices):
+			if AgenticGraph.parent_of(index) is not None and AgenticGraph.parent_of(index) not in indices:
+				errors.append('%s "%s" has no parent "%s" in %s.' % (kind, index, AgenticGraph.parent_of(index), ontology))
+
+		return errors

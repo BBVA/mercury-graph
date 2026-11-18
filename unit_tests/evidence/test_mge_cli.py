@@ -245,3 +245,7 @@ def test_cli_module_dispatch(monkeypatch, tmp_path):
 		runpy.run_module('cli.mge', run_name = '__main__')
 
 	assert uvicorn_run.called
+
+
+# if __name__ == "__main__":
+# 	pytest.main([__file__])

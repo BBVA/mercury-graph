@@ -32,11 +32,11 @@
 			// This dictionary allows using different names or disabling (making null) the various components of the EvidenceGraph.
 			// The names (values) must match the "tools" the Formalizer expects the Endpoint to provide.
 			// Sources is a list with any number of Source tools, everything else is a single tool or null.
-			"agentics": {"formalizer": "GLiNER2", "id_nodes": "GLiNER2", "id_edges": null, "is_same": null, "sources": ["mediawiki_example"]}
+			"agentics": {"formalizer": "Formalizer", "id_nodes": "Formalizer", "id_edges": null, "is_same": null, "sources": ["mediawiki_example"]}
 		},
 
 		// "tools" declares what tools does the evidence graph expect. The endpoint will find them and provide them via `add_tool()`.
 		// Provide a list of tool names
-		"tools": ["mediawiki_example", "GLiNER2"]
+		"tools": ["mediawiki_example", "Formalizer"]
 	}
 }

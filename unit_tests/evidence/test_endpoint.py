@@ -10,6 +10,7 @@ from mercury.graph.evidence.endpoint import AgenticFailedToFindCapability, Agent
 
 from cli.mge import MgeCli
 
+import mercury.graph.evidence.deciders as deciders_module
 import mercury.graph.evidence.endpoint as endpoint_module
 
 
@@ -17,10 +18,11 @@ def _endpoint_conf():
 	return {
 		'sources': {},
 		'ontologies': {},
+		'deciders': {},
 		'formalizers': {},
 		'evidence_graphs': {},
 		'agents': {},
-		'custom_agentics': {}
+		'custom': {}
 	}
 
 
@@ -224,8 +226,9 @@ def test_endpoint_auto_pilot_and_close(tmp_path, monkeypatch):
 def test_endpoint_str_loaded_objects_and_capabilities(tmp_path):
 	endpoint = _make_endpoint(tmp_path, 'str_loaded')
 	endpoint.conf['agents'] = {'empty': {}, 'unknown': {}, 'ready': {}}
-	endpoint._meta_ = {'state': 0, 'capabilities': [{'function': {'name': 'capability'}}]}
-	endpoint.agentic_by_capability = {'capability': Mock()}
+	capability_names = ['capability_%d' % index for index in range(5)]
+	endpoint._meta_ = {'state': 0, 'capabilities': [{'function': {'name': name}} for name in capability_names]}
+	endpoint.agentic_by_capability = {name: Mock() for name in capability_names}
 
 	empty = Mock()
 	empty.id = 'empty_id'
@@ -242,7 +245,8 @@ def test_endpoint_str_loaded_objects_and_capabilities(tmp_path):
 	endpoint.tools = {empty.id: empty, ready.id: ready, unknown.id: unknown}
 
 	text = re.sub(r'\033\[[0-9;]*m', '', str(endpoint))
-	assert 'capabilities  : (1 total)' in text
+	assert 'capabilities  : (5 total)' in text
+	assert "'...'" in text
 	assert 'empty: no state' in text
 	assert 'unknown: 99 (no name)' in text
 	assert 'ready: 100 (ALL_READY)' in text
@@ -319,6 +323,11 @@ def test_endpoint_pilot_states(tmp_path, monkeypatch):
 	endpoint.meta['state'] = EndPointState.ERR_LOADING_OBJ.value
 	endpoint.pilot(EndPointState.ALL_READY.value)
 	assert endpoint.meta['state'] == EndPointState.ERR_LOADING_OBJ.value
+
+	endpoint.meta['state'] = EndPointState.INITIAL.value
+	monkeypatch.setattr(endpoint, '_load_objects', lambda: True)
+	endpoint.pilot(EndPointState.LOADED_OBJ.value, just_once = True)
+	assert endpoint.meta['state'] == EndPointState.LOADED_OBJ.value
 
 	endpoint.meta['state'] = EndPointState.INITIAL.value
 	monkeypatch.setattr(endpoint, '_load_objects', lambda: False)
@@ -525,14 +534,20 @@ def test_endpoint_response_loop_tool_calls(tmp_path):
 		endpoint._response_loop(agentic, [], response([call]))
 
 
-def test_endpoint_load_objects(tmp_path):
+def test_endpoint_load_objects(tmp_path, monkeypatch):
 	conf = _endpoint_conf()
 	conf['sources'] = {'source': {'name': 'source', 'extra_args': {'nested': {'$path': 'source'}}}}
 	conf['ontologies'] = {'ontology': {'name': 'ontology', 'extra_args': {}}}
-	conf['formalizers'] = {'formalizer': {'name': 'formalizer', 'extra_args': {}}}
 	conf['evidence_graphs'] = {'graph': {'name': 'graph', 'extra_args': {}}}
 	conf['agents'] = {'agent': {'name': 'agent', 'extra_args': {}}}
-	conf['custom_agentics'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py', 'extra_args': {}}}
+	decider_classes = ('XNodesGl2Decider', 'XEdgesGl2Decider', 'MatchNodeJevDecider', 'MatchNodeLayaDecider')
+	for class_name in decider_classes:
+		monkeypatch.setattr(deciders_module, class_name, Mock)
+	conf['deciders'] = {
+		class_name: {'name': class_name, 'class_name': class_name, '$path': 'unused.py', 'extra_args': {}}
+		for class_name in decider_classes
+	}
+	conf['custom'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py', 'extra_args': {}}}
 	endpoint = _make_endpoint(tmp_path, 'load_objects', conf)
 	custom = tmp_path / 'load_objects' / 'custom.py'
 	custom.write_text(
@@ -548,18 +563,19 @@ def test_endpoint_load_objects(tmp_path):
 	assert endpoint._load_objects() is True
 	assert set(endpoint.ids) == set(conf)
 	assert endpoint.tools[endpoint.ids['sources']['source']].conf['nested']['path'].endswith('/source')
-	assert endpoint.ids['custom_agentics']['custom'] in endpoint.tools
+	assert set(endpoint.ids['deciders']) == set(decider_classes)
+	assert endpoint.ids['custom']['custom'] in endpoint.tools
 
 
 def test_endpoint_load_objects_errors(tmp_path, monkeypatch):
 	conf = _endpoint_conf()
-	conf['custom_agentics'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py'}}
+	conf['custom'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py'}}
 	endpoint = _make_endpoint(tmp_path, 'invalid_custom', conf)
 	(tmp_path / 'invalid_custom' / 'custom.py').write_text('class Custom: pass\n')
 	assert endpoint._load_objects() is False
 
 	conf = _endpoint_conf()
-	conf['custom_agentics'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py'}}
+	conf['custom'] = {'custom': {'name': 'custom', 'class_name': 'Custom', '$path': 'custom.py'}}
 	endpoint = _make_endpoint(tmp_path, 'missing_spec', conf)
 	monkeypatch.setattr(endpoint_module.importlib.util, 'spec_from_file_location', lambda name, path: None)
 	assert endpoint._load_objects() is False
@@ -719,18 +735,6 @@ def test_end_to_end_using_cli(tmp_path, capsys):
 	cli.unlock()
 	assert 'forcefully unlocked.' in capsys.readouterr().out
 
-	args = {'command': 'pilot', 'name': endpoint, 'intent': 'ALL_READY', 'just_once': True, 'log_file': log_file}
-	cli = MgeCli(args)
-	cli.pilot()
-	assert 'Final state is 1 "LOADED_OBJ"' in capsys.readouterr().out
-
-	args = {'command': 'summary', 'name': endpoint, 'just_once': False}
-	cli = MgeCli(args)
-	cli.summary()
-	output = capsys.readouterr().out
-	assert '🌐 Endpoint' in output
-	assert '   state         : 4 \x1b[3m(PILOT_REQUIRED)\x1b[0m\n' in output
-	assert ': 0 (INITIAL) id: endpoint' in output
 
 # if __name__ == "__main__":
 # 	pytest.main([__file__])

@@ -130,7 +130,7 @@ class Endpoint(Agentic):
 		super().__init__(my_class = 'endpoint', schema = schema, endpoint = None, logger = logger)
 
 		self.states = EndPointState
-		self.ids = {'sources': {}, 'ontologies': {}, 'formalizers': {}, 'evidence_graphs': {}, 'agents': {}, 'custom_agentics': {}}
+		self.ids = {'sources': {}, 'ontologies': {}, 'deciders': {}, 'formalizers': {}, 'evidence_graphs': {}, 'agents': {}, 'custom': {}}
 
 		if not auto_pilot:
 			return
@@ -163,7 +163,7 @@ class Endpoint(Agentic):
 		italic	 = '\033[3m'
 		reset	 = '\033[0m'
 		labels	 = ['name', 'creation_date', 'mge_version', 'description']
-		sections = ['sources', 'ontologies', 'formalizers', 'evidence_graphs', 'agents', 'custom_agentics']
+		sections = ['sources', 'ontologies', 'deciders','formalizers', 'evidence_graphs', 'agents', 'custom']
 		no_name	 = '%sno name%s' % (italic, reset)
 		no_obj	 = '%snot loaded%s' % (italic, reset)
 		no_state = '%sno state%s' % (italic, reset)
@@ -171,10 +171,11 @@ class Endpoint(Agentic):
 			'endpoint': '🌐',
 			'sources': '📚',
 			'ontologies': '🏛️',
+			'deciders': '⚖️',
 			'formalizers': '🧩',
 			'evidence_graphs': '🕸️',
 			'agents': '🤖',
-			'custom_agentics': '🛠️'
+			'custom': '🛠️'
 		}
 
 		txt = ['%s%s Endpoint%s' % (bold, icons['endpoint'], reset)]
@@ -585,8 +586,8 @@ class Endpoint(Agentic):
 
 
 	def _load_objects(self):
-		""" This method parses the self.conf dictionary, category by category: sources, ontologies, formalizers, evidence_graphs,
-		agents and custom_agentics.
+		""" This method parses the self.conf dictionary, category by category: sources, ontologies, deciders, formalizers, evidence_graphs,
+		agents and custom.
 
 		It creates and instance of each, passing extra arguments to the constructor if they are present in the configuration.
 		These instances are verified to have unique IDs and are stored in self.ids.
@@ -612,8 +613,28 @@ class Endpoint(Agentic):
 
 			return new_arg
 
-		def _load_custom_agentic_class(class_name, file_path):
-			""" Load a custom Agentic class from a Python source file. """
+		def _load_decider_or_custom_class(class_name, file_path):
+			""" Load either one of the Decider descendants in the library or a custom Agentic class from a Python source file. """
+
+			if class_name == 'XNodesGl2Decider':
+				from .deciders import XNodesGl2Decider
+
+				return XNodesGl2Decider
+
+			if class_name == 'XEdgesGl2Decider':
+				from .deciders import XEdgesGl2Decider
+
+				return XEdgesGl2Decider
+
+			if class_name == 'MatchNodeJevDecider':
+				from .deciders import MatchNodeJevDecider
+
+				return MatchNodeJevDecider
+
+			if class_name == 'MatchNodeLayaDecider':
+				from .deciders import MatchNodeLayaDecider
+
+				return MatchNodeLayaDecider
 
 			module_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -634,10 +655,11 @@ class Endpoint(Agentic):
 		section_classes = {
 			'sources': Source,
 			'ontologies': AgenticGraph,
+			'deciders': None,
 			'formalizers': Formalizer,
 			'evidence_graphs': EvidenceGraph,
 			'agents': Agent,
-			'custom_agentics': None
+			'custom': None
 		}
 		for section in self.ids.keys():
 			for value in self.conf[section].values():
@@ -650,7 +672,7 @@ class Endpoint(Agentic):
 				agentic_class = section_classes[section]
 
 				if agentic_class is None:
-					agentic_class = _load_custom_agentic_class(agentic_def['class_name'], agentic_def['path'])
+					agentic_class = _load_decider_or_custom_class(agentic_def['class_name'], agentic_def['path'])
 
 					if agentic_class is None:
 						return False

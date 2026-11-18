@@ -63,9 +63,8 @@ entity and its definition to the extraction model, so a clear definition directl
 ### Types and concepts
 
 A type of the ontology, of entity or of relationship, is also called a **concept**: both words name the same thing. The code and the
-files of the ontology (`entities_concepts.csv`, `relationships_concepts.csv`) say *concept*. The capabilities say *type* in what they
-return and in the context they give to a [`Decider`](evidence.md#mercury.graph.evidence.Decider) (e.g., the `type` of a mention and
-its `type_definition`), but they take the types to look for in an argument named `concepts`.
+files of the ontology (`entities_concepts.csv`, `relationships_concepts.csv`) say *concept*. The capabilities say *type*: e.g., the
+`type` of a mention and the argument `types` with the types to look for.
 
 
 ## Relationships: the edges of the ontology
@@ -211,6 +210,3 @@ own, and every answer is limited to `max_results` entries and says when it has b
 - There is no graph query language: agents explore the ontology through the capabilities above, one question at a time.
 - The initial graph is loaded into the EvidenceGraph, but it cannot be explored through capabilities yet.
 - The ontology cannot be edited at runtime: it is defined by its .csv files (deleting its pickle to apply changes).
-- [`Formalizer.is_same_node()`](evidence.md#mercury.graph.evidence.Formalizer.is_same_node), which scores whether a mention is a
-  known instance, is answered by [`RulesDecider`](evidence.md#mercury.graph.evidence.RulesDecider), the only Decider so far: it only
-  compares their names and does not read the texts that mention them.
