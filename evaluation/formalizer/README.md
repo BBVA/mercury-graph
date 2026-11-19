@@ -21,6 +21,7 @@ Run them from the root of the repository:
 python evaluation/formalizer/check_cases.py
 python evaluation/formalizer/run_eval.py -v
 python evaluation/formalizer/run_match_node_eval.py -v
+python evaluation/formalizer/run_match_node_eval.py hard_cases.json --laya
 ```
 
 `-v` lists what is missing and what is extra in every case. Both scripts take another dataset of this directory as an argument (e.g.,
@@ -48,7 +49,9 @@ positive if the instance is the expected `id` of the mention. `ambiguous` and `u
 mention is given with the type the text gives it (as in `types` above) and with the text of the case.
 
 The Decider is `NamesDecider`, defined in the script as a baseline: the score is the share of the words of the mention that are in the
-name of the instance, and the mention is the same instance from 0.5 on.
+name of the instance, and the mention is the same instance from 0.5 on. With `--laya`, it is `MatchNodeLayaDecider` with the model
+`convaiinnovations/laya` (it needs `pip install laya`), and `--laya=<subfolder>` uses another checkpoint of that model (e.g.,
+`--laya=typed-decisions`).
 
 Scores:
 
