@@ -9,7 +9,7 @@ The dataset is cases.json unless another .json file of this directory is given.
 """
 
 import json, os, sys
-from typing import Literal, NotRequired, TypedDict
+from typing import List, Literal, Optional, Set, Tuple, TypedDict
 
 import networkx as nx
 
@@ -20,14 +20,17 @@ from mercury.graph.evidence.formalizer import FormalizerState
 Status = Literal['known', 'new', 'ambiguous', 'unresolved']
 
 
-class Entity(TypedDict):
-	mention		  : str
-	id			  : str | None
-	status		  : Status
-	candidates	  : NotRequired[list[str]]
-	type_conflict : NotRequired[bool]
-	text_type	  : NotRequired[str]	# The type the text gives, when it is not the type of the id.
-	type		  : NotRequired[str]	# The type chosen by the Formalizer: only in its output.
+class RequiredEntity(TypedDict):
+	mention : str
+	id		: Optional[str]
+	status	: Status
+
+
+class Entity(RequiredEntity, total = False):
+	candidates	  : List[str]
+	type_conflict : bool
+	text_type	  : str		# The type the text gives, when it is not the type of the id.
+	type		  : str		# The type chosen by the Formalizer: only in its output.
 
 
 class Edge(TypedDict):
@@ -37,8 +40,8 @@ class Edge(TypedDict):
 
 
 class Output(TypedDict):
-	entities : list[Entity]
-	edges	 : list[Edge]
+	entities : List[Entity]
+	edges	 : List[Edge]
 
 
 class KnownNode(TypedDict):
@@ -46,19 +49,22 @@ class KnownNode(TypedDict):
 	description : str
 
 
-class Case(Output):
-	id				  : str
-	source			  : str
-	text			  : str
-	notes			  : str
-	extra_known_nodes : NotRequired[list[KnownNode]]
-	context			  : NotRequired[str]
-	with_context	  : NotRequired[Output]
+class RequiredCase(Output):
+	id	   : str
+	source : str
+	text   : str
+	notes  : str
+
+
+class Case(RequiredCase, total = False):
+	extra_known_nodes : List[KnownNode]
+	context			  : str
+	with_context	  : Output
 
 
 class Context(TypedDict):
-	ontology : list[str]
-	known	 : list[str]
+	ontology : List[str]
+	known	 : List[str]
 
 
 HERE	 = os.path.dirname(os.path.abspath(__file__))
@@ -71,7 +77,7 @@ def csv(path: str) -> dict:
 	return {'type': 'csv', 'path': path}
 
 
-def load_context(context: Context) -> tuple[AgenticGraph, nx.MultiDiGraph]:
+def load_context(context: Context) -> Tuple[AgenticGraph, nx.MultiDiGraph]:
 	""" Returns the ready ontology and the NetworkX graph of the known instances. """
 
 	ontology = AgenticGraph(schema = 'ontology', extra_args = {'nodes': csv(context['ontology'][0]), 'edges': csv(context['ontology'][1])})
@@ -91,7 +97,7 @@ def ontology_formalizer(ontology: AgenticGraph) -> Formalizer:
 	return formalizer
 
 
-def check_case(case: Case, ontology: AgenticGraph, known: nx.MultiDiGraph) -> list[str]:
+def check_case(case: Case, ontology: AgenticGraph, known: nx.MultiDiGraph) -> List[str]:
 	""" Returns the problems of one case: of its expected output and, if it has a context, of its expected output with the context. """
 
 	errors = check_output(case, case, ontology, known)
@@ -104,7 +110,7 @@ def check_case(case: Case, ontology: AgenticGraph, known: nx.MultiDiGraph) -> li
 	return ['%s: %s' % (case['id'], error) for error in errors]
 
 
-def check_output(output: Output, case: Case, ontology: AgenticGraph, known: nx.MultiDiGraph) -> list[str]:
+def check_output(output: Output, case: Case, ontology: AgenticGraph, known: nx.MultiDiGraph) -> List[str]:
 	""" Returns the problems of one expected output (its entities and edges) of a case. """
 
 	known_ids = set(known.nodes) | {node['id'] for node in case.get('extra_known_nodes', [])}
@@ -117,7 +123,7 @@ def check_output(output: Output, case: Case, ontology: AgenticGraph, known: nx.M
 	return errors + check_edges(output, case, ontology)
 
 
-def check_entity(entity: Entity, case: Case, known_ids: set[str], types: set[str]) -> list[str]:
+def check_entity(entity: Entity, case: Case, known_ids: Set[str], types: Set[str]) -> List[str]:
 	""" Returns the problems of one expected entity. """
 
 	errors = []
@@ -143,7 +149,7 @@ def check_entity(entity: Entity, case: Case, known_ids: set[str], types: set[str
 	return errors
 
 
-def check_text_type(entity: Entity, types: set[str]) -> list[str]:
+def check_text_type(entity: Entity, types: Set[str]) -> List[str]:
 	""" Returns the problems of the text_type of an entity: it is a type of the ontology and a type_conflict needs it. """
 
 	if 'text_type' not in entity:
@@ -155,7 +161,7 @@ def check_text_type(entity: Entity, types: set[str]) -> list[str]:
 	return []
 
 
-def check_ambiguous(entity: Entity, known_ids: set[str]) -> list[str]:
+def check_ambiguous(entity: Entity, known_ids: Set[str]) -> List[str]:
 	""" Returns the problems of an ambiguous entity: it has no id and at least two known candidates. """
 
 	errors = [] if entity['id'] is None else ['an ambiguous entity has no id']
@@ -165,13 +171,13 @@ def check_ambiguous(entity: Entity, known_ids: set[str]) -> list[str]:
 	return errors
 
 
-def check_unresolved(entity: Entity) -> list[str]:
+def check_unresolved(entity: Entity) -> List[str]:
 	""" Returns the problems of an unresolved mention: it has neither an id nor candidates. """
 
 	return [] if entity['id'] is None and 'candidates' not in entity else ['an unresolved mention has neither id nor candidates']
 
 
-def check_status(entity: Entity, known_ids: set[str]) -> list[str]:
+def check_status(entity: Entity, known_ids: Set[str]) -> List[str]:
 	""" Returns the problems of the status of an entity with an id: known if and only if its id is known. """
 
 	if (entity['status'] == 'known') != (entity['id'] in known_ids):
@@ -180,7 +186,7 @@ def check_status(entity: Entity, known_ids: set[str]) -> list[str]:
 	return []
 
 
-def check_edges(output: Output, case: Case, ontology: AgenticGraph) -> list[str]:
+def check_edges(output: Output, case: Case, ontology: AgenticGraph) -> List[str]:
 	""" Returns the problems of the expected edges: ends that are entities of the output and valid against the ontology. """
 
 	ends   = {e['id'] for e in output['entities'] if e['status'] in ('known', 'new')}
@@ -205,6 +211,19 @@ def expected_graph(output: Output, case_id: str) -> nx.MultiDiGraph:
 		ntx.add_edge(edge['src'], edge['dst'], key = '%s_%d' % (case_id, i), relation = edge['relation'])
 
 	return ntx
+
+
+def text_type(entity: Entity) -> Optional[str]:
+	""" Returns the type the text gives an entity: its text_type or, by default, the type of its id (None if it has no id or its
+	type conflicts with the known one). """
+
+	if 'text_type' in entity:
+		return entity['text_type']
+
+	if entity['id'] is None or entity.get('type_conflict', False):
+		return None
+
+	return AgenticGraph.parent_of(entity['id'])
 
 
 def get_dataset_name() -> str:
