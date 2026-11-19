@@ -34,7 +34,8 @@
 			// extract_edges: every edge of a relation of the ontology between the nodes of a text.
 			"extract_edges": "EdgesGLiNER2",
 
-			// match_node: whether a mention is a known instance. Not exposed until a Decider for it is available.
+			// match_node: whether a mention is a known instance. To expose it, uncomment MatchNodeLaya in deciders.jsonc, set it here
+			// ("match_node": "MatchNodeLaya") and add it to "tools" below.
 			"match_node": null
 		},
 

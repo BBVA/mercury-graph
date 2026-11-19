@@ -44,6 +44,26 @@
 		// A Decider does not use other Agentic tools directly. This should be null.
 		"tools": []
 	},
+	// MatchNodeLaya answers match_node (whether a mention is a known instance) with a local Laya model. Laya is not installed with
+	// mercury-graph and requires Python 3.10 or later: to use it, run `pip install laya`, uncomment this Decider and set it as
+	// "match_node" of the Formalizer (in formalizers.jsonc).
+	// "MatchNodeLaya": {
+	// 	"name": "MatchNodeLaya",
+	// 	"class_name": "MatchNodeLayaDecider",
+	// 	"path": null,
+	//
+	// 	"extra_args": {
+	// 		"description": "This Decider decides whether a mention is a known instance using a local Laya model.",
+	//
+	// 		// "typed-decisions" (a subfolder of the model) is another checkpoint of Laya.
+	// 		"model": "convaiinnovations/laya",
+	// 		"subfolder": null,
+	//
+	// 		// The score (the probability of yes) from which the mention is the known instance.
+	// 		"threshold": 0.5
+	// 	},
+	// 	"tools": []
+	// },
 	"EdgesGLiNER2": {
 		"name": "EdgesGLiNER2",
 
@@ -56,16 +76,6 @@
 			"map_location": null,
 			"quantize": null,
 			"compile": null
-		},
-		"tools": []
-	},
-	"MatchNodeLaya": {
-		"name": "MatchNodeLaya",
-		"class_name": "MatchNodeLayaDecider",
-		"path": null,
-
-		"extra_args": {
-			"description": "This Decider matches a node against known instances using the Laya rules."
 		},
 		"tools": []
 	}
