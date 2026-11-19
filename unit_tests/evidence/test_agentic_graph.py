@@ -572,6 +572,14 @@ def test_capabilities_depend_on_the_content_of_the_graph(tmp_path):
 	assert _capability_names(_ontology_graph(tmp_path)) == entities + relationships
 
 
+@pytest.mark.parametrize(('index', 'expected'), [
+	('person|employee', 'person'),
+	('person', None),
+])
+def test_parent_of_returns_parent_for_hierarchical_ids(index, expected):
+	assert AgenticGraph.parent_of(index) == expected
+
+
 def test_search_entities_finds_nodes_by_id_and_then_by_definition(tmp_path):
 	""" The search ignores case, lists matches in the id before matches in the definition and never returns folders. """
 	graph = _school_graph(tmp_path)

@@ -20,10 +20,12 @@ def test_source(tmp_path):
 	Source(schema = None, extra_args = {})
 	(tmp_path / 'source.md').write_text('# Source\n')
 	conf = _conf(tmp_path)
+	conf['description'] = ['First line.', 'Second line.']
 	s = Source(schema = 'any', extra_args = conf)
 	assert type(s) is Source
 	assert Source(schema = 'any', extra_args = conf).conf == conf
 	assert s.state_name(0) == 'INITIAL'
+	assert s.meta['description'] == 'First line.\nSecond line.'
 
 	s.pilot(100)
 	request = {'name': 'children_by_idx_any', 'arguments': {'index': 'any'}}
@@ -84,6 +86,13 @@ def test_source_pilot_outcomes(tmp_path, monkeypatch):
 	relative_source = Source(schema = 'relative', extra_args = relative)
 	relative_source.pilot(100, just_once = True)
 	assert relative_source._maker.src == str(tmp_path / 'source')
+
+	endpoint = types.SimpleNamespace(id = 'endpoint', home = str(tmp_path / 'endpoint'))
+	endpoint_relative = _conf(tmp_path)
+	endpoint_relative['src_path'] = 'new-source'
+	endpoint_source = Source(schema = 'endpoint_relative', extra_args = endpoint_relative, endpoint = endpoint)
+	endpoint_source.pilot(100, just_once = True)
+	assert endpoint_source._maker.src == str(tmp_path / 'endpoint' / 'new-source')
 
 	failed_indices = Source(schema = 'failed_indices', extra_args = _conf(tmp_path))
 	DummyMaker.build_result = False

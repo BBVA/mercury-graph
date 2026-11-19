@@ -18,6 +18,11 @@
 		// This is a class in mercury.graph.evidence.deciders (You can use custom Agentics too.)
 		"class_name": "XNodesGl2Decider",
 
+		// In case the Decider is a custom Agentic, you must provide the path to the Python file that contains the class.
+		// If the Decider is part of mecrury-graph, just leave it as null. You can define either absolute paths with 'path' or relative
+		// to the project with '$path'.
+		"path": null,
+
 		"extra_args": {
 			// The description will be exposed via the Agentic API. It can be a string or a list of strings.
 			"description": "This Decider extracts entities from text using the GLiNER2 model.",
@@ -37,12 +42,13 @@
 			"compile": null
 		},
 		// A Decider does not use other Agentic tools directly. This should be null.
-		"tools": null
+		"tools": []
 	},
 	"EdgesGLiNER2": {
 		"name": "EdgesGLiNER2",
 
 		"class_name": "XEdgesGl2Decider",
+		"path": null,
 
 		"extra_args": {
 			"description": "This Decider extracts relationships from text using the GLiNER2 model.",
@@ -51,15 +57,16 @@
 			"quantize": null,
 			"compile": null
 		},
-		"tools": null
+		"tools": []
 	},
 	"MatchNodeLaya": {
 		"name": "MatchNodeLaya",
 		"class_name": "MatchNodeLayaDecider",
+		"path": null,
 
 		"extra_args": {
 			"description": "This Decider matches a node against known instances using the Laya rules."
 		},
-		"tools": null
+		"tools": []
 	}
 }

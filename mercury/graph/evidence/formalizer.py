@@ -35,9 +35,9 @@ class Formalizer(Agentic):
 
 	| Layer | What it knows | What it does |
 	|---|---|---|
-	| The caller (an Agent or the EvidenceGraph) | nothing of the ontology | asks in terms of the ontology: "extract the nodes of this text" |
-	| The Formalizer | the ontology, but not the instances that exist | completes the question with the types, the relations and their definitions |
-	| A [`Decider`][mercury.graph.evidence.Decider] | nothing | answers a self-contained [`Question`][mercury.graph.evidence.Question] with its model |
+	| The caller (an Agent or the EvidenceGraph) | nothing of the ontology | asks in ontology terms: "extract the nodes of a text" |
+	| The Formalizer | the ontology, but not the instances that exist | completes the question with types, relations and definitions |
+	| A [`Decider`][mercury.graph.evidence.Decider] | nothing | answers a [`Question`][mercury.graph.evidence.Question] with its model |
 
 	The Formalizer translates: the caller never passes the ontology, and the Decider receives everything it needs in the question. The
 	instances that exist are known by the EvidenceGraph.
@@ -72,11 +72,13 @@ class Formalizer(Agentic):
 	| Question | The caller gives | The Decider receives |
 	|---|---|---|
 	| `extract_nodes` | `text`, optionally `types` (ids) and `context` | `text`, `ontology` (its types) and `context` |
-	| `extract_edges` | `text`, `nodes`, optionally `relations` (ids) and `context` | `text`, `nodes`, `ontology` (its relations) and `context` |
-	| `match_node` | `mention` (without `definition`), `node` and optionally `context` | `mention` with the `definition` of its type, `node` and `context` |
+	| `extract_edges` | `text`, `nodes`, optionally `relations` (ids) and `context` | `text`, `nodes`, `ontology` and `context` |
+	| `match_node` | `mention` (no `definition`), `node` and optionally `context` | `mention` with `definition`, `node` and `context` |
 
-	`types` and `relations` restrict the question to some ids of the ontology; by default, all of them are used. The answers are those of
-	the Decider. The arguments are validated, including the required fields of the objects they contain: if they are wrong, every problem
+	The `ontology` of the Decider holds the types or the relations asked for, with their definitions, and the `mention` of `match_node`
+	gets the `definition` of its type. `types` and `relations` restrict the question to some ids of the ontology; by default, all of
+	them are used. The answers are those of the Decider. The arguments are validated, including the required fields of the objects
+	they contain and the ids of the nodes of `extract_edges` (a type of the ontology, "|" and a name): if they are wrong, every problem
 	is logged and the answer is None.
 
 	## Types and concepts
@@ -121,7 +123,7 @@ class Formalizer(Agentic):
 							'items': {
 								'type': 'string'
 							},
-							'description': 'Optional ids of the types of the ontology to look for (e.g., "person|teacher"). All of them by default.'
+							'description': 'Optional ids of the types of the ontology to look for (e.g., "person|teacher"). All by default.'
 						},
 						'context': CONTEXT_PARAMETER
 					},
@@ -183,15 +185,15 @@ class Formalizer(Agentic):
 								'type': 'object',
 								'required': ['mention', 'id']
 							},
-							'description': 'The nodes of the text, with "mention" and "id".'
+							'description': 'The nodes of the text, with "mention" and "id". The id of a node is the type extract_nodes gave it, '
+										   'exactly as it is, "|" and its name (e.g., "organization|club|Chess Club").'
 						},
 						'relations': {
 							'type': 'array',
 							'items': {
 								'type': 'string'
 							},
-							'description': 'Optional ids of the relations of the ontology to look for (e.g., "teaches_at"). All of them by '
-										   'default.'
+							'description': 'Optional ids of the relations of the ontology to look for (e.g., "teaches_at"). All by default.'
 						},
 						'context': CONTEXT_PARAMETER
 					},
@@ -467,6 +469,7 @@ class Formalizer(Agentic):
 
 		ids					= arguments.get('relations', None)
 		relations, problems = self._ontology_relations(ids)
+		problems		   += self._node_id_problems(arguments['nodes'])
 
 		question = {'text': arguments['text'], 'nodes': arguments['nodes'], 'ontology': {'relations': relations}}
 		self._copy_context(arguments, question)
@@ -494,6 +497,27 @@ class Formalizer(Agentic):
 		self._copy_context(arguments, question)
 
 		return question, []
+
+
+	def _node_id_problems(self, nodes):
+		""" Returns a problem for every node whose id is not a type of the ontology, "|" and a name (e.g., "person|teacher|Elena Ruiz"). """
+
+		ntx = self._ontology._graph.networkx
+
+		problems = []
+		for position, node in enumerate(nodes):
+			index = node['id']
+			if not isinstance(index, str):
+				problem = 'Argument "nodes[%d]" has an id that is not a text.' % position
+				problems.append(problem)
+				continue
+
+			concept = AgenticGraph.parent_of(index)
+			if concept not in ntx.nodes:
+				problem = 'Argument "nodes[%d]" has id "%s", which is not a type of the ontology, "|" and a name.' % (position, index)
+				problems.append(problem)
+
+		return problems
 
 
 	def _copy_context(self, arguments, question):
@@ -924,7 +948,8 @@ class Formalizer(Agentic):
 		errors = []
 		for end, concept, expected in zip(('src', 'dst'), ends, parent_ends):
 			if not AgenticGraph.descends_from(concept, expected):
-				errors.append('Relationship "%s" has %s "%s", which is not a "%s" as required by its parent "%s".' % (index, end, concept, expected, parent))
+				msg = 'Relationship "%s" has %s "%s", which is not a "%s" as required by its parent "%s".'
+				errors.append(msg % (index, end, concept, expected, parent))
 
 		return errors
 
