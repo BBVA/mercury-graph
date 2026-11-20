@@ -14,7 +14,8 @@ file starts with a line that describes it (its split, its parameters, the type o
 many mentions every filter removed) and has a mention per line after it, as in data.py:
 
 - the mention is its words in the page where it is found, with a window of --context-words words before and after it (without the
-  title that starts the page) as its text. Its type is "entity", since ZESHEL has no types,
+  title that starts the page) as its text. Its type is "entity", since ZESHEL has no types. Only names are used: not pronouns, words
+  that work as one ("someone", "here") nor lowercase words ending in "-ed", which are verbs or adjectives ("attacked"),
 - its candidates are the entity it refers to and other entities of the same world: some whose titles share words with the mention,
   the title of its entity or its text (most of all with the mention), and some random others (--train-candidates and
   --eval-candidates; random ones fill the similar ones that are missing). A candidate whose description is almost the same as that of
@@ -53,6 +54,12 @@ STOPWORDS  = {'a', 'an', 'and', 'as', 'at', 'by', 'de', 'for', 'from', 'in', 'is
 TYPE	   = {'id': 'entity', 'definition': 'Anything a page of a wiki describes: a person, a character, a place, an organization, an '
 		  'object, a work, an event or a concept.'}
 BREAKDOWNS = ['category', 'group']
+
+PRONOUNS  = {'he', 'she', 'it', 'they', 'him', 'her', 'them', 'his', 'hers', 'its', 'their', 'theirs', 'himself', 'herself',
+			 'itself', 'themselves', 'i', 'me', 'my', 'we', 'us', 'our', 'you', 'your', 'this', 'that', 'these', 'those', 'one', 'two',
+			 'three', 'another', 'other', 'others', 'someone', 'somebody', 'something', 'everyone', 'everybody', 'everything', 'anyone',
+			 'anything', 'here', 'there'}	# Mentions that, like a pronoun, need the text before them to know what they are.
+PARTICIPLE = re.compile(r'[a-z]{2,}(?<!e)ed')	# A lowercase word of 4+ letters ending in "-ed", but not "-eed" ("speed").
 
 REFERENCE = re.compile(r'\s*\(\s*(?:[,;][^()]*)?\)')		# "()", "(;)" or '(, "okudagram")'.
 PROBLEMS  = {
@@ -256,9 +263,22 @@ def window_of(document: dict, start: int, end: int, context_words: int) -> str:
 	return clean(' '.join(window))
 
 
+def is_name(text: str) -> bool:
+	""" Returns False if a mention is not the name of an entity: a pronoun or a word that works as one ("one", "someone", "here"), or a
+	lowercase word ending in "-ed", which is a verb or an adjective ("attacked", "unnamed"). """
+
+	if text.lower() in PRONOUNS:
+		return False
+
+	return PARTICIPLE.fullmatch(text) is None
+
+
 def mention_problem(mention: dict, documents: Dict[str, dict], args: argparse.Namespace) -> Optional[str]:
-	""" Returns why a mention cannot be used, or None: its entity cannot be one, its page is missing or redirects, or its text has a
-	problem. Sets its cleaned text ("window") if it can be used. """
+	""" Returns why a mention cannot be used, or None: it is not a name, its entity cannot be one, its page is missing or redirects, or
+	its text has a problem. Sets its cleaned text ("window") if it can be used. """
+
+	if not is_name(mention['text']):
+		return 'mention: not a name'
 
 	entity	= documents.get(mention['label_document_id'])
 	context = documents.get(mention['context_document_id'])
