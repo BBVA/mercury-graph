@@ -4,8 +4,8 @@ Run it from the root of the repository:
 
 	python -m evaluation.match_node.run [dataset] [--decider NAME] [--threshold T] [--out FILE] [-v]
 
-The dataset is "cases" unless another one is given (see data.py), and the Decider is "names" unless another one is given (see
-deciders.py). -v lists the pairs whose answer is wrong.
+The dataset is "cases" unless another one, or a .jsonl file, is given (see data.py), and the Decider is "names" unless another one is
+given (see deciders.py). -v lists the pairs whose answer is wrong.
 
 The run is saved as a .jsonl file (by default, runs/<dataset>__<decider>__<date>.jsonl): its first line describes the run (the
 dataset and the hash of its file, the Decider and its configuration, the versions, the time, how many pairs the model cut and how many
@@ -143,7 +143,7 @@ def save_run(path: str, run: dict, mentions: List[dict]) -> None:
 
 def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description = 'Runs match_node on a dataset and saves and prints its scores.')
-	parser.add_argument('dataset', nargs = '?', default = 'cases', help = 'the dataset: %s' % ', '.join(data.CASES))
+	parser.add_argument('dataset', nargs = '?', default = 'cases', help = 'the dataset: %s or a .jsonl file' % ', '.join(data.CASES))
 	parser.add_argument('--decider', default = 'names', help = 'names, laya or laya/<subfolder>')
 	parser.add_argument('--threshold', type = float, default = deciders.THRESHOLD, help = 'the threshold of "same"')
 	parser.add_argument('--out', help = 'the file of the run (by default, in runs/)')

@@ -452,7 +452,7 @@ def header_of(split: str, args: argparse.Namespace, counts: List[int], removed: 
 
 	params = {'context_words': args.context_words, 'description_words': args.description_words, 'max_page_words': args.max_page_words,
 			  'similar': counts[0], 'random': counts[1], 'seed': args.seed}
-	info   = {'name': 'zeshel_' + split, 'source': 'ZESHEL', 'split': split, 'type': TYPE, 'breakdowns': BREAKDOWNS,
+	info   = {'name': 'zeshel_' + split, 'source': 'ZESHEL', 'split': split, 'types': [TYPE], 'breakdowns': BREAKDOWNS,
 			  'params': params, 'removed_mentions': dict(removed.most_common()), 'eligible_mentions': eligible,
 			  'mentions': len(mentions)}
 

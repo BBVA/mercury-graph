@@ -16,11 +16,19 @@ it is compared with, each one with the expected answer:
 A pair is a mention with one of its candidates. "meta" holds what the scores can be broken down by: of the mention (e.g., its case) or
 of the pair (e.g., its group).
 
-The datasets are "cases" and "hard_cases": the cases of the Formalizer (evaluation/formalizer/), with the ontology and the known graph
-of their context.
+The datasets are:
+
+- "cases" and "hard_cases": the cases of the Formalizer (evaluation/formalizer/), with the ontology and the known graph of their
+  context,
+- a .jsonl file (e.g., the datasets of ZESHEL made by zeshel.py): a mention per line after a first line that describes the dataset,
+
+	{"dataset": {"name": "zeshel_test", "types": [{"id": "entity", "definition": "..."}], "breakdowns": ["category", "group"], ...}}
+
+  with its name, the types of its mentions (with their definitions, the ontology the Formalizer is given) and the fields of "meta" its
+  scores are broken down by by default. Other keys describe how it was made.
 """
 
-import hashlib, os, re
+import hashlib, json, os, re, tempfile
 from typing import List, Optional, Set
 
 import networkx as nx
@@ -71,10 +79,66 @@ class Dataset:
 
 
 def load(name: str) -> Dataset:
-	""" Returns the dataset of a name (see CASES). """
+	""" Returns the dataset of a name (one of CASES) or of the path of a .jsonl file. """
 
-	if name not in CASES:
-		raise ValueError('Unknown dataset "%s": it must be one of %s.' % (name, ', '.join(CASES)))
+	if name in CASES:
+		return load_cases(name)
+
+	if name.endswith('.jsonl') and os.path.isfile(name):
+		return load_file(name)
+
+	raise ValueError('Unknown dataset "%s": it must be one of %s or a .jsonl file.' % (name, ', '.join(CASES)))
+
+
+def source_of(info: dict) -> str:
+	""" Returns what load() needs to load again the dataset of a run (see Dataset.info()). """
+
+	if info['name'] in CASES:
+		return info['name']
+
+	return os.path.join(ROOT, info['path'])
+
+
+def load_file(path: str) -> Dataset:
+	""" Returns the dataset of a .jsonl file: its first line describes it, and every other line is a mention. """
+
+	with open(path) as f:
+		lines = [json.loads(line) for line in f if line.strip() != '']
+
+	header	 = lines[0]['dataset']
+	ontology = ontology_of(header['types'])
+
+	return Dataset(header['name'], path, ontology, lines[1:], header['breakdowns'])
+
+
+def ontology_of(types: List[dict]) -> AgenticGraph:
+	""" Returns a ready ontology with the types (their "id" and "definition") and no relationships. """
+
+	with tempfile.TemporaryDirectory() as folder:
+		nodes = os.path.join(folder, 'entities_concepts.csv')
+		edges = os.path.join(folder, 'relationships_concepts.csv')
+		write_types(nodes, types)
+		with open(edges, 'w') as f:
+			f.write('id\tsrc\tdst\tdefinition\n')
+
+		ontology = AgenticGraph(schema = 'ontology', extra_args = {'nodes': {'type': 'csv', 'path': nodes},
+																	'edges': {'type': 'csv', 'path': edges}})
+		ontology.pilot(100)
+
+	return ontology
+
+
+def write_types(path: str, types: List[dict]) -> None:
+	""" Writes the types (their "id" and "definition") as the tab separated file of the types of an ontology. """
+
+	with open(path, 'w') as f:
+		f.write('id\tdefinition\n')
+		for concept in types:
+			f.write('%s\t%s\n' % (concept['id'], concept['definition']))
+
+
+def load_cases(name: str) -> Dataset:
+	""" Returns the dataset of the cases of the Formalizer of a name (one of CASES). """
 
 	path	= os.path.join(CASES_DIR, name + '.json')
 	dataset = load_dataset(name + '.json')

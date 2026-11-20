@@ -8,6 +8,7 @@ It is not part of the unit tests: it may download a model and its scores measure
 3.8 or later (Laya needs 3.10 or later).
 
 - `data.py`: the datasets, in a common format.
+- `zeshel.py`: converts ZESHEL, a public dataset of entity linking, into datasets in that format (see [ZESHEL](#zeshel)).
 - `deciders.py`: the Deciders that can be evaluated.
 - `run.py`: runs a Decider on a dataset, saves the run and prints its scores.
 - `score.py`: scores saved runs again, without running any model: with another threshold, another breakdown, their errors or the
@@ -18,6 +19,7 @@ Run them from the root of the repository:
 
 ```bash
 python -m evaluation.match_node.run hard_cases --decider laya -v
+python -m evaluation.match_node.run evaluation/match_node/zeshel_data/zeshel_test.jsonl --decider laya
 python -m evaluation.match_node.score evaluation/match_node/runs/<run>.jsonl --threshold 0.45 --errors
 python -m evaluation.match_node.score --history
 ```
@@ -39,6 +41,10 @@ mention and of the pair hold what the scores can be broken down by:
 }
 ```
 
+A dataset is either `cases` or `hard_cases` (below) or a `.jsonl` file with a mention per line after a first line that describes it:
+its `name`, the `types` of its mentions with their definitions (the ontology the Formalizer is given) and the fields of `meta` its
+scores are broken down by (`breakdowns`).
+
 `cases` and `hard_cases` are the cases of the Formalizer (see [its README](../formalizer/README.md)), with the ontology and the known
 graph of the `mge new` template:
 
@@ -50,6 +56,43 @@ graph of the `mge new` template:
   `extract_nodes` do not count here, and with the text of the case,
 - every pair has a `group`: a positive written as the name of the instance (`positive exact`) or not (`positive different`), and a
   negative that shares a word with the name of the instance (`negative homonym`) or not (`negative other`).
+
+## ZESHEL
+
+[ZESHEL](https://github.com/lajanugen/zeshel) (Zero-Shot Entity Linking, Logeswaran et al., 2019) links the mentions in pages of 16
+FANDOM wikis ("worlds", such as Star Wars, Star Trek or Lego) to the pages of the entities they refer to. Its train, val and test
+splits have different worlds, so that val and test measure entities and domains never seen in training, as a new ontology and known
+graph would be. Its text is CC BY-SA 3.0 and it is not included in this repository: download it, extract it and convert it:
+
+```bash
+python -m evaluation.match_node.zeshel <folder of ZESHEL, with "documents" and "mentions">
+```
+
+It writes `zeshel_train.jsonl` (2,000 mentions, 8 candidates each), `zeshel_val.jsonl` and `zeshel_test.jsonl` (500 mentions, 16
+candidates each) in `zeshel_data/` (which is not committed). The same arguments write the same files. In every file:
+
+- the mention is given with a window of 50 words before and after it as its text, and with the type `entity`, since ZESHEL has no
+  types,
+- the candidates are its entity and other entities of the same world: some whose titles share words with the mention, the title of
+  its entity or its text, and some random others. The id of a candidate is the title of its page and its description the first
+  sentences of the page, up to 100 words,
+- only entities whose page has at most 200 words are used, as expected entities and as candidates, so that the description keeps
+  most of the page,
+- the mentions are sampled with the same number of each category of ZESHEL, which compares the mention with the title of its entity:
+  the same (`HIGH_OVERLAP`), the title followed by a disambiguation phrase (`MULTIPLE_CATEGORIES`), a part of the title
+  (`AMBIGUOUS_SUBSTRING`) or anything else (`LOW_OVERLAP`). The scores are broken down by `category` and `group`, and `world` is also
+  in `meta`.
+
+The text of ZESHEL is cleaned (its words and punctuation are joined as usual and the empty references left by removed links are
+removed), and what cannot be cleaned is left out: pages that redirect to Wikipedia, code of the wikis, lists of links and removed links
+that leave an article or quotes empty ("aboard the, was"). Mentions that are not names are left out too: pronouns, words that work as
+one ("someone", "here") and lowercase words ending in "-ed" ("attacked"). The first line of every file says how it was made and how
+many mentions every filter removed. `python -m evaluation.match_node.zeshel --help` lists the arguments (the sizes, the lengths and the
+candidates).
+
+Its limits: the mentions have no type, the worlds are fiction, games and sports rather than the domain of an ontology, the wikis keep
+the titles of their sections in the text ("... the mosque. Activities. Followers of ..."), and almost no mention is a pronoun, since
+the mentions are the links of the wikis.
 
 ## Deciders
 

@@ -120,7 +120,7 @@ def print_scores(run: dict, scores: dict) -> None:
 def print_errors(run: dict, mentions: List[dict], threshold: float) -> None:
 	""" Prints the pairs whose answer is wrong, with the mention as written in the dataset of the run. """
 
-	dataset = data.load(run['dataset']['name'])
+	dataset = data.load(data.source_of(run['dataset']))
 	if dataset.sha256 != run['dataset']['sha256']:
 		print('\nThe dataset %s has changed since the run: its errors are not listed.' % dataset.name)
 
