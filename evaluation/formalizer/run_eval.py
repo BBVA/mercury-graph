@@ -22,11 +22,12 @@ case.
 
 import sys, time
 from dataclasses import dataclass, field
+from typing import Dict, List, Set
 
 from mercury.graph.evidence import AgenticGraph, Formalizer
 from mercury.graph.evidence.deciders import XEdgesGl2Decider, XNodesGl2Decider
 
-from check_cases import Case, Entity, Output, get_dataset_name, load_context, load_dataset
+from check_cases import Case, Output, get_dataset_name, load_context, load_dataset, text_type
 
 
 MODEL	= {'model': 'fastino/gliner2.5-base-v1'}
@@ -76,7 +77,7 @@ def build_formalizer(ontology: AgenticGraph) -> Formalizer:
 	return formalizer
 
 
-def expected_nodes(case: Case) -> list[dict]:
+def expected_nodes(case: Case) -> List[dict]:
 	""" Returns the expected nodes of a case that have an id, as given to extract_edges. """
 
 	return [{'mention': e['mention'], 'id': e['id']} for e in case['entities'] if e['id'] is not None]
@@ -93,7 +94,7 @@ def formalize(case: Case, formalizer: Formalizer) -> Output:
 	return {'entities': nodes, 'edges': edges}
 
 
-def keys(output: Output, metric: str) -> set[tuple]:
+def keys(output: Output, metric: str) -> Set[tuple]:
 	""" Returns what is compared of an output for a metric. """
 
 	if metric == 'mentions':
@@ -102,20 +103,7 @@ def keys(output: Output, metric: str) -> set[tuple]:
 	return {(e['src'], e['relation'], e['dst']) for e in output['edges']}
 
 
-def text_type(entity: Entity) -> str | None:
-	""" Returns the type the text gives an entity: its text_type or, by default, the type of its id (None if it has no id or its
-	type conflicts with the known one). """
-
-	if 'text_type' in entity:
-		return entity['text_type']
-
-	if entity['id'] is None or entity.get('type_conflict', False):
-		return None
-
-	return AgenticGraph.parent_of(entity['id'])
-
-
-def expected_types(case: Case) -> set[tuple]:
+def expected_types(case: Case) -> Set[tuple]:
 	""" Returns (mention, type) of the entities of a case whose type the text gives. """
 
 	typed  = [(e['mention'], text_type(e)) for e in case['entities']]
@@ -135,14 +123,14 @@ def score_types(case: Case, predicted: Output) -> Score:
 	return result
 
 
-def score(expected: set[tuple], predicted: set[tuple]) -> Score:
+def score(expected: Set[tuple], predicted: Set[tuple]) -> Score:
 	""" Returns the hits, the misses and the extras of a prediction. """
 
 	return Score(len(expected & predicted), len(predicted - expected), len(expected - predicted),
 				 sorted(expected - predicted, key = str), sorted(predicted - expected, key = str))
 
 
-def score_case(case: Case, predicted: Output) -> dict[str, Score]:
+def score_case(case: Case, predicted: Output) -> Dict[str, Score]:
 	""" Returns the score of an output for every metric. """
 
 	result			= {metric: score(keys(case, metric), keys(predicted, metric)) for metric in METRICS if metric != 'types'}
@@ -151,7 +139,7 @@ def score_case(case: Case, predicted: Output) -> dict[str, Score]:
 	return result
 
 
-def print_case(case: Case, scores: dict[str, Score], verbose: bool) -> None:
+def print_case(case: Case, scores: Dict[str, Score], verbose: bool) -> None:
 	""" Prints the hits, misses and extras of a case and, if verbose, what is missing and what is extra. """
 
 	print('%-4s %s' % (case['id'], '   '.join('%s %d/%d/%d' % (m, scores[m].tp, scores[m].fn, scores[m].fp) for m in METRICS)))
@@ -166,7 +154,7 @@ def print_case(case: Case, scores: dict[str, Score], verbose: bool) -> None:
 			print('       extra   %-8s %s' % (metric, item))
 
 
-def print_totals(totals: dict[str, Score]) -> None:
+def print_totals(totals: Dict[str, Score]) -> None:
 	""" Prints a table with the micro-averaged precision, recall and F1 of every metric. """
 
 	print('\n%-9s %9s %9s %9s' % ('', 'precision', 'recall', 'F1'))

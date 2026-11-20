@@ -286,10 +286,8 @@
     {"mention": "Riverside High", "id": "organization|school|Riverside High School", "status": "known"},
     {"mention": "robotics club", "id": "organization|club|Riverside Robotics Club", "status": "known"}
    ],
-   "edges": [
-    {"src": "organization|club|Riverside Robotics Club", "relation": "belongs_to", "dst": "organization|school|Riverside High School"}
-   ],
-   "notes": "Judgment calls: \"Riverside High's robotics club\" identifies the known club and states that it belongs to the school; \"the regional contest\" is not named, so it is not a new event."
+   "edges": [],
+   "notes": "Judgment calls: \"robotics club\" is listed because the text relates it to the school (belongs_to), and it is the known club, the only robotics club known; \"the regional contest\" is not named, so it is not a new event. belongs_to is presupposed by \"Riverside High's robotics club\" (it identifies the club), not stated, so no edge is expected."
   },
   {
    "id": "S08",
