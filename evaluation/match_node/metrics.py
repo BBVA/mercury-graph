@@ -8,6 +8,9 @@ the candidate together. The answer "same" is score >= threshold.
   which does not depend on any threshold,
 - best threshold: the threshold with the highest F1 on these pairs, and that F1,
 - top-1: the share of the mentions with an expected candidate whose expected candidate is the only one with the highest score.
+
+The scores of a breakdown by a field of the mentions (e.g., their category) have top-1 too; those by a field of the pairs (e.g., their
+group) do not, since the pairs of a mention can have different values.
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -172,6 +175,25 @@ def breakdown(pairs: List[dict], field: str, threshold: float) -> Dict[str, dict
 	return result
 
 
+def top_1_by(mentions: List[dict], field: str) -> Dict[str, dict]:
+	""" Returns top-1 of the mentions by the value of a field of their "meta" (none if it is a field of the pairs, such as "group"). """
+
+	by_value = {}
+	for mention in mentions:
+		if field not in mention['meta']:
+			continue
+
+		value = str(mention['meta'][field])
+		by_value.setdefault(value, []).append(mention)
+
+	result = {}
+	for value, value_mentions in by_value.items():
+		hits, total	  = top_1(value_mentions)
+		result[value] = {'top_1': hits/total if total > 0 else None, 'top_1_hits': hits, 'top_1_mentions': total}
+
+	return result
+
+
 def summary(mentions: List[dict], threshold: float, fields: List[str]) -> dict:
 	""" Returns every score of the mentions of a run: of all the pairs, the best threshold, top-1 and the breakdown by every field. """
 
@@ -187,5 +209,7 @@ def summary(mentions: List[dict], threshold: float, fields: List[str]) -> dict:
 	by = {}
 	for field in fields:
 		by[field] = breakdown(pairs, field, threshold)
+		for value, scores in top_1_by(mentions, field).items():
+			by[field][value].update(scores)
 
 	return {'threshold': threshold, 'all': overall, 'by': by}

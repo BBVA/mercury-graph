@@ -127,7 +127,8 @@ per run with its main scores. `score.py` prints them again from the scores of th
 - `top-1`: the share of the mentions with an expected candidate whose expected candidate is the only one with the highest score.
 
 They are also broken down by the fields of `meta` of the dataset (`group` for `cases` and `hard_cases`) or of `--by` (e.g., `--by
-case`): how many pairs there are and get the right answer and, when there are both positives and negatives, `same` and `AUC`.
+case`): how many pairs there are and get the right answer, `same` and `AUC` when there are both positives and negatives, and top-1
+when the field is of the mentions (e.g., `category`) rather than of the pairs (e.g., `group`).
 
 ## Results
 

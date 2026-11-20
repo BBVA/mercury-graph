@@ -82,16 +82,17 @@ def number(value: Optional[float], width: int) -> str:
 	return text.rjust(width)
 
 
+HEADER = '%-20s %6s %6s %9s %7s %6s %6s %6s'
+
+
 def score_line(label: str, scores: dict) -> str:
-	""" Returns the line of a table for the scores of some pairs. """
+	""" Returns the line of a table for the scores of some pairs, with "-" for the scores they do not have (e.g., the AUC of pairs that
+	are all positive, or top-1 by a field of the pairs). """
 
-	line = '%-20s %6d %6d' % (label, scores['pairs'], scores['right'])
-	if 'auc' not in scores:
-		return line
+	values = [number(scores.get('precision'), 9), number(scores.get('recall'), 7), number(scores.get('f1'), 6),
+			  number(scores.get('auc'), 6), number(scores.get('top_1'), 6)]
 
-	values = [number(scores['precision'], 9), number(scores['recall'], 7), number(scores['f1'], 6), number(scores['auc'], 6)]
-
-	return line + ' ' + ' '.join(values)
+	return '%-20s %6d %6d ' % (label, scores['pairs'], scores['right']) + ' '.join(values)
 
 
 def print_scores(run: dict, scores: dict) -> None:
@@ -102,12 +103,12 @@ def print_scores(run: dict, scores: dict) -> None:
 		  scores['threshold'], dataset['name'], dataset['pairs'], dataset['mentions']))
 
 	for field, by_value in scores['by'].items():
-		print('\n%-20s %6s %6s %9s %7s %6s %6s' % (field, 'pairs', 'right', 'precision', 'recall', 'F1', 'AUC'))
+		print('\n' + HEADER % (field, 'pairs', 'right', 'precision', 'recall', 'F1', 'AUC', 'top-1'))
 		for value in ordered(field, list(by_value)):
 			print(score_line(value, by_value[value]))
 
 	overall = scores['all']
-	print('\n%-20s %6s %6s %9s %7s %6s %6s' % ('', 'pairs', 'right', 'precision', 'recall', 'F1', 'AUC'))
+	print('\n' + HEADER % ('', 'pairs', 'right', 'precision', 'recall', 'F1', 'AUC', 'top-1'))
 	print(score_line('all', overall))
 
 	top_1 = number(overall['top_1'], 0)
