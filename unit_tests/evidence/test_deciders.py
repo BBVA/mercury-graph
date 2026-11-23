@@ -2,7 +2,8 @@ import pytest
 
 from mercury.graph.evidence import DeciderState
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest, AgenticRunInvalidState
-from mercury.graph.evidence.deciders import XNodesGl2Decider, XEdgesGl2Decider, MatchNodeJevDecider, MatchNodeLayaDecider
+from mercury.graph.evidence.deciders import XNodesGl2Decider, XEdgesGl2Decider, MatchNodeJevDecider, MatchNodeLayaDecider, \
+	MatchNodeLayaPrompter
 
 
 def dummy_test_xnodesgl2decider():
@@ -166,18 +167,14 @@ def test_matchnodelayadecider_run_answers_score_and_same(monkeypatch, score, thr
 	assert response == {'finish_reason': 'stop', 'message': {'score': score, 'same': same}}
 
 
-def test_matchnodelayadecider_run_sends_the_laya_state(monkeypatch):
-	""" Laya gets the known instance, the mention with the definition of its type and the context, in that order. """
+def test_matchnodelayaprompter_create_state():
+	""" The state has the known instance, the mention with the definition of its type and the context, in that order. """
 	arguments = _laya_arguments()
 	arguments['node']['names'] = ['Elena Ruiz', 'Ms. Ruiz']
 	arguments['mention']['texts'] = ['Ms. Ruiz took the team to the fair.']
 	arguments['context'] = 'The Brookdale Science Fair.'
 
-	model	= FakeLaya(0.9)
-	decider = _ready_laya_decider(monkeypatch, model)
-	decider.run(_request(decider, arguments))
-
-	laya_state, questions = model.calls[0]
+	laya_state = MatchNodeLayaPrompter.create_state(arguments)
 
 	assert list(laya_state) == ['known_instance', 'mention', 'context']
 	assert laya_state['known_instance'] == {
@@ -192,20 +189,29 @@ def test_matchnodelayadecider_run_sends_the_laya_state(monkeypatch):
 		'texts': ['Ms. Ruiz took the team to the fair.']
 	}
 	assert laya_state['context'] == 'The Brookdale Science Fair.'
-	assert questions == MatchNodeLayaDecider.QUESTIONS
 
 
-def test_matchnodelayadecider_run_leaves_out_missing_fields(monkeypatch):
-	""" The optional fields that the request does not have are not in the state. """
-	model	= FakeLaya(0.9)
-	decider = _ready_laya_decider(monkeypatch, model)
-	decider.run(_request(decider, _laya_arguments()))
-
-	laya_state = model.calls[0][0]
+def test_matchnodelayaprompter_create_state_leaves_out_missing_fields():
+	""" The optional fields that the arguments do not have are not in the state. """
+	laya_state = MatchNodeLayaPrompter.create_state(_laya_arguments())
 
 	assert list(laya_state) == ['known_instance', 'mention']
 	assert list(laya_state['known_instance']) == ['id', 'description']
 	assert list(laya_state['mention']) == ['mention', 'type', 'type_definition']
+
+
+def test_matchnodelayadecider_run_asks_the_prompter(monkeypatch):
+	""" Laya is asked the state and the questions of MatchNodeLayaPrompter. """
+	arguments = _laya_arguments()
+	arguments['context'] = 'The Brookdale Science Fair.'
+
+	model	= FakeLaya(0.9)
+	decider = _ready_laya_decider(monkeypatch, model)
+	decider.run(_request(decider, arguments))
+
+	expected = (MatchNodeLayaPrompter.create_state(arguments), MatchNodeLayaPrompter.QUESTIONS)
+
+	assert model.calls[0] == expected
 
 
 @pytest.mark.parametrize('usage, logged', [
