@@ -55,7 +55,9 @@ graph of the `mge new` template:
 - the mention is given with the type the text gives it (its `text_type` or, by default, the type of its `id`), so that the errors of
   `extract_nodes` do not count here, and with the text of the case,
 - every pair has a `group`: a positive written as the name of the instance (`positive exact`) or not (`positive different`), and a
-  negative that shares a word with the name of the instance (`negative homonym`) or not (`negative other`).
+  negative that shares a word with the name of the instance (`negative homonym`) or not (`negative other`),
+- the `status` of a mention is that of the case: a `new` mention has no expected candidate. The scores are broken down by `status`
+  and `group`.
 
 ## ZESHEL
 
@@ -80,8 +82,12 @@ candidates each) in `zeshel_data/` (which is not committed). The same arguments 
   most of the page,
 - the mentions are sampled with the same number of each category of ZESHEL, which compares the mention with the title of its entity:
   the same (`HIGH_OVERLAP`), the title followed by a disambiguation phrase (`MULTIPLE_CATEGORIES`), a part of the title
-  (`AMBIGUOUS_SUBSTRING`) or anything else (`LOW_OVERLAP`). The scores are broken down by `category` and `group`, and `world` is also
-  in `meta`.
+  (`AMBIGUOUS_SUBSTRING`) or anything else (`LOW_OVERLAP`),
+- in val and test, 20% of the mentions of every category are `new` (`--new`): their entity is left out of their candidates, so that
+  the right decision is that they are none of them. The other mentions are `known` and do not change with `--new`. Train has only
+  `known` mentions.
+
+The scores are broken down by `status`, `category` and `group`, and `world` is also in `meta`.
 
 The text of ZESHEL is cleaned (its words and punctuation are joined as usual and the empty references left by removed links are
 removed), and what cannot be cleaned is left out: pages that redirect to Wikipedia, code of the wikis, lists of links and removed links
@@ -124,11 +130,21 @@ per run with its main scores. `score.py` prints them again from the scores of th
 - `AUC`: the probability that a positive pair gets a higher score than a negative one, whatever the threshold (1 orders every pair
   right, 0.5 is chance): it tells whether the score is useful before it is calibrated,
 - `best threshold`: the threshold with the highest F1 on these pairs, and that F1,
-- `top-1`: the share of the mentions with an expected candidate whose expected candidate is the only one with the highest score.
+- `top-1`: the share of the mentions with an expected candidate whose expected candidate is the only one with the highest score,
+- `decision`: the share of the mentions whose final decision is right, as the Formalizer would take it. A mention is linked to its
+  candidate with the highest score if that score reaches the threshold and no other candidate has it (a tie at the top is a wrong
+  link), and it is new if no candidate reaches the threshold. A `known` mention (with an expected candidate) is right if it is linked
+  to it, and otherwise is a wrong link or missed; a `new` one is right if it is new, and otherwise is a wrong link. A wrong link
+  merges two instances in the graph, while a missed mention duplicates one. The scores give the share of known mentions `linked`
+  right and of new ones `detected`, with how many of each are wrong links or missed,
+- `best decision threshold`: the threshold, among the highest scores of the mentions, with the most right decisions, and their share.
+  It is the threshold to calibrate: it applies to the highest score of a mention, so it is usually not the best threshold of the
+  pairs.
 
-They are also broken down by the fields of `meta` of the dataset (`group` for `cases` and `hard_cases`) or of `--by` (e.g., `--by
-case`): how many pairs there are and get the right answer, `same` and `AUC` when there are both positives and negatives, and top-1
-when the field is of the mentions (e.g., `category`) rather than of the pairs (e.g., `group`).
+They are also broken down by the fields of `meta` of the dataset (`status` and `group` for `cases` and `hard_cases`) or of `--by`
+(e.g., `--by case`): how many pairs there are and get the right answer, `same` and `AUC` when there are both positives and negatives,
+and top-1 and `decision` when the field is of the mentions (e.g., `category`) rather than of the pairs (e.g., `group`). `--errors`
+lists the pairs whose answer is wrong and the mentions whose decision is wrong.
 
 ## Results
 

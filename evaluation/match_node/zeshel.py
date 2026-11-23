@@ -25,14 +25,16 @@ many mentions every filter removed) and has a mention per line after it, as in d
 - only entities whose page has at most --max-page-words words are used (as expected entities and as candidates, so that the length
   of a description does not tell the expected one), so that the description keeps most of the page,
 - the mentions are sampled with the same number of each category of ZESHEL (HIGH_OVERLAP, MULTIPLE_CATEGORIES, AMBIGUOUS_SUBSTRING,
-  LOW_OVERLAP), as far as there are enough, and the candidates are shuffled.
+  LOW_OVERLAP), as far as there are enough, and the candidates are shuffled,
+- in val and test, a share --new of the mentions of every category is new: its entity is left out of its candidates, so that the
+  right decision is that it is none of them. The other mentions are known, and the same as without --new.
 
 The text of ZESHEL is cleaned: its words and punctuation are joined as usual, and the empty references it leaves where it removed a
 link, such as "()" or '(, "okudagram")', are removed. Pages that only redirect to Wikipedia, and texts and descriptions that cannot be
 cleaned, are left out: those with code of the wikis ("<NormalText ...>", "{{"), lists of links ("Bajor; Borg;;;") or a removed link
 that leaves an article or quotes empty ('aboard the, was', 'in the novel " "').
 
-The "meta" of a mention is its category and its world, and that of a pair its group (see data.py): a positive written as the title of
+The "meta" of a mention is its status (known or new), its category and its world, and that of a pair its group (see data.py): a positive written as the title of
 the entity (exact) or not (different), and a negative whose title shares a word with the mention (homonym) or not (other). The
 category of ZESHEL compares the mention with the title of its entity: the same (HIGH_OVERLAP), the title followed by a disambiguation
 phrase (MULTIPLE_CATEGORIES), a part of the title (AMBIGUOUS_SUBSTRING) or anything else (LOW_OVERLAP).
@@ -53,7 +55,7 @@ STOPWORDS  = {'a', 'an', 'and', 'as', 'at', 'by', 'de', 'for', 'from', 'in', 'is
 			  'with'}
 TYPE	   = {'id': 'entity', 'definition': 'Anything a page of a wiki describes: a person, a character, a place, an organization, an '
 		  'object, a work, an event or a concept.'}
-BREAKDOWNS = ['category', 'group']
+BREAKDOWNS = ['status', 'category', 'group']
 
 PRONOUNS  = {'he', 'she', 'it', 'they', 'him', 'her', 'them', 'his', 'hers', 'its', 'their', 'theirs', 'himself', 'herself',
 			 'itself', 'themselves', 'i', 'me', 'my', 'we', 'us', 'our', 'you', 'your', 'this', 'that', 'these', 'those', 'one', 'two',
@@ -339,6 +341,22 @@ def sample(mentions: List[dict], size: int, rng: random.Random) -> List[dict]:
 	return chosen
 
 
+def new_ids(mentions: List[dict], share: float, rng: random.Random) -> Set[str]:
+	""" Returns the ids of the mentions that are new: a share of those of every category. """
+
+	by_category = {}
+	for mention in sorted(mentions, key = lambda m: m['mention_id']):
+		by_category.setdefault(mention['category'], []).append(mention['mention_id'])
+
+	ids = set()
+	for category in sorted(by_category):
+		pool  = by_category[category]
+		count = round(share*len(pool))
+		ids.update(rng.sample(pool, count))
+
+	return ids
+
+
 def is_duplicate(document: dict, gold: dict) -> bool:
 	""" Returns True if the description of a page is almost the same as that of the entity: they share DUPLICATE of their words. """
 
@@ -422,9 +440,9 @@ def candidate_of(document: dict, mention: str, gold: bool) -> dict:
 	return {'node': node, 'gold': gold, 'meta': meta}
 
 
-def convert(mention: dict, documents: Dict[str, dict], world: World, counts: List[int], rng: random.Random) -> dict:
+def convert(mention: dict, documents: Dict[str, dict], world: World, counts: List[int], new: bool, rng: random.Random) -> dict:
 	""" Returns a mention of ZESHEL in the format of data.py, with its entity and counts[0] similar and counts[1] random candidates
-	(more random ones if there are not enough similar ones). """
+	(more random ones if there are not enough similar ones). A new mention is the same without its entity. """
 
 	gold = documents[mention['label_document_id']]
 	text = detokenize(mention['text'])
@@ -439,19 +457,33 @@ def convert(mention: dict, documents: Dict[str, dict], world: World, counts: Lis
 		candidates.append(candidate_of(world.entities[entity_id], text, False))
 
 	rng.shuffle(candidates)
+	if new:
+		candidates = without_gold(candidates)
 
-	found = {'mention': text, 'type': TYPE['id'], 'texts': [mention['window']]}
-	meta  = {'category': mention['category'], 'world': mention['corpus']}
+	status = 'new' if new else 'known'
+	found  = {'mention': text, 'type': TYPE['id'], 'texts': [mention['window']]}
+	meta   = {'status': status, 'category': mention['category'], 'world': mention['corpus']}
 
 	return {'mention_id': mention['mention_id'], 'meta': meta, 'mention': found, 'candidates': candidates}
 
 
-def header_of(split: str, args: argparse.Namespace, counts: List[int], removed: Counter, eligible: int,
+def without_gold(candidates: List[dict]) -> List[dict]:
+	""" Returns the candidates without the expected one. """
+
+	result = []
+	for candidate in candidates:
+		if not candidate['gold']:
+			result.append(candidate)
+
+	return result
+
+
+def header_of(split: str, args: argparse.Namespace, counts: List[int], share: float, removed: Counter, eligible: int,
 			  mentions: List[dict]) -> dict:
 	""" Returns the first line of the file of a split: what it is, how it was made and how many mentions every filter removed. """
 
 	params = {'context_words': args.context_words, 'description_words': args.description_words, 'max_page_words': args.max_page_words,
-			  'similar': counts[0], 'random': counts[1], 'seed': args.seed}
+			  'similar': counts[0], 'random': counts[1], 'new': share, 'seed': args.seed}
 	info   = {'name': 'zeshel_' + split, 'source': 'ZESHEL', 'split': split, 'types': [TYPE], 'breakdowns': BREAKDOWNS,
 			  'params': params, 'removed_mentions': dict(removed.most_common()), 'eligible_mentions': eligible,
 			  'mentions': len(mentions)}
@@ -475,16 +507,21 @@ def convert_split(split: str, root: str, documents: Dict[str, dict], worlds: Dic
 	rng	   = random.Random('%s-%s' % (args.seed, split))
 	size   = getattr(args, split)
 	counts = args.train_candidates if split == 'train' else args.eval_candidates
+	share  = 0.0 if split == 'train' else args.new
 
 	eligible, removed = eligible_of(load_mentions(root, split), documents, args)
+	chosen			  = sample(eligible, size, rng)
+	new_rng			  = random.Random('%s-%s-new' % (args.seed, split))
+	new				  = new_ids(chosen, share, new_rng)
 
 	mentions = []
-	for mention in sample(eligible, size, rng):
-		world = worlds[mention['corpus']]
-		mentions.append(convert(mention, documents, world, counts, rng))
+	for mention in chosen:
+		world	= worlds[mention['corpus']]
+		is_new	= mention['mention_id'] in new
+		mentions.append(convert(mention, documents, world, counts, is_new, rng))
 
 	path   = os.path.join(args.out, 'zeshel_%s.jsonl' % split)
-	header = header_of(split, args, counts, removed, len(eligible), mentions)
+	header = header_of(split, args, counts, share, removed, len(eligible), mentions)
 	write(path, header, mentions)
 
 	print('%-5s %5d mentions of %d eligible -> %s' % (split, len(mentions), len(eligible), path))
@@ -506,6 +543,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 						help = 'similar and random candidates of a mention of train')
 	parser.add_argument('--eval-candidates', type = int, nargs = 2, default = [10, 5], metavar = ('SIMILAR', 'RANDOM'),
 						help = 'similar and random candidates of a mention of val and test')
+	parser.add_argument('--new', type = float, default = 0.2, help = 'share of the mentions of val and test that are new')
 	parser.add_argument('--seed', type = int, default = 0, help = 'the seed of the samples')
 
 	return parser.parse_args(argv)

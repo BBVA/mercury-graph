@@ -42,7 +42,7 @@ ROOT	   = os.path.dirname(os.path.dirname(CASES_DIR))		# The root of the reposit
 CASES	   = ('cases', 'hard_cases')
 PRONOUNS   = {'he', 'she', 'it', 'they', 'him', 'her', 'them', 'his', 'its', 'their'}
 GROUPS	   = ('positive exact', 'positive different', 'negative homonym', 'negative other')
-BREAKDOWNS = ['group']
+BREAKDOWNS = ['status', 'group']
 
 
 class Dataset:
