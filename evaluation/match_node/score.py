@@ -6,19 +6,21 @@ Run it from the root of the repository:
 	python -m evaluation.match_node.score --history
 
 It prints the scores of every run (see metrics.py), with the threshold of its Decider unless --threshold is given, broken down by the
-fields of --by (by default, those of its dataset). --errors lists the pairs whose answer is wrong and the mentions whose decision is wrong. --save keeps the scores next to the
-run (<run>.metrics.json) and adds them to the history of the runs (runs/results.jsonl). --history prints that history.
+fields of --by (by default, those of its dataset). --errors lists the pairs whose answer is wrong and the mentions whose decision is
+wrong. --save keeps the scores next to the run (<run>.metrics.json) and adds them to the history of the runs (runs/results.jsonl).
+--history prints that history.
 """
 
 import argparse, json, os, sys
 from typing import List, Optional, Tuple
 
-from evaluation.match_node import data, metrics
+from data.match_node import dataset as datasets
+from evaluation.match_node import cases, metrics
 
 
 RUNS	= os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs')
 HISTORY = os.path.join(RUNS, 'results.jsonl')
-ORDER	= {'group': data.GROUPS}		# The order of the values of a field in the breakdown; other fields are sorted.
+ORDER	= {'group': datasets.GROUPS}		# The order of the values of a field in the breakdown; other fields are sorted.
 
 
 def load_run(path: str) -> Tuple[dict, List[dict]]:
@@ -136,7 +138,8 @@ def print_decisions(overall: dict) -> None:
 def print_errors(run: dict, mentions: List[dict], threshold: float) -> None:
 	""" Prints the pairs whose answer is wrong and the mentions whose decision is wrong, as written in the dataset of the run. """
 
-	dataset = data.load(data.source_of(run['dataset']))
+	source	= cases.source_of(run['dataset'])
+	dataset = cases.load(source)
 	if dataset.sha256 != run['dataset']['sha256']:
 		print('\nThe dataset %s has changed since the run: its errors are not listed.' % dataset.name)
 
@@ -146,7 +149,7 @@ def print_errors(run: dict, mentions: List[dict], threshold: float) -> None:
 	print_decision_errors(dataset, mentions, threshold)
 
 
-def print_pair_errors(dataset: data.Dataset, mentions: List[dict], threshold: float) -> None:
+def print_pair_errors(dataset: datasets.Dataset, mentions: List[dict], threshold: float) -> None:
 	""" Prints the pairs whose answer is wrong. """
 
 	print('\nPairs:')
@@ -156,7 +159,7 @@ def print_pair_errors(dataset: data.Dataset, mentions: List[dict], threshold: fl
 			continue
 
 		kind	= 'missed' if pair['gold'] else 'wrong '
-		mention = data.find(dataset, pair['mention_id'])['mention']['mention']
+		mention = datasets.find(dataset, pair['mention_id'])['mention']['mention']
 		group	= pair['meta'].get('group', '')
 		print('%-8s %s %-18s %-24s vs %-45s score %.3f' % (pair['mention_id'], kind, group, '"%s"' % mention, pair['id'], pair['score']))
 
@@ -171,7 +174,7 @@ def top_candidate(mention: dict) -> dict:
 			return candidate
 
 
-def print_decision_errors(dataset: data.Dataset, mentions: List[dict], threshold: float) -> None:
+def print_decision_errors(dataset: datasets.Dataset, mentions: List[dict], threshold: float) -> None:
 	""" Prints the mentions whose decision is wrong, with the candidate with the highest score. """
 
 	print('\nDecisions:')
@@ -185,7 +188,7 @@ def print_decision_errors(dataset: data.Dataset, mentions: List[dict], threshold
 			continue
 
 		kind	= 'known' if decision['known'] else 'new'
-		text	= data.find(dataset, mention['mention_id'])['mention']['mention']
+		text	= datasets.find(dataset, mention['mention_id'])['mention']['mention']
 		top		= top_candidate(mention)
 		print('%-8s %-5s %-10s %-24s top %-45s score %.3f' % (mention['mention_id'], kind, outcome, '"%s"' % text, top['id'],
 			  top['score']))

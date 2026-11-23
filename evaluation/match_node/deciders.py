@@ -10,7 +10,7 @@ from typing import List
 from mercury.graph.evidence import Decider
 from mercury.graph.evidence.deciders import MatchNodeLayaDecider
 
-from evaluation.match_node.data import name_of, words
+from data.match_node.dataset import name_of, words
 
 
 THRESHOLD = 0.5

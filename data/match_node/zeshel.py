@@ -1,4 +1,4 @@
-""" Converts ZESHEL (Zero-Shot Entity Linking, Logeswaran et al., 2019) into datasets of match_node, in the format of data.py.
+""" Converts ZESHEL (Zero-Shot Entity Linking, Logeswaran et al., 2019) into datasets of match_node, in the format of dataset.py.
 
 ZESHEL links mentions in pages of 16 FANDOM wikis ("worlds") to the pages of the entities they refer to. Its train, val and test
 splits have different worlds, so that val and test measure entities and domains never seen in training. It is not included in this
@@ -7,11 +7,11 @@ repository (its text is CC BY-SA 3.0): download it from https://github.com/lajan
 
 Run it from the root of the repository:
 
-	python -m evaluation.match_node.zeshel <zeshel folder> [--out FOLDER] [--seed 0]
+	python -m data.match_node.zeshel <zeshel folder> [--out FOLDER] [--seed 0]
 
 It writes zeshel_train.jsonl, zeshel_val.jsonl and zeshel_test.jsonl (by default, in zeshel_data/, which is not committed). Every
 file starts with a line that describes it (its split, its parameters, the type of the mentions, the breakdowns of its scores and how
-many mentions every filter removed) and has a mention per line after it, as in data.py:
+many mentions every filter removed) and has a mention per line after it, as in dataset.py:
 
 - the mention is its words in the page where it is found, with a window of --context-words words before and after it (without the
   title that starts the page) as its text. Its type is "entity", since ZESHEL has no types. Only names are used: not pronouns, words
@@ -34,16 +34,16 @@ link, such as "()" or '(, "okudagram")', are removed. Pages that only redirect t
 cleaned, are left out: those with code of the wikis ("<NormalText ...>", "{{"), lists of links ("Bajor; Borg;;;") or a removed link
 that leaves an article or quotes empty ('aboard the, was', 'in the novel " "').
 
-The "meta" of a mention is its status (known or new), its category and its world, and that of a pair its group (see data.py): a positive written as the title of
-the entity (exact) or not (different), and a negative whose title shares a word with the mention (homonym) or not (other). The
-category of ZESHEL compares the mention with the title of its entity: the same (HIGH_OVERLAP), the title followed by a disambiguation
-phrase (MULTIPLE_CATEGORIES), a part of the title (AMBIGUOUS_SUBSTRING) or anything else (LOW_OVERLAP).
+The "meta" of a mention is its status (known or new), its category and its world, and that of a pair its group (see dataset.py): a
+positive written as the title of the entity (exact) or not (different), and a negative whose title shares a word with the mention
+(homonym) or not (other). The category of ZESHEL compares the mention with the title of its entity: the same (HIGH_OVERLAP), the title
+followed by a disambiguation phrase (MULTIPLE_CATEGORIES), a part of the title (AMBIGUOUS_SUBSTRING) or anything else (LOW_OVERLAP).
 """
 
 import argparse, collections, json, os, random, re, sys
 from typing import Counter, Dict, List, Optional, Set, Tuple
 
-from evaluation.match_node.data import words
+from data.match_node.dataset import words
 
 
 SPLITS	   = ('train', 'val', 'test')
@@ -441,7 +441,7 @@ def candidate_of(document: dict, mention: str, gold: bool) -> dict:
 
 
 def convert(mention: dict, documents: Dict[str, dict], world: World, counts: List[int], new: bool, rng: random.Random) -> dict:
-	""" Returns a mention of ZESHEL in the format of data.py, with its entity and counts[0] similar and counts[1] random candidates
+	""" Returns a mention of ZESHEL in the format of dataset.py, with its entity and counts[0] similar and counts[1] random candidates
 	(more random ones if there are not enough similar ones). A new mention is the same without its entity. """
 
 	gold = documents[mention['label_document_id']]
