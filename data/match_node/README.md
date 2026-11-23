@@ -61,10 +61,11 @@ candidates each) in `zeshel_data/` (which is not committed). The same arguments 
 
 The scores are broken down by `status`, `category` and `group`, and `world` is also in `meta`.
 
-The text of ZESHEL is cleaned (its words and punctuation are joined as usual and the empty references left by removed links are
-removed), and what cannot be cleaned is left out: pages that redirect to Wikipedia, code of the wikis, lists of links and removed links
-that leave an article or quotes empty ("aboard the, was"). Mentions that are not names are left out too: pronouns, words that work as
-one ("someone", "here") and lowercase words ending in "-ed" ("attacked"). The first line of every file says how it was made and how
+The text of ZESHEL is cleaned (its words and punctuation are joined as usual, as are the plurals of its links, "droid s", and its
+numbers, "60, 000" or "7. 92", and the empty references left by removed links are removed), and what cannot be cleaned is left out:
+pages that redirect to Wikipedia, code of the wikis, lists of links and removed links that leave an article or quotes empty ("aboard
+the, was"). Mentions that are not names are left out too: mentions without letters ("1990"), pronouns, words that work as one
+("someone", "here") and lowercase words ending in "-ed" ("attacked"). The first line of every file says how it was made and how
 many mentions every filter removed. `python -m data.match_node.zeshel --help` lists the arguments (the sizes, the lengths and the
 candidates).
 

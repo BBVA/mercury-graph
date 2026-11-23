@@ -14,8 +14,9 @@ file starts with a line that describes it (its split, its parameters, the type o
 many mentions every filter removed) and has a mention per line after it, as in dataset.py:
 
 - the mention is its words in the page where it is found, with a window of --context-words words before and after it (without the
-  title that starts the page) as its text. Its type is "entity", since ZESHEL has no types. Only names are used: not pronouns, words
-  that work as one ("someone", "here") nor lowercase words ending in "-ed", which are verbs or adjectives ("attacked"),
+  title that starts the page) as its text. Its type is "entity", since ZESHEL has no types. Only names are used: not mentions without
+  letters ("1990"), pronouns, words that work as one ("someone", "here") nor lowercase words ending in "-ed", which are verbs or
+  adjectives ("attacked"),
 - its candidates are the entity it refers to and other entities of the same world: some whose titles share words with the mention,
   the title of its entity or its text (most of all with the mention), and some random others (--train-candidates and
   --eval-candidates; random ones fill the similar ones that are missing). A candidate whose description is almost the same as that of
@@ -29,8 +30,9 @@ many mentions every filter removed) and has a mention per line after it, as in d
 - in val and test, a share --new of the mentions of every category is new: its entity is left out of its candidates, so that the
   right decision is that it is none of them. The other mentions are known, and the same as without --new.
 
-The text of ZESHEL is cleaned: its words and punctuation are joined as usual, and the empty references it leaves where it removed a
-link, such as "()" or '(, "okudagram")', are removed. Pages that only redirect to Wikipedia, and texts and descriptions that cannot be
+The text of ZESHEL is cleaned: its words and punctuation are joined as usual, as are the plurals of its links ("droid s") and its
+numbers ("60, 000", "7. 92"), and the empty references it leaves where it removed a link, such as "()" or '(, "okudagram")', are
+removed. Pages that only redirect to Wikipedia, and texts and descriptions that cannot be
 cleaned, are left out: those with code of the wikis ("<NormalText ...>", "{{"), lists of links ("Bajor; Borg;;;") or a removed link
 that leaves an article or quotes empty ('aboard the, was', 'in the novel " "').
 
@@ -62,6 +64,28 @@ PRONOUNS  = {'he', 'she', 'it', 'they', 'him', 'her', 'them', 'his', 'hers', 'it
 			 'three', 'another', 'other', 'others', 'someone', 'somebody', 'something', 'everyone', 'everybody', 'everything', 'anyone',
 			 'anything', 'here', 'there'}	# Mentions that, like a pronoun, need the text before them to know what they are.
 PARTICIPLE = re.compile(r'[a-z]{2,}(?<!e)ed')	# A lowercase word of 4+ letters ending in "-ed", but not "-eed" ("speed").
+LETTER	   = re.compile(r'[^\W\d_]')			# A letter, in any alphabet.
+
+JOINS = [													# How detokenize() joins what ZESHEL separates, in order.
+	(re.compile(r' ([.,;:!?%)\]])'), r'\1'),					# "ship ." -> "ship."
+	(re.compile(r'([(\[]) '), r'\1'),							# "( 1990" -> "(1990"
+	(re.compile(r"(\w) ' s\b"), r"\1's"),						# "Luc ' s" -> "Luc's"
+	(re.compile(r'(\w) - (?=\w)'), r'\1-'),						# "Jean - Luc" -> "Jean-Luc"
+	(re.compile(r'" ([^"]*?) "'), r'"\1"'),						# '" Slave I "' -> '"Slave I"'
+	(re.compile(r"(?<!\w)' ([^']{1,80}?) '(?!\w)"), r"'\1'"),	# "' Kingpin '" -> "'Kingpin'"
+	(re.compile(r'(?<=\w) s\b'), 's'),							# "droid s" -> "droids": the plural of a link
+	(re.compile(r'" s\b'), '"\'s'),								# '"Doctor Who" s' -> '"Doctor Who"\'s'
+	(re.compile(r'\s’'), '’'),									# "Kul Tiras ’ s" -> "Kul Tiras’ s"
+	(re.compile(r'’ s\b'), '’s'),								# "Kul Tiras’ s" -> "Kul Tiras’s"
+	(re.compile(r'(?<=\d), (?=\d{3}\b)'), ','),					# "60, 000" -> "60,000"
+	(re.compile(r'(?<![\d.])(\d{1,3})\. (\d{1,3})\b'), r'\1.\2'),	# "7. 92" -> "7.92", but not "515. 2368" (a new sentence)
+	(re.compile(r'(?<![\d.])(\d{4,})\. (\d)\b'), r'\1.\2'),			# "stardate 4372. 5" -> "4372.5", but not "2013. 350"
+	(re.compile(r'\(\. (?=\d)'), '(.'),							# "(. 312 in)" -> "(.312 in)"
+	(re.compile(r'\$ (?=\d)'), '$'),								# "$ 10" -> "$10"
+	(re.compile(r'\b([A-Z])\. (?=[A-Z]\.)'), r'\1.'),				# "U. S." -> "U.S."
+	(re.compile(r'\.\s(?=(?:com|org|net)\b)'), '.'),				# "Amazon. com" -> "Amazon.com"
+	(re.compile(r'\bwww\. '), 'www.')							# "www. lego" -> "www.lego"
+]
 
 REFERENCE = re.compile(r'\s*\(\s*(?:[,;][^()]*)?\)')		# "()", "(;)" or '(, "okudagram")'.
 PROBLEMS  = {
@@ -112,15 +136,11 @@ def content_words(text: str) -> Set[str]:
 
 
 def detokenize(text: str) -> str:
-	""" Returns a text of ZESHEL, whose words and punctuation are separated by spaces, written as usual (e.g., "Jean - Luc ' s ship ."
-	becomes "Jean-Luc's ship."). """
+	""" Returns a text of ZESHEL, whose words and punctuation are separated by spaces, written as usual (e.g., "Jean - Luc ' s droid s ."
+	becomes "Jean-Luc's droids.", and "7. 92 mm" becomes "7.92 mm"): see JOINS. """
 
-	text = re.sub(r' ([.,;:!?%)\]])', r'\1', text)
-	text = re.sub(r'([(\[]) ', r'\1', text)
-	text = re.sub(r"(\w) ' s\b", r"\1's", text)
-	text = re.sub(r'(\w) - (?=\w)', r'\1-', text)
-	text = re.sub(r'" ([^"]*?) "', r'"\1"', text)
-	text = re.sub(r"(?<!\w)' ([^']{1,80}?) '(?!\w)", r"'\1'", text)
+	for pattern, joined in JOINS:
+		text = pattern.sub(joined, text)
 
 	return text
 
@@ -266,8 +286,12 @@ def window_of(document: dict, start: int, end: int, context_words: int) -> str:
 
 
 def is_name(text: str) -> bool:
-	""" Returns False if a mention is not the name of an entity: a pronoun or a word that works as one ("one", "someone", "here"), or a
-	lowercase word ending in "-ed", which is a verb or an adjective ("attacked", "unnamed"). """
+	""" Returns False if a mention is not the name of an entity: a mention without letters, such as a year or a number ("1990", "481"),
+	a pronoun or a word that works as one ("one", "someone", "here"), or a lowercase word ending in "-ed", which is a verb or an
+	adjective ("attacked", "unnamed"). """
+
+	if LETTER.search(text) is None:
+		return False
 
 	if text.lower() in PRONOUNS:
 		return False
