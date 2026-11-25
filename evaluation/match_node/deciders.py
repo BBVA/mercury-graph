@@ -2,9 +2,11 @@
 
 - "names": NamesDecider, a baseline defined here,
 - "laya": MatchNodeLayaDecider with the model convaiinnovations/laya (it needs `pip install laya`),
-- "laya/<subfolder>": the same with the checkpoint of that model in the subfolder (e.g., "laya/typed-decisions").
+- "laya/<subfolder>": the same with the checkpoint of that model in the subfolder (e.g., "laya/typed-decisions"),
+- "laya:<folder>": the same with a local checkpoint, such as one fine-tuned by training/match_node/finetune.py.
 """
 
+import os
 from typing import List
 
 from mercury.graph.evidence import Decider
@@ -52,13 +54,28 @@ def create(name: str, threshold: float, logger: List[dict]) -> Decider:
 	if name == 'names':
 		return NamesDecider('Names', {'threshold': threshold}, logger = logger)
 
+	if name.startswith('laya:'):
+		return create_local_laya(name, threshold, logger)
+
 	model, _, subfolder = name.partition('/')
 	if model != 'laya':
-		raise ValueError('Unknown Decider "%s": it must be "names", "laya" or "laya/<subfolder>".' % name)
+		raise ValueError('Unknown Decider "%s": it must be "names", "laya", "laya/<subfolder>" or "laya:<folder>".' % name)
 
 	conf = {'model': LAYA, 'threshold': threshold}
 	if subfolder != '':
 		conf['subfolder'] = subfolder
+
+	return MatchNodeLayaDecider('Laya', conf, logger = logger)
+
+
+def create_local_laya(name: str, threshold: float, logger: List[dict]) -> Decider:
+	""" Returns MatchNodeLayaDecider with the local checkpoint of a name "laya:<folder>". """
+
+	folder = os.path.abspath(name[len('laya:'):])
+	if not os.path.isdir(folder):
+		raise ValueError('The checkpoint "%s" is not a folder.' % folder)
+
+	conf = {'model': folder, 'threshold': threshold}
 
 	return MatchNodeLayaDecider('Laya', conf, logger = logger)
 
