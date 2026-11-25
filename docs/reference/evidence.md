@@ -23,6 +23,7 @@ Classes in submodules :
 
 See also :
 [Introduction](evidence_intro.md) ·
+[In detail](evidence_detail.md) ·
 [mge command line interface](evidence_cli.md) ·
 [Implementation ideas](evidence_how.md)
 
