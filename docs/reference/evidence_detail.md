@@ -37,9 +37,8 @@ and does not guess anything itself. Following this rule, this design adds these 
   something.
 - `decide_node` (later): choose among several candidates that match a mention.
 
-Each question can be answered by a rule-based Decider (e.g., taking the sentences of the paragraph as the description) or by a model:
-a classifier (e.g., Laya, JEV) for the binary questions, and a generative model for the descriptions. The configuration chooses
-which one.
+The binary questions are answered by a classifier (e.g., Laya, JEV), and the descriptions are written by a generative model. The
+configuration chooses the Decider of each question.
 
 **The EvidenceGraph stores evidence; it does not aggregate it.** Every node and edge keeps a list of evidence: the paragraph it comes
 from, the confidence score of the source and the confidence score of the model. Whoever uses the graph combines them as they need.
@@ -52,9 +51,9 @@ filtered by a compatible type. The vector index (ChromaDB) belongs to the Eviden
 queries.
 
 **Steps to get there:** (1) data and deterministic operations of nodes and edges, (2) vector index and `search_candidates`, (3)
-recall of the search, (4) `match_edge` and the new `extract_edges`, (5) `describe_node` and `update_description`, (6) `read_text`, (7)
-configuration, template and end-to-end example, (8) model Deciders for descriptions, (9) `decide_node`. Steps 1, 2 and 4 are
-independent of each other.
+recall of the search, (4) `match_edge` and the new `extract_edges`, (5) model Deciders for descriptions, (6) `adds_information` with
+Laya, (7) `read_text`, (8) configuration, template and end-to-end example, (9) `decide_node`. Steps 1, 2 and 4 are independent of
+each other.
 
 
 ## Concepts
@@ -162,7 +161,8 @@ mention (the same type, its ancestors or its descendants in the ontology):
   by type removes most of this problem (a school is not a candidate for a person). Two mentions of the same type in the same paragraph
   still share a ranking, but with a large enough N, telling them apart is the job of `match_node`, not of the search.
 
-N is chosen by measuring the **recall@N** of the search on the ZESHEL match_node dataset.
+N is chosen by measuring the **recall@N** of the search on a dataset of mentions in their paragraphs, each one linked to a known
+entity with a description.
 
 **Improving the search.** Asking `match_node` about candidates far beyond the top N (e.g., the top 50) shows where the right node was
 ranked when it was not in the top N. Spending tokens this way builds a dataset to improve the embeddings of the search.
@@ -225,13 +225,7 @@ The Formalizer exposes `describe_node` and `update_description` as capabilities.
 and only generates a new description when the answer is positive; otherwise it returns the description unchanged. If no Decider is
 configured for `adds_information`, it always generates.
 
-Each question can be answered by rules or by a model:
-
-| Question | Rules | Model |
-|----------|-------|-------|
-| `describe_node` | The sentences of the paragraph that contain the mention, or a template with the type and the mention | A generative model writes a short description from the paragraph |
-| `adds_information` | Whether the sentences of the paragraph that contain the mention are already in the description | A classifier (e.g., Laya, JEV) |
-| `update_description` | Appends the new sentences, up to the maximum length | A generative model merges the description with what the paragraph adds |
+`adds_information` is answered by a classifier (Laya), and `describe_node` and `update_description` by a generative model.
 
 Every description has a **maximum length** (in the configuration), whatever the Decider: a node must have a bounded size, and long
 descriptions dilute their embedding.
@@ -252,8 +246,8 @@ Its two errors do not cost the same:
 
 So its threshold leans towards "yes".
 
-There are no labelled examples for it yet. They can be generated on ZESHEL (several paragraphs per entity and its description) with a
-large LLM as a teacher, as was done for the types of `extract_nodes`.
+There are no labelled examples for it yet. They can be generated from a dataset of paragraphs about known entities and their
+descriptions, labelled by a large LLM as a teacher, to fine-tune Laya.
 
 #### Generative Deciders
 
@@ -286,7 +280,8 @@ confidence. It costs more than an update but does not drift, so it can be run fr
 on every merge.
 
 **Evaluation.** A description is good if it helps to find and match its node. Instead of scoring the text, we measure the recall@N of
-the search and the accuracy of `match_node` on ZESHEL with the generated descriptions instead of the original ones.
+the search and the accuracy of `match_node` with the generated descriptions instead of the original ones, on the dataset used to
+choose N.
 
 
 ## Edges
@@ -411,18 +406,17 @@ Source gets an optional `confidence_score`.
    `create_edge` / `merge_edge` without descriptions, the thresholds and the top K, and their tests.
 2. **Vector index and `search_candidates`.** ChromaDB in the EvidenceGraph, indexing on pilot, updates on every create and merge,
    persistence and the filter by type.
-3. **Recall of the search.** Measure recall@N on ZESHEL and choose N.
+3. **Recall of the search.** A dataset of mentions linked to known entities, and recall@N on it to choose N.
 4. **`match_edge` and the new `extract_edges`.** The question, a Decider for it, the new implementation of `extract_edges`, its dataset
    from `evaluation/formalizer/`, and a comparison with the GLiNER2 Decider with `run_eval.py`.
-5. **Descriptions with rules.** The questions `describe_node`, `adds_information` and `update_description`, the capability
-   `update_description` that chains them, a rule-based Decider for each, the maximum length and the `status` of the node.
-6. **`read_text`.** Nodes (`extract_nodes` → `search_candidates` → `match_node` → create or merge) and edges (`extract_edges` → create
+5. **Model Deciders for descriptions.** The questions `describe_node` and `update_description`, generative Deciders for them through
+   `litellm`, the maximum length, the `status` of the node, rewriting from the evidence, and their evaluation.
+6. **`adds_information` with Laya.** The question, its place in `update_description`, a dataset labelled by a large LLM, and a Laya
+   Decider fine-tuned on it.
+7. **`read_text`.** Nodes (`extract_nodes` → `search_candidates` → `match_node` → create or merge) and edges (`extract_edges` → create
    or merge), with the policy for errors.
-7. **Configuration and end-to-end.** The `agentics` keys, the `confidence_score` of the Sources, headers, the endpoint template and an
+8. **Configuration and end-to-end.** The `agentics` keys, the `confidence_score` of the Sources, headers, the endpoint template and an
    end-to-end example in the tutorial notebook.
-8. **Model Deciders for descriptions.** Generative Deciders for `describe_node` and `update_description` through `litellm`, a
-   classifier for `adds_information` with its dataset generated on ZESHEL, rewriting from the evidence, and their evaluation on
-   ZESHEL.
 9. **`decide_node`.** If the evaluation shows that the highest score is not reliable enough.
 
 Steps 1, 2 and 4 are independent and can be done in parallel.
