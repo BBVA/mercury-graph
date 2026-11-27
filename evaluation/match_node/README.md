@@ -7,7 +7,7 @@ This evaluation runs a Decider on a dataset of such pairs, saves its scores and 
 It is not part of the unit tests: it may download a model and its scores measure the model, they do not pass or fail. It needs Python
 3.8 or later (Laya needs 3.10 or later).
 
-- `data.py`: the datasets, in a common format.
+- `cases.py`: the datasets that can be evaluated: the cases of the Formalizer (below) or a `.jsonl` file.
 - `deciders.py`: the Deciders that can be evaluated.
 - `run.py`: runs a Decider on a dataset, saves the run and prints its scores.
 - `score.py`: scores saved runs again, without running any model: with another threshold, another breakdown, their errors or the
@@ -18,26 +18,15 @@ Run them from the root of the repository:
 
 ```bash
 python -m evaluation.match_node.run hard_cases --decider laya -v
+python -m evaluation.match_node.run data/match_node/zeshel_data/zeshel_test.jsonl --decider laya
 python -m evaluation.match_node.score evaluation/match_node/runs/<run>.jsonl --threshold 0.45 --errors
 python -m evaluation.match_node.score --history
 ```
 
 ## Datasets
 
-A dataset is a list of mentions, each one with the arguments of `match_node` for the mention and its candidates (the known instances
-it is compared with), each one with the expected answer (`gold`). A mention and one of its candidates make a pair. The `meta` of the
-mention and of the pair hold what the scores can be broken down by:
-
-```json
-{
-  "mention_id": "H03#1",
-  "meta": {"case": "H03", "status": "known"},
-  "mention": {"mention": "Ms. Ruiz", "type": "person|teacher", "texts": ["..."]},
-  "candidates": [
-    {"node": {"id": "person|teacher|Elena Ruiz", "description": "..."}, "gold": true, "meta": {"group": "positive exact"}}
-  ]
-}
-```
+A dataset is `cases`, `hard_cases` or a `.jsonl` file in the format of [the data of match_node](../../data/match_node/README.md), such
+as the datasets of ZESHEL.
 
 `cases` and `hard_cases` are the cases of the Formalizer (see [its README](../formalizer/README.md)), with the ontology and the known
 graph of the `mge new` template:
@@ -49,7 +38,9 @@ graph of the `mge new` template:
 - the mention is given with the type the text gives it (its `text_type` or, by default, the type of its `id`), so that the errors of
   `extract_nodes` do not count here, and with the text of the case,
 - every pair has a `group`: a positive written as the name of the instance (`positive exact`) or not (`positive different`), and a
-  negative that shares a word with the name of the instance (`negative homonym`) or not (`negative other`).
+  negative that shares a word with the name of the instance (`negative homonym`) or not (`negative other`),
+- the `status` of a mention is that of the case: a `new` mention has no expected candidate. The scores are broken down by `status`
+  and `group`.
 
 ## Deciders
 
@@ -81,10 +72,21 @@ per run with its main scores. `score.py` prints them again from the scores of th
 - `AUC`: the probability that a positive pair gets a higher score than a negative one, whatever the threshold (1 orders every pair
   right, 0.5 is chance): it tells whether the score is useful before it is calibrated,
 - `best threshold`: the threshold with the highest F1 on these pairs, and that F1,
-- `top-1`: the share of the mentions with an expected candidate whose expected candidate is the only one with the highest score.
+- `top-1`: the share of the mentions with an expected candidate whose expected candidate is the only one with the highest score,
+- `decision`: the share of the mentions whose final decision is right, as the Formalizer would take it. A mention is linked to its
+  candidate with the highest score if that score reaches the threshold and no other candidate has it (a tie at the top is a wrong
+  link), and it is new if no candidate reaches the threshold. A `known` mention (with an expected candidate) is right if it is linked
+  to it, and otherwise is a wrong link or missed; a `new` one is right if it is new, and otherwise is a wrong link. A wrong link
+  merges two instances in the graph, while a missed mention duplicates one. The scores give the share of known mentions `linked`
+  right and of new ones `detected`, with how many of each are wrong links or missed,
+- `best decision threshold`: the threshold, among the highest scores of the mentions, with the most right decisions, and their share.
+  It is the threshold to calibrate: it applies to the highest score of a mention, so it is usually not the best threshold of the
+  pairs.
 
-They are also broken down by the fields of `meta` of the dataset (`group` for `cases` and `hard_cases`) or of `--by` (e.g., `--by
-case`): how many pairs there are and get the right answer and, when there are both positives and negatives, `same` and `AUC`.
+They are also broken down by the fields of `meta` of the dataset (`status` and `group` for `cases` and `hard_cases`) or of `--by`
+(e.g., `--by case`): how many pairs there are and get the right answer, `same` and `AUC` when there are both positives and negatives,
+and top-1 and `decision` when the field is of the mentions (e.g., `category`) rather than of the pairs (e.g., `group`). `--errors`
+lists the pairs whose answer is wrong and the mentions whose decision is wrong.
 
 ## Results
 
@@ -98,3 +100,13 @@ With Laya 0.4.31, zero-shot, threshold 0.5:
 | `hard_cases` | `names` | 158 | 0.70 | 0.79 | 0.74 | 0.85 | 1.000 (0.78) | 0.70 |
 | `hard_cases` | `laya` | 158 | 0.81 | 0.74 | 0.78 | 0.92 | 0.444 (0.82) | 0.94 |
 | `hard_cases` | `laya/typed-decisions` | 158 | 0.78 | 0.85 | 0.82 | 0.92 | 0.524 (0.83) | 0.96 |
+
+On `zeshel_val` (500 mentions, 400 known and 100 new, with 16 candidates each), the decision of the mentions at threshold 0.5 and at
+the best decision threshold:
+
+| Decider | Pairs | AUC | Top-1 | Decision | Best decision threshold (decision) |
+|---|---|---|---|---|---|
+| `names` | 7,900 | 0.75 | 0.28 | 0.26 | 0.800 (0.31) |
+| `laya` | 7,900 | 0.73 | 0.23 | 0.19 | 0.842 (0.24) |
+
+Zero-shot, Laya ranks the candidates of ZESHEL no better than the names.

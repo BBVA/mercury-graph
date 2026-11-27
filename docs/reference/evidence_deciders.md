@@ -8,3 +8,4 @@ A [Decider](evidence.md#mercury.graph.evidence.Decider) is and Agentic that answ
 ::: mercury.graph.evidence.deciders.XEdgesGl2Decider
 ::: mercury.graph.evidence.deciders.MatchNodeJevDecider
 ::: mercury.graph.evidence.deciders.MatchNodeLayaDecider
+::: mercury.graph.evidence.deciders.MatchNodeLayaPrompter

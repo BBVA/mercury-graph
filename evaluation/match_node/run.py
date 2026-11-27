@@ -4,8 +4,8 @@ Run it from the root of the repository:
 
 	python -m evaluation.match_node.run [dataset] [--decider NAME] [--threshold T] [--out FILE] [-v]
 
-The dataset is "cases" unless another one is given (see data.py), and the Decider is "names" unless another one is given (see
-deciders.py). -v lists the pairs whose answer is wrong.
+The dataset is "cases" unless another one, or a .jsonl file, is given (see cases.py), and the Decider is "names" unless another one is
+given (see deciders.py). -v lists the pairs whose answer is wrong.
 
 The run is saved as a .jsonl file (by default, runs/<dataset>__<decider>__<date>.jsonl): its first line describes the run (the
 dataset and the hash of its file, the Decider and its configuration, the versions, the time, how many pairs the model cut and how many
@@ -18,23 +18,10 @@ import argparse, datetime, json, os, platform, subprocess, sys, time
 from importlib.metadata import PackageNotFoundError, version
 from typing import List, Optional
 
-from mercury.graph.evidence import AgenticGraph, Decider, DeciderState, Formalizer
+from mercury.graph.evidence import DeciderState, Formalizer
 
-from evaluation.match_node import data, deciders, metrics, score
-
-
-def build_formalizer(ontology: AgenticGraph, decider: Decider) -> Formalizer:
-	""" Returns a ready Formalizer that uses the ontology and answers match_node with the Decider. """
-
-	conf	   = {'ontology': 'ontology', 'match_node': decider.name}
-	formalizer = Formalizer(schema = 'Formalizer', extra_args = conf)
-	formalizer.tools['%s/%s' % (formalizer.id.split('/')[0], ontology.id)] = ontology
-
-	decider.pilot(DeciderState.READY.value)
-	formalizer.add_tool(decider)
-	formalizer.pilot(100)
-
-	return formalizer
+from data.match_node.dataset import Dataset, build_formalizer
+from evaluation.match_node import cases, deciders, metrics, score
 
 
 def is_cut(logger: List[dict], start: int) -> bool:
@@ -69,7 +56,7 @@ def decide(formalizer: Formalizer, logger: List[dict], mention: dict, candidate:
 	return result
 
 
-def run_mentions(formalizer: Formalizer, logger: List[dict], dataset: data.Dataset) -> List[dict]:
+def run_mentions(formalizer: Formalizer, logger: List[dict], dataset: Dataset) -> List[dict]:
 	""" Returns every mention of the dataset with the score of every candidate. """
 
 	scored = []
@@ -143,7 +130,7 @@ def save_run(path: str, run: dict, mentions: List[dict]) -> None:
 
 def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description = 'Runs match_node on a dataset and saves and prints its scores.')
-	parser.add_argument('dataset', nargs = '?', default = 'cases', help = 'the dataset: %s' % ', '.join(data.CASES))
+	parser.add_argument('dataset', nargs = '?', default = 'cases', help = 'the dataset: %s or a .jsonl file' % ', '.join(cases.CASES))
 	parser.add_argument('--decider', default = 'names', help = 'names, laya or laya/<subfolder>')
 	parser.add_argument('--threshold', type = float, default = deciders.THRESHOLD, help = 'the threshold of "same"')
 	parser.add_argument('--out', help = 'the file of the run (by default, in runs/)')
@@ -154,7 +141,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
 	args	= parse_args()
-	dataset = data.load(args.dataset)
+	dataset = cases.load(args.dataset)
 	logger	= []
 	decider = deciders.create(args.decider, args.threshold, logger)
 

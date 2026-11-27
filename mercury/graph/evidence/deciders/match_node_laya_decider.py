@@ -4,14 +4,65 @@ from mercury.graph.evidence import Decider, DeciderState
 from mercury.graph.evidence.agentic import AgenticRunInvalidRequest, AgenticRunInvalidState
 
 
+class MatchNodeLayaPrompter:
+	""" Creates what Laya is asked to answer `match_node`: the state (its input, a JSON object) and the question about it.
+
+	[`MatchNodeLayaDecider`][mercury.graph.evidence.deciders.MatchNodeLayaDecider] asks the model with it, and so must the data a
+	Laya model is fine-tuned on, so that the model is trained on the same input it is asked.
+
+	The state has the known instance (`id`, `description` and `names`, if any), the mention (`mention`, `type`, the
+	`type_definition` and `texts`, if any) and the `context` of the question, if any, in that order: if the state does not fit the
+	model, Laya cuts it from the end, so the context and then the texts are cut first. The question `same` asks for the probability
+	that the mention is the known instance.
+	"""
+
+	QUESTIONS = {
+		'same': {
+			'type': 'noul',
+			'instructions': 'Does the mention refer to the same real-world entity as the known instance?',
+			'criteria': {
+				'true': 'the mention refers to the known instance',
+				'false': 'the mention refers to a different entity'
+			}
+		}
+	}
+
+	@staticmethod
+	def create_state(arguments):
+		""" Returns the state of the arguments of `match_node`: the known instance, the mention and the context, in that order.
+
+		Args:
+			arguments (dict): the arguments of `match_node`: the `node` (the known instance), the `mention` and, optionally, the
+				`context`.
+
+		Returns:
+			(dict): the state that Laya decides on.
+		"""
+
+		node  = arguments['node']
+		known = {'id': node['id'], 'description': node['description']}
+		if 'names' in node:
+			known['names'] = node['names']
+
+		mention = arguments['mention']
+		found	= {'mention': mention['mention'], 'type': mention['type'], 'type_definition': mention.get('definition', None)}
+		if 'texts' in mention:
+			found['texts'] = mention['texts']
+
+		laya_state = {'known_instance': known, 'mention': found}
+		if 'context' in arguments:
+			laya_state['context'] = arguments['context']
+
+		return laya_state
+
+
 class MatchNodeLayaDecider(Decider):
 	""" A [`Decider`][mercury.graph.evidence.Decider] that answers `match_node` with a local Laya model: whether a mention is a known
 	instance.
 
-	Laya answers a yes/no question about a state (its input, a JSON object) with the probability of "yes". The state has the known
-	instance (`id`, `description` and `names`, if any), the mention (`mention`, `type`, the `type_definition` and `texts`, if any) and
-	the `context` of the question, if any, in that order: if the state does not fit the model, Laya cuts it from the end, so the context
-	and then the texts are cut first. A cut is logged.
+	Laya answers a yes/no question about a state (its input, a JSON object) with the probability of "yes". The state and the question
+	are created by [`MatchNodeLayaPrompter`][mercury.graph.evidence.deciders.MatchNodeLayaPrompter]. If the state does not fit the
+	model, Laya cuts it from the end, and the cut is logged.
 
 	The answer is `{"score": <the probability of yes>, "same": score >= threshold}`.
 
@@ -35,17 +86,6 @@ class MatchNodeLayaDecider(Decider):
 
 	MODEL_OPTIONS = ['subfolder', 'device', 'revision']	# Passed to laya.load() when they are not None.
 	THRESHOLD	  = 0.5
-
-	QUESTIONS = {
-		'same': {
-			'type': 'noul',
-			'instructions': 'Does the mention refer to the same real-world entity as the known instance?',
-			'criteria': {
-				'true': 'the mention refers to the known instance',
-				'false': 'the mention refers to a different entity'
-			}
-		}
-	}
 
 	def __init__(self, schema, extra_args, endpoint = None, logger = None):
 		super().__init__(schema, extra_args, endpoint = endpoint, logger = logger)
@@ -81,8 +121,8 @@ class MatchNodeLayaDecider(Decider):
 	def _answer(self, arguments):
 		""" Returns the score and the decision of the model for the mention and the known instance of the arguments. """
 
-		laya_state = self._create_laya_state(arguments)
-		result	   = self._model.predict(laya_state, self.QUESTIONS)
+		laya_state = MatchNodeLayaPrompter.create_state(arguments)
+		result	   = self._model.predict(laya_state, MatchNodeLayaPrompter.QUESTIONS)
 
 		self._log_cut(result)
 
@@ -90,26 +130,6 @@ class MatchNodeLayaDecider(Decider):
 		threshold = self.conf.get('threshold', self.THRESHOLD)
 
 		return {'score': score, 'same': score >= threshold}
-
-
-	def _create_laya_state(self, arguments):
-		""" Returns the state that Laya decides on (its input): the known instance, the mention and the context, in that order. """
-
-		node  = arguments['node']
-		known = {'id': node['id'], 'description': node['description']}
-		if 'names' in node:
-			known['names'] = node['names']
-
-		mention = arguments['mention']
-		found	= {'mention': mention['mention'], 'type': mention['type'], 'type_definition': mention.get('definition', None)}
-		if 'texts' in mention:
-			found['texts'] = mention['texts']
-
-		laya_state = {'known_instance': known, 'mention': found}
-		if 'context' in arguments:
-			laya_state['context'] = arguments['context']
-
-		return laya_state
 
 
 	def _log_cut(self, result):

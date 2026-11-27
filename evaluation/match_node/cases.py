@@ -1,80 +1,49 @@
-""" The datasets of match_node, in a common format.
+""" The datasets that can be evaluated: the cases of the Formalizer or a .jsonl file, in the format of data/match_node/dataset.py.
 
-A dataset is a list of mentions. Every mention has the arguments of match_node for the mention and its candidates, the known instances
-it is compared with, each one with the expected answer:
-
-	{
-		"mention_id": "H03#1",
-		"meta": {"case": "H03", "status": "known"},
-		"mention": {"mention": "Ms. Ruiz", "type": "person|teacher", "texts": ["..."]},
-		"candidates": [
-			{"node": {"id": "person|teacher|Elena Ruiz", "description": "..."}, "gold": true, "meta": {"group": "positive exact"}},
-			...
-		]
-	}
-
-A pair is a mention with one of its candidates. "meta" holds what the scores can be broken down by: of the mention (e.g., its case) or
-of the pair (e.g., its group).
-
-The datasets are "cases" and "hard_cases": the cases of the Formalizer (evaluation/formalizer/), with the ontology and the known graph
-of their context.
+"cases" and "hard_cases" are the cases of the Formalizer (evaluation/formalizer/), with the ontology and the known graph of their
+context: every mention of a case that is known or new is paired with every known instance of its root type.
 """
 
-import hashlib, os, re
-from typing import List, Optional, Set
+import os
+from typing import List
 
 import networkx as nx
 
-from mercury.graph.evidence import AgenticGraph
-
+from data.match_node.dataset import ROOT, Dataset, load_file, name_of, words
 from evaluation.formalizer.check_cases import HERE as CASES_DIR, Case, Entity, load_context, load_dataset, text_type
 
 
-ROOT	   = os.path.dirname(os.path.dirname(CASES_DIR))		# The root of the repository.
 CASES	   = ('cases', 'hard_cases')
 PRONOUNS   = {'he', 'she', 'it', 'they', 'him', 'her', 'them', 'his', 'its', 'their'}
-GROUPS	   = ('positive exact', 'positive different', 'negative homonym', 'negative other')
-BREAKDOWNS = ['group']
-
-
-class Dataset:
-	""" A dataset of match_node: its name, its file and the hash of that file, the ontology the Formalizer needs, the mentions and the
-	fields of "meta" its scores are broken down by by default. """
-
-	def __init__(self, name: str, path: str, ontology: AgenticGraph, mentions: List[dict], breakdowns: List[str]):
-		self.name		= name
-		self.path		= path
-		self.sha256		= sha256_of(path)
-		self.ontology	= ontology
-		self.mentions	= mentions
-		self.breakdowns = breakdowns
-
-
-	def pairs(self) -> int:
-		""" Returns the number of pairs of the dataset. """
-
-		total = 0
-		for mention in self.mentions:
-			total += len(mention['candidates'])
-
-		return total
-
-
-	def info(self) -> dict:
-		""" Returns what a run keeps of the dataset. """
-
-		path = os.path.relpath(self.path, ROOT)
-		info = {'name': self.name, 'path': path, 'sha256': self.sha256, 'mentions': len(self.mentions), 'pairs': self.pairs(),
-				'breakdowns': self.breakdowns}
-
-		return info
+BREAKDOWNS = ['status', 'group']
 
 
 def load(name: str) -> Dataset:
-	""" Returns the dataset of a name (see CASES). """
+	""" Returns the dataset of a name (one of CASES) or of the path of a .jsonl file. """
 
-	if name not in CASES:
-		raise ValueError('Unknown dataset "%s": it must be one of %s.' % (name, ', '.join(CASES)))
+	if name in CASES:
+		return load_cases(name)
+
+	if name.endswith('.jsonl') and os.path.isfile(name):
+		return load_file(name)
+
+	raise ValueError('Unknown dataset "%s": it must be one of %s or a .jsonl file.' % (name, ', '.join(CASES)))
+
+
+def source_of(info: dict) -> str:
+	""" Returns what load() needs to load again the dataset of a run (see Dataset.info()). """
+
+	if info['name'] in CASES:
+		return info['name']
+
+	return os.path.join(ROOT, info['path'])
+
+
+
+
+
+def load_cases(name: str) -> Dataset:
+	""" Returns the dataset of the cases of the Formalizer of a name (one of CASES). """
 
 	path	= os.path.join(CASES_DIR, name + '.json')
 	dataset = load_dataset(name + '.json')
@@ -88,25 +57,7 @@ def load(name: str) -> Dataset:
 	return Dataset(name, path, ontology, mentions, BREAKDOWNS)
 
 
-def sha256_of(path: str) -> str:
-	""" Returns the SHA-256 of a file. """
 
-	with open(path, 'rb') as f:
-		digest = hashlib.sha256(f.read()).hexdigest()
-
-	return digest
-
-
-def words(text: str) -> Set[str]:
-	""" Returns the words of a text, in lower case. """
-
-	return set(re.findall(r'\w+', text.lower()))
-
-
-def name_of(node_id: str) -> str:
-	""" Returns the name of a known instance: the last level of its id (e.g., "Elena Ruiz" for "person|teacher|Elena Ruiz"). """
-
-	return node_id.split('|')[-1]
 
 
 def root_of(concept: str) -> str:
@@ -198,13 +149,3 @@ def candidate_of(entity: Entity, instance: dict) -> dict:
 	meta = {'group': group_of(entity, instance)}
 
 	return {'node': node, 'gold': gold, 'meta': meta}
-
-
-def find(dataset: Dataset, mention_id: str) -> Optional[dict]:
-	""" Returns the mention of a dataset with an id, or None. """
-
-	for mention in dataset.mentions:
-		if mention['mention_id'] == mention_id:
-			return mention
-
-	return None
