@@ -100,3 +100,13 @@ With Laya 0.4.31, zero-shot, threshold 0.5:
 | `hard_cases` | `names` | 158 | 0.70 | 0.79 | 0.74 | 0.85 | 1.000 (0.78) | 0.70 |
 | `hard_cases` | `laya` | 158 | 0.81 | 0.74 | 0.78 | 0.92 | 0.444 (0.82) | 0.94 |
 | `hard_cases` | `laya/typed-decisions` | 158 | 0.78 | 0.85 | 0.82 | 0.92 | 0.524 (0.83) | 0.96 |
+
+On `zeshel_val` (500 mentions, 400 known and 100 new, with 16 candidates each), the decision of the mentions at threshold 0.5 and at
+the best decision threshold:
+
+| Decider | Pairs | AUC | Top-1 | Decision | Best decision threshold (decision) |
+|---|---|---|---|---|---|
+| `names` | 7,900 | 0.75 | 0.28 | 0.26 | 0.800 (0.31) |
+| `laya` | 7,900 | 0.73 | 0.23 | 0.19 | 0.842 (0.24) |
+
+Zero-shot, Laya ranks the candidates of ZESHEL no better than the names.
