@@ -113,7 +113,13 @@ def versions() -> dict:
 
 
 def label_of(decider_name: str) -> str:
-	""" Returns the Decider name as it is written in the name of a run (e.g., "laya-typed-decisions" for "laya/typed-decisions"). """
+	""" Returns the Decider name as it is written in the name of a run: "laya-typed-decisions" for "laya/typed-decisions", and
+	"laya-<checkpoint>" for "laya:<folder>", with the last folder of its path. """
+
+	if decider_name.startswith('laya:'):
+		folder = os.path.normpath(decider_name[len('laya:'):])
+
+		return 'laya-' + os.path.basename(folder)
 
 	return decider_name.replace('/', '-')
 
@@ -131,7 +137,7 @@ def save_run(path: str, run: dict, mentions: List[dict]) -> None:
 def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description = 'Runs match_node on a dataset and saves and prints its scores.')
 	parser.add_argument('dataset', nargs = '?', default = 'cases', help = 'the dataset: %s or a .jsonl file' % ', '.join(cases.CASES))
-	parser.add_argument('--decider', default = 'names', help = 'names, laya or laya/<subfolder>')
+	parser.add_argument('--decider', default = 'names', help = 'names, laya, laya/<subfolder> or laya:<folder>')
 	parser.add_argument('--threshold', type = float, default = deciders.THRESHOLD, help = 'the threshold of "same"')
 	parser.add_argument('--out', help = 'the file of the run (by default, in runs/)')
 	parser.add_argument('-v', action = 'store_true', help = 'list the pairs whose answer is wrong')

@@ -2,8 +2,8 @@
 
 `match_node` asks whether a mention is a known instance: the Formalizer gives its Decider the mention (with its type, the definition of
 the type and the texts where it is found) and a known instance (its id and description), and the Decider answers a score and `same`.
-This folder has the datasets of such pairs, which the evaluation (`evaluation/match_node/`) runs Deciders on, and the code to load
-them:
+This folder has the datasets of such pairs, which the evaluation (`evaluation/match_node/`) runs Deciders on and the training
+(`training/match_node/`) fine-tunes models on, and the code they share:
 
 - `dataset.py`: the format of the datasets, how to load them and the Formalizer that gives a Decider the arguments of their pairs.
 - `zeshel.py`: converts ZESHEL, a public dataset of entity linking, into datasets (see [ZESHEL](#zeshel)).
