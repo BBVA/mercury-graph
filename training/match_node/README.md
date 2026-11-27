@@ -56,3 +56,33 @@ never sees. The checkpoint keeps:
   scored with `python -m evaluation.match_node.score <file>`,
 - `best/` with `--keep-best`: the checkpoint of the epoch with the lowest log-loss in val, calibrated as the final one,
 - `finetune.json`: the arguments, the data, the versions, the time, the summary of the training and the best epoch.
+
+## Results
+
+`--epochs 6 --micro-batch 4 --checkpointing --keep-best` on `zeshel_train` (16,000 pairs of 2,000 mentions, 400 of them held out for
+calibration) takes about 7 hours on Apple Silicon. The curves of a run on the 500 mentions of `zeshel_val`:
+
+| Epoch | Log-loss | AUC | Top-1 | Best decision |
+|---|---|---|---|---|
+| 0 | 0.82 | 0.73 | 0.23 | 0.24 |
+| 1 | 0.63 | 0.93 | 0.70 | 0.63 |
+| 2 | 0.50 | 0.96 | 0.79 | 0.70 |
+| 3 | 0.43 | 0.96 | 0.84 | 0.73 |
+| 4 | 0.46 | 0.97 | 0.82 | 0.72 |
+| 5 | 0.52 | 0.97 | 0.82 | 0.73 |
+| 6 | 0.51 | 0.97 | 0.83 | 0.74 |
+
+After epoch 3 the log-loss rises while the ranking of the candidates does not get worse: the model grows overconfident, and the
+temperature fitted on the calibration slice is the highest one (5).
+
+The checkpoints of another run of the same command, with `--decider laya:<folder>`, at the best decision threshold of `zeshel_val`,
+which the cases are scored with too (their worlds are not those of ZESHEL):
+
+| Model | Threshold | `zeshel_val` | `cases` | `hard_cases` |
+|---|---|---|---|---|
+| `laya`, zero-shot | 0.842 | 0.24 | 0.34 | 0.29 |
+| `best/` (epoch 3) | 0.039 | 0.72 | 0.89 | 0.86 |
+| final (epoch 6) | 0.031 | 0.75 | 0.84 | 0.83 |
+
+Zero-shot, Laya is a generalist in English. To answer match_node on a domain or in another language, fine-tune it on pairs of that
+domain or language.
